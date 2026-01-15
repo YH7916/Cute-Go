@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameBoard } from './components/GameBoard';
 import { BoardState, Player, GameMode, GameType, BoardSize, Difficulty } from './types';
 import { createBoard, attemptMove, getAIMove, checkGomokuWin, calculateScore } from './utils/goLogic';
-import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check } from 'lucide-react';
+import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check, Wind } from 'lucide-react';
 import Peer, { DataConnection } from 'peerjs';
 
 // Types for P2P Messages
@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [gameType, setGameType] = useState<GameType>('Go');
   const [gameMode, setGameMode] = useState<GameMode>('PvP'); // PvP, PvAI, Online
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
+  const [showQi, setShowQi] = useState<boolean>(false); // New: Qi aura visualization
 
   // Game State
   const [board, setBoard] = useState<BoardState>(createBoard(9));
@@ -335,6 +336,7 @@ const App: React.FC = () => {
             onIntersectionClick={handleIntersectionClick}
             currentPlayer={currentPlayer}
             lastMove={lastMove}
+            showQi={showQi}
             />
         </div>
       </div>
@@ -431,6 +433,16 @@ const App: React.FC = () => {
                         </button>
                     ))}
                 </div>
+            </div>
+            
+            <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">特效</label>
+                <button 
+                    onClick={() => setShowQi(!showQi)}
+                    className={`w-full py-2 rounded-xl font-bold text-sm border-2 flex items-center justify-center gap-2 ${showQi ? 'border-purple-300 bg-purple-50 text-purple-600' : 'border-transparent bg-gray-100 text-gray-400'}`}
+                >
+                    <Wind size={16} /> {showQi ? '气场特效：开' : '气场特效：关'}
+                </button>
             </div>
 
             <button 

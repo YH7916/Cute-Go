@@ -9,6 +9,7 @@ interface GameBoardProps {
   onIntersectionClick: (x: number, y: number) => void;
   currentPlayer: Player;
   lastMove: { x: number, y: number } | null;
+  showQi: boolean;
 }
 
 type ConnectionType = 'ortho' | 'loose';
@@ -25,14 +26,15 @@ interface Connection {
 export const GameBoard: React.FC<GameBoardProps> = ({ 
   board, 
   onIntersectionClick, 
-  lastMove 
+  lastMove,
+  showQi
 }) => {
   const boardSize = board.length;
   // Dynamic cell size
   const CELL_SIZE = boardSize === 9 ? 40 : boardSize === 13 ? 30 : 22;
   const GRID_PADDING = boardSize === 19 ? 20 : 30;
   
-  const STONE_RADIUS = CELL_SIZE * 0.42; 
+  const STONE_RADIUS = CELL_SIZE * 0.45; // Slightly larger for better merging
   
   const boardPixelSize = (boardSize - 1) * CELL_SIZE + GRID_PADDING * 2;
 
@@ -67,27 +69,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-         const dx = e.touches[0].clientX - touchState.current.lastX;
-         const dy = e.touches[0].clientY - touchState.current.lastY;
-         
-         if (!touchState.current.isPanning && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-             touchState.current.isPanning = true;
-             touchState.current.blockClick = true;
-         }
+    if (e.touches.length !== 2) return;
 
-         if (touchState.current.isPanning) {
-             setTransform(prev => {
-                 const limit = (boardPixelSize * prev.scale) / 2;
-                 const newX = Math.max(-limit, Math.min(limit, prev.x + dx));
-                 const newY = Math.max(-limit, Math.min(limit, prev.y + dy));
-                 return { ...prev, x: newX, y: newY };
-             });
-             touchState.current.lastX = e.touches[0].clientX;
-             touchState.current.lastY = e.touches[0].clientY;
-         }
-
-    } else if (e.touches.length === 2) {
+    if (e.touches.length === 2) {
          const dx = e.touches[0].clientX - e.touches[1].clientX;
          const dy = e.touches[0].clientY - e.touches[1].clientY;
          const dist = Math.hypot(dx, dy);
@@ -95,7 +79,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
          if (touchState.current.startDist > 0) {
              const scaleFactor = dist / touchState.current.startDist;
              const newScale = Math.min(Math.max(1, touchState.current.startScale * scaleFactor), 3);
-             setTransform(prev => ({ ...prev, scale: newScale }));
+             
+             const panDx = e.touches[0].clientX - touchState.current.lastX;
+             const panDy = e.touches[0].clientY - touchState.current.lastY;
+             
+             touchState.current.lastX = e.touches[0].clientX;
+             touchState.current.lastY = e.touches[0].clientY;
+
+             setTransform(prev => {
+                 const limit = (boardPixelSize * prev.scale) / 2;
+                 const newX = Math.max(-limit, Math.min(limit, prev.x + panDx));
+                 const newY = Math.max(-limit, Math.min(limit, prev.y + panDy));
+                 return { ...prev, x: newX, y: newY, scale: newScale };
+             });
          }
     }
   };
@@ -117,7 +113,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         const isValid = (cx: number, cy: number) => cx >= 0 && cx < boardSize && cy >= 0 && cy < boardSize;
 
         // 1. ORTHO CONNECTIONS (The Snake Body)
-        // Always add these, they form the solid body
         if(isValid(x+1, y)) {
            const right = board[y][x+1];
            if(right && right.color === stone.color) {
@@ -132,10 +127,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         }
 
         // 2. LOOSE CONNECTIONS (The Silk)
-        // Strict Pruning Rule: 
-        // Only draw a loose connection if there are NO other friendly stones in the bounding box
-        // defined by start and end points. If there's an intermediate stone, the eye already connects them.
-
         const addLooseIfIsolated = (dx: number, dy: number) => {
             const tx = x + dx;
             const ty = y + dy;
@@ -144,7 +135,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             const target = board[ty][tx];
             if (!target || target.color !== stone.color) return;
 
-            // Check Bounding Box for "Bridge" stones
             const minX = Math.min(x, tx);
             const maxX = Math.max(x, tx);
             const minY = Math.min(y, ty);
@@ -154,11 +144,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             
             for (let by = minY; by <= maxY; by++) {
                 for (let bx = minX; bx <= maxX; bx++) {
-                    // Skip start and end points
                     if ((bx === x && by === y) || (bx === tx && by === ty)) continue;
-                    
                     const midStone = board[by][bx];
-                    // If we find ANY friendly stone in the box, we assume visual connection exists
                     if (midStone && midStone.color === stone.color) {
                         hasBridge = true;
                         break;
@@ -167,12 +154,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 if (hasBridge) break;
             }
 
-            // Cut Check: If the path is blocked by TWO opponents (e.g. Kosumi cut), don't draw
-            // Simplified cut check for Diagonal (1,1)
             let isCut = false;
             if (Math.abs(dx) === 1 && Math.abs(dy) === 1) {
-                 const s1 = board[y][tx]; // (x+1, y)
-                 const s2 = board[ty][x]; // (x, y+1)
+                 const s1 = board[y][tx]; 
+                 const s2 = board[ty][x]; 
                  if (s1?.color === opColor && s2?.color === opColor) isCut = true;
             }
 
@@ -181,15 +166,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             }
         };
 
-        // A. Diagonal (Kosumi)
         addLooseIfIsolated(1, 1);
         addLooseIfIsolated(-1, 1);
-
-        // B. One-Point Jump (Tobikomi)
         addLooseIfIsolated(2, 0);
         addLooseIfIsolated(0, 2);
-
-        // C. Knight's Move (Keima)
         addLooseIfIsolated(1, 2);
         addLooseIfIsolated(2, 1);
         addLooseIfIsolated(-1, 2);
@@ -241,11 +221,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         const isHorizontalLine = (maxY === minY) && count > 1;
         const isVerticalLine = (maxX === minX) && count > 1;
 
-        if (isHorizontalLine) {
-            const edgeStone = sortedStones[sortedStones.length - 1];
-            finalX = edgeStone.x;
-            finalY = edgeStone.y;
-        } else if (isVerticalLine) {
+        if (isHorizontalLine || isVerticalLine) {
             const edgeStone = sortedStones[sortedStones.length - 1];
             finalX = edgeStone.x;
             finalY = edgeStone.y;
@@ -334,73 +310,90 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     return hits;
   };
 
+  const renderQiLayer = () => {
+      if (!showQi) return null;
+      return (
+        <g className="animate-pulse-slow">
+            {stones.map(s => {
+                const cx = GRID_PADDING + s.x * CELL_SIZE;
+                const cy = GRID_PADDING + s.y * CELL_SIZE;
+                const isBlack = s.color === 'black';
+                const fillColor = isBlack ? '#4a148c' : '#e0f7fa';
+                const opacity = isBlack ? 0.35 : 0.5;
+
+                return (
+                    <circle
+                        key={`qi-${s.id}`}
+                        cx={cx}
+                        cy={cy}
+                        r={CELL_SIZE * 0.8}
+                        fill={fillColor}
+                        opacity={opacity}
+                        filter="url(#qi-blur)"
+                    />
+                )
+            })}
+        </g>
+      )
+  };
+
   // 1. Renders the solid, merged body (Stones + Ortho Connections)
-  // Uses Goo Filter
-  const renderSolidBody = (color: Player, mode: 'outline' | 'fill') => {
-    const isOutline = mode === 'outline';
+  // New: Uses "jelly-black" or "jelly-white" filters for 3D Specular Highlight + Soft Shadow
+  const renderSolidBody = (color: Player) => {
     const baseColor = color === 'black' ? '#2a2a2a' : '#f0f0f0';
-    const strokeColor = isOutline ? '#000000' : baseColor;
-    const fillColor = isOutline ? '#000000' : baseColor;
-    
-    // Scale parameters for outline
-    const outlineThickness = 3; 
-    const radiusMultiplier = isOutline ? 1 : 1;
-    const radiusAdd = isOutline ? 2 : 0; 
-    
-    const orthoWidth = CELL_SIZE * 0.88;
+    const filterId = color === 'black' ? 'url(#jelly-black)' : 'url(#jelly-white)';
+    const orthoWidth = CELL_SIZE * 0.95; // Thicker for better merging
 
     return (
-        <g filter={isOutline ? 'url(#goo-outline)' : 'url(#goo-fill)'}>
-           {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => {
-              const width = isOutline ? orthoWidth + (outlineThickness * 2) : orthoWidth;
-
-              return (
+        <g filter={filterId}>
+           {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => (
                 <line 
-                    key={`${color}-${mode}-ortho-${i}`}
+                    key={`${color}-body-ortho-${i}`}
                     x1={GRID_PADDING + c.x1 * CELL_SIZE}
                     y1={GRID_PADDING + c.y1 * CELL_SIZE}
                     x2={GRID_PADDING + c.x2 * CELL_SIZE}
                     y2={GRID_PADDING + c.y2 * CELL_SIZE}
-                    stroke={strokeColor}
-                    strokeWidth={width}
+                    stroke={baseColor}
+                    strokeWidth={orthoWidth}
                     strokeLinecap="round"
                 />
-              );
-           })}
+           ))}
            {stones.filter(s => s.color === color).map(s => (
             <circle
-              key={`${color}-${mode}-base-${s.id}`}
+              key={`${color}-body-base-${s.id}`}
               cx={GRID_PADDING + s.x * CELL_SIZE}
               cy={GRID_PADDING + s.y * CELL_SIZE}
-              r={(STONE_RADIUS * radiusMultiplier) + radiusAdd}
-              fill={fillColor}
-              className={mode === 'fill' ? "stone-enter" : ""}
+              r={STONE_RADIUS}
+              fill={baseColor}
+              className="stone-enter"
             />
           ))}
         </g>
     );
   };
 
-  // 2. Renders the loose silk connections (Loose Connections only)
-  // NO Filter, No Outline, Transparent, Thin
+  // 2. Renders the loose silk connections 
+  // Improved: Groups all lines BEFORE opacity to avoid dark intersections
+  // Improved: "Breathe" animation is now strokewidth change before Goo filter, creating liquid flow
   const renderLooseSilk = (color: Player) => {
     const baseColor = color === 'black' ? '#2a2a2a' : '#f0f0f0';
     
+    // Group opacity is applied to the WHOLE liquid layer, solving intersection darkness
     return (
-        <g>
-           {connections.filter(c => c.color === color && c.type === 'loose').map((c, i) => (
-                <line 
-                    key={`${color}-loose-${i}`}
-                    x1={GRID_PADDING + c.x1 * CELL_SIZE}
-                    y1={GRID_PADDING + c.y1 * CELL_SIZE}
-                    x2={GRID_PADDING + c.x2 * CELL_SIZE}
-                    y2={GRID_PADDING + c.y2 * CELL_SIZE}
-                    stroke={baseColor}
-                    strokeWidth={CELL_SIZE * 0.1} // Thin silk
-                    strokeLinecap="round"
-                    strokeOpacity={0.8} // Translucent
-                />
-           ))}
+        <g opacity="0.65" filter="url(#goo-silk)">
+           <g className="animate-liquid-flow">
+             {connections.filter(c => c.color === color && c.type === 'loose').map((c, i) => (
+                  <line 
+                      key={`${color}-loose-${i}`}
+                      x1={GRID_PADDING + c.x1 * CELL_SIZE}
+                      y1={GRID_PADDING + c.y1 * CELL_SIZE}
+                      x2={GRID_PADDING + c.x2 * CELL_SIZE}
+                      y2={GRID_PADDING + c.y2 * CELL_SIZE}
+                      stroke={baseColor}
+                      strokeLinecap="round"
+                  />
+             ))}
+           </g>
         </g>
     );
   };
@@ -417,6 +410,27 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             }, 100);
         }}
     >
+      <style>{`
+        @keyframes pulseSlow {
+            0%, 100% { opacity: 0.3; transform: scale(0.95); }
+            50% { opacity: 0.6; transform: scale(1.05); }
+        }
+        .animate-pulse-slow {
+            animation: pulseSlow 4s ease-in-out infinite;
+            transform-origin: center;
+        }
+        @keyframes liquidFlow {
+            /* 
+               Varying stroke width fed into a Threshold filter creates a "peristaltic" pumping effect 
+               visually resembling liquid flowing through a tube.
+            */
+            0%, 100% { stroke-width: ${CELL_SIZE * 0.12}px; }
+            50% { stroke-width: ${CELL_SIZE * 0.22}px; }
+        }
+        .animate-liquid-flow line {
+            animation: liquidFlow 2.5s ease-in-out infinite;
+        }
+      `}</style>
       <div 
         className="w-full h-full relative transition-transform duration-75 ease-linear origin-center"
         style={{
@@ -438,35 +452,78 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             style={{ maxWidth: '100%', maxHeight: '100%' }}
         >
             <defs>
-                <filter id="goo-fill">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.08} result="blur" />
-                    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
+                {/* --- SHARED LIGHTING DEFINITIONS --- */}
+                
+                {/* 1. SILK GOO: High blur + High contrast = Liquid Blob */}
+                <filter id="goo-silk">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.15} result="blur" />
+                    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 25 -10" result="goo" />
                     <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
                 </filter>
-                
-                <filter id="goo-outline">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.08} result="blur" />
-                    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
-                    <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+
+                {/* 2. JELLY BLACK: 3D look for Black stones */}
+                <filter id="jelly-black" x="-50%" y="-50%" width="200%" height="200%">
+                    {/* A. Create Blob Shape */}
+                    <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.1} result="blur" />
+                    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="blob" />
+                    
+                    {/* B. Specular Highlight (The "Wet" look) */}
+                    <feGaussianBlur in="blob" stdDeviation="2" result="blurBlob"/>
+                    <feSpecularLighting in="blurBlob" surfaceScale="5" specularConstant="0.8" specularExponent="20" lightingColor="#ffffff" result="specular">
+                        <fePointLight x="-500" y="-500" z="300" />
+                    </feSpecularLighting>
+                    <feComposite in="specular" in2="blob" operator="in" result="specularInBlob"/>
+
+                    {/* C. Soft Drop Shadow (Instead of black border) */}
+                    <feDropShadow dx="0" dy={CELL_SIZE * 0.1} stdDeviation={CELL_SIZE * 0.05} floodColor="#000000" floodOpacity="0.5" in="blob" result="shadow" />
+
+                    {/* D. Composition: Shadow -> Blob -> Highlight */}
+                    <feComposite in="shadow" in2="blob" operator="over" result="shadowedBlob"/>
+                    <feComposite in="specularInBlob" in2="shadowedBlob" operator="over" />
+                </filter>
+
+                {/* 3. JELLY WHITE: 3D look for White stones */}
+                <filter id="jelly-white" x="-50%" y="-50%" width="200%" height="200%">
+                    {/* A. Create Blob Shape */}
+                    <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.1} result="blur" />
+                    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="blob" />
+                    
+                    {/* B. Specular Highlight (The "Wet" look) */}
+                    <feGaussianBlur in="blob" stdDeviation="2" result="blurBlob"/>
+                    <feSpecularLighting in="blurBlob" surfaceScale="5" specularConstant="1.2" specularExponent="15" lightingColor="#ffffff" result="specular">
+                        <fePointLight x="-500" y="-500" z="300" />
+                    </feSpecularLighting>
+                    <feComposite in="specular" in2="blob" operator="in" result="specularInBlob"/>
+
+                    {/* C. Soft Drop Shadow */}
+                    <feDropShadow dx="0" dy={CELL_SIZE * 0.1} stdDeviation={CELL_SIZE * 0.05} floodColor="#5c4033" floodOpacity="0.3" in="blob" result="shadow" />
+
+                    {/* D. Composition */}
+                    <feComposite in="shadow" in2="blob" operator="over" result="shadowedBlob"/>
+                    <feComposite in="specularInBlob" in2="shadowedBlob" operator="over" />
+                </filter>
+
+                {/* QI BLUR */}
+                <filter id="qi-blur">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.3} />
                 </filter>
             </defs>
+            
+            {/* Layer 0: Qi (Aura) - Below Grid */}
+            {renderQiLayer()}
 
             <g>{renderGridLines()}</g>
             {starPoints.map(([x, y], i) => (
                 <circle key={`star-${i}`} cx={GRID_PADDING + x * CELL_SIZE} cy={GRID_PADDING + y * CELL_SIZE} r={boardSize > 13 ? 2 : 3} fill="#5c4033" />
             ))}
 
-            {/* Layer 1: Loose Silk (Behind main body, no border, translucent) */}
+            {/* Layer 1: Loose Silk (Liquid) */}
             {renderLooseSilk('black')}
             {renderLooseSilk('white')}
 
-            {/* Layer 2: Borders (Goo Filtered) */}
-            {renderSolidBody('black', 'outline')}
-            {renderSolidBody('white', 'outline')}
-
-            {/* Layer 3: Main Body Fill (Goo Filtered) */}
-            {renderSolidBody('black', 'fill')}
-            {renderSolidBody('white', 'fill')}
+            {/* Layer 2: Main Body (Jelly 3D) */}
+            {renderSolidBody('black')}
+            {renderSolidBody('white')}
 
             <g>
             {groupFaces.map(face => (
