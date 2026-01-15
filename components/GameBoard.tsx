@@ -28,12 +28,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   lastMove 
 }) => {
   const boardSize = board.length;
-  // Dynamic cell size (Internal coordinate system units)
+  // Dynamic cell size
   const CELL_SIZE = boardSize === 9 ? 40 : boardSize === 13 ? 30 : 22;
-  // Reduced padding for larger boards to maximize space on small screens
   const GRID_PADDING = boardSize === 19 ? 20 : 30;
-  const STONE_RADIUS = CELL_SIZE * 0.48; 
-
+  
+  const STONE_RADIUS = CELL_SIZE * 0.42; 
+  
   const boardPixelSize = (boardSize - 1) * CELL_SIZE + GRID_PADDING * 2;
 
   // --- ZOOM & PAN STATE ---
@@ -47,7 +47,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     blockClick: false
   });
 
-  // Reset zoom when board size changes
   useEffect(() => {
     setTransform({ scale: 1, x: 0, y: 0 });
   }, [boardSize]);
@@ -115,19 +114,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         const stone = board[y][x];
         if(!stone) continue;
         const opColor = stone.color === 'black' ? 'white' : 'black';
-
-        // Helper to check valid coordinate
         const isValid = (cx: number, cy: number) => cx >= 0 && cx < boardSize && cy >= 0 && cy < boardSize;
 
-        // 1. TIGHT CONNECTIONS (Orthogonal) - Right & Down
-        // Right
+        // 1. ORTHO CONNECTIONS (The Snake Body)
+        // Always add these, they form the solid body
         if(isValid(x+1, y)) {
            const right = board[y][x+1];
            if(right && right.color === stone.color) {
              lines.push({ x1: x, y1: y, x2: x+1, y2: y, color: stone.color, type: 'ortho' });
            }
         }
-        // Bottom
         if(isValid(x, y+1)) {
            const bottom = board[y+1][x];
            if(bottom && bottom.color === stone.color) {
@@ -135,73 +131,69 @@ export const GameBoard: React.FC<GameBoardProps> = ({
            }
         }
 
-        // 2. LOOSE CONNECTIONS (Diagonal, Jumps & Knight's Moves)
-        // Only look "forward" (Right, Down-Right, Down-Left, Down) to avoid duplicates
+        // 2. LOOSE CONNECTIONS (The Silk)
+        // Strict Pruning Rule: 
+        // Only draw a loose connection if there are NO other friendly stones in the bounding box
+        // defined by start and end points. If there's an intermediate stone, the eye already connects them.
 
-        // A. Diagonal (Kosumi) - Down Right
-        if (isValid(x+1, y+1)) {
-            const target = board[y+1][x+1];
-            if (target && target.color === stone.color) {
-                // Check if cut by TWO opposing stones (classic cross-cut)
-                // If board[y][x+1] AND board[y+1][x] are opponents, line is broken visually
-                const right = board[y][x+1];
-                const down = board[y+1][x];
-                const isCut = right && right.color === opColor && down && down.color === opColor;
-                
-                if (!isCut) {
-                    lines.push({ x1: x, y1: y, x2: x+1, y2: y+1, color: stone.color, type: 'loose' });
-                }
-            }
-        }
-        // B. Diagonal (Kosumi) - Down Left
-        if (isValid(x-1, y+1)) {
-            const target = board[y+1][x-1];
-            if (target && target.color === stone.color) {
-                const left = board[y][x-1];
-                const down = board[y+1][x];
-                const isCut = left && left.color === opColor && down && down.color === opColor;
-                
-                if (!isCut) {
-                    lines.push({ x1: x, y1: y, x2: x-1, y2: y+1, color: stone.color, type: 'loose' });
-                }
-            }
-        }
+        const addLooseIfIsolated = (dx: number, dy: number) => {
+            const tx = x + dx;
+            const ty = y + dy;
+            
+            if (!isValid(tx, ty)) return;
+            const target = board[ty][tx];
+            if (!target || target.color !== stone.color) return;
 
-        // C. One-Point Jump (Tobikomi) - Right
-        if (isValid(x+2, y)) {
-            const target = board[y][x+2];
-            const mid = board[y][x+1];
-            if (target && target.color === stone.color && (!mid || mid.color !== opColor)) {
-                if (!mid) lines.push({ x1: x, y1: y, x2: x+2, y2: y, color: stone.color, type: 'loose' });
-            }
-        }
-        // D. One-Point Jump - Down
-        if (isValid(x, y+2)) {
-            const target = board[y+2][x];
-            const mid = board[y+1][x];
-            if (target && target.color === stone.color && (!mid || mid.color !== opColor)) {
-                if (!mid) lines.push({ x1: x, y1: y, x2: x, y2: y+2, color: stone.color, type: 'loose' });
-            }
-        }
+            // Check Bounding Box for "Bridge" stones
+            const minX = Math.min(x, tx);
+            const maxX = Math.max(x, tx);
+            const minY = Math.min(y, ty);
+            const maxY = Math.max(y, ty);
 
-        // E. Knight's Move (Keima)
-        const checkKnight = (dx: number, dy: number, cutX: number, cutY: number) => {
-            if (isValid(x + dx, y + dy)) {
-                const target = board[y + dy][x + dx];
-                const cutter = isValid(x + cutX, y + cutY) ? board[y + cutY][x + cutX] : null;
-                
-                if (target && target.color === stone.color) {
-                    if (!cutter || cutter.color !== opColor) {
-                         lines.push({ x1: x, y1: y, x2: x + dx, y2: y + dy, color: stone.color, type: 'loose' });
+            let hasBridge = false;
+            
+            for (let by = minY; by <= maxY; by++) {
+                for (let bx = minX; bx <= maxX; bx++) {
+                    // Skip start and end points
+                    if ((bx === x && by === y) || (bx === tx && by === ty)) continue;
+                    
+                    const midStone = board[by][bx];
+                    // If we find ANY friendly stone in the box, we assume visual connection exists
+                    if (midStone && midStone.color === stone.color) {
+                        hasBridge = true;
+                        break;
                     }
                 }
+                if (hasBridge) break;
             }
-        }
 
-        checkKnight(1, 2, 0, 1);
-        checkKnight(2, 1, 1, 0);
-        checkKnight(-1, 2, 0, 1);
-        checkKnight(-2, 1, -1, 0);
+            // Cut Check: If the path is blocked by TWO opponents (e.g. Kosumi cut), don't draw
+            // Simplified cut check for Diagonal (1,1)
+            let isCut = false;
+            if (Math.abs(dx) === 1 && Math.abs(dy) === 1) {
+                 const s1 = board[y][tx]; // (x+1, y)
+                 const s2 = board[ty][x]; // (x, y+1)
+                 if (s1?.color === opColor && s2?.color === opColor) isCut = true;
+            }
+
+            if (!hasBridge && !isCut) {
+                lines.push({ x1: x, y1: y, x2: tx, y2: ty, color: stone.color, type: 'loose' });
+            }
+        };
+
+        // A. Diagonal (Kosumi)
+        addLooseIfIsolated(1, 1);
+        addLooseIfIsolated(-1, 1);
+
+        // B. One-Point Jump (Tobikomi)
+        addLooseIfIsolated(2, 0);
+        addLooseIfIsolated(0, 2);
+
+        // C. Knight's Move (Keima)
+        addLooseIfIsolated(1, 2);
+        addLooseIfIsolated(2, 1);
+        addLooseIfIsolated(-1, 2);
+        addLooseIfIsolated(-2, 1);
       }
     }
     return lines;
@@ -215,23 +207,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     return flat;
   }, [board]);
 
-  // Calculate Group Faces placement
   const groupFaces = useMemo(() => {
     const groups = getAllGroups(board);
     return groups.map(group => {
-        // 1. Calculate Geometric Centroid
         let sumX = 0;
         let sumY = 0;
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
         
-        // Use a stable sort to ensure deterministic behavior for "last" stone
         const sortedStones = [...group.stones].sort((a, b) => {
             if (a.y !== b.y) return a.y - b.y;
             return a.x - b.x;
         });
 
-        // Generate ID
         const groupKey = sortedStones.map(s => s.id).join('-');
 
         sortedStones.forEach(s => {
@@ -250,26 +238,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         let finalX = centerX;
         let finalY = centerY;
 
-        // 2. Determine Face Placement Logic
         const isHorizontalLine = (maxY === minY) && count > 1;
         const isVerticalLine = (maxX === minX) && count > 1;
 
         if (isHorizontalLine) {
-            // Render on the right-most stone (Tail/Head)
             const edgeStone = sortedStones[sortedStones.length - 1];
             finalX = edgeStone.x;
             finalY = edgeStone.y;
         } else if (isVerticalLine) {
-            // Render on the bottom-most stone
             const edgeStone = sortedStones[sortedStones.length - 1];
             finalX = edgeStone.x;
             finalY = edgeStone.y;
         } else {
-            // Irregular shape: Find the stone closest to the geometric center
-            // This prevents the face from floating in empty space (void)
             let closestDist = Infinity;
             let closestStone = sortedStones[0];
-
             sortedStones.forEach(s => {
                 const dist = Math.pow(s.x - centerX, 2) + Math.pow(s.y - centerY, 2);
                 if (dist < closestDist) {
@@ -281,7 +263,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             finalY = closestStone.y;
         }
 
-        // Determine mood
         let mood: 'happy' | 'neutral' | 'worried' = 'happy';
         if (group.liberties === 1) mood = 'worried';
         else if (group.liberties <= 3) mood = 'neutral';
@@ -353,26 +334,34 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     return hits;
   };
 
-  const renderStoneLayer = (color: Player) => {
-    const filterId = color === 'black' ? 'goo-black' : 'goo-white';
-    const fill = color === 'black' ? '#2a2a2a' : '#f0f0f0';
-    const stroke = fill;
+  // 1. Renders the solid, merged body (Stones + Ortho Connections)
+  // Uses Goo Filter
+  const renderSolidBody = (color: Player, mode: 'outline' | 'fill') => {
+    const isOutline = mode === 'outline';
+    const baseColor = color === 'black' ? '#2a2a2a' : '#f0f0f0';
+    const strokeColor = isOutline ? '#000000' : baseColor;
+    const fillColor = isOutline ? '#000000' : baseColor;
     
+    // Scale parameters for outline
+    const outlineThickness = 3; 
+    const radiusMultiplier = isOutline ? 1 : 1;
+    const radiusAdd = isOutline ? 2 : 0; 
+    
+    const orthoWidth = CELL_SIZE * 0.88;
+
     return (
-        <g filter={`url(#${filterId})`}>
-           {connections.filter(c => c.color === color).map((c, i) => {
-              // Capsule logic: Make Ortho connections very thick to merge properly
-              let width = CELL_SIZE * 0.90; // Almost full width to create capsule
-              if (c.type === 'loose') width = CELL_SIZE * 0.18; // Thicker silk for better visibility
+        <g filter={isOutline ? 'url(#goo-outline)' : 'url(#goo-fill)'}>
+           {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => {
+              const width = isOutline ? orthoWidth + (outlineThickness * 2) : orthoWidth;
 
               return (
                 <line 
-                    key={`${color}-conn-${i}`}
+                    key={`${color}-${mode}-ortho-${i}`}
                     x1={GRID_PADDING + c.x1 * CELL_SIZE}
                     y1={GRID_PADDING + c.y1 * CELL_SIZE}
                     x2={GRID_PADDING + c.x2 * CELL_SIZE}
                     y2={GRID_PADDING + c.y2 * CELL_SIZE}
-                    stroke={stroke}
+                    stroke={strokeColor}
                     strokeWidth={width}
                     strokeLinecap="round"
                 />
@@ -380,14 +369,38 @@ export const GameBoard: React.FC<GameBoardProps> = ({
            })}
            {stones.filter(s => s.color === color).map(s => (
             <circle
-              key={`${color}-base-${s.id}`}
+              key={`${color}-${mode}-base-${s.id}`}
               cx={GRID_PADDING + s.x * CELL_SIZE}
               cy={GRID_PADDING + s.y * CELL_SIZE}
-              r={STONE_RADIUS} 
-              fill={fill}
-              className="stone-enter" 
+              r={(STONE_RADIUS * radiusMultiplier) + radiusAdd}
+              fill={fillColor}
+              className={mode === 'fill' ? "stone-enter" : ""}
             />
           ))}
+        </g>
+    );
+  };
+
+  // 2. Renders the loose silk connections (Loose Connections only)
+  // NO Filter, No Outline, Transparent, Thin
+  const renderLooseSilk = (color: Player) => {
+    const baseColor = color === 'black' ? '#2a2a2a' : '#f0f0f0';
+    
+    return (
+        <g>
+           {connections.filter(c => c.color === color && c.type === 'loose').map((c, i) => (
+                <line 
+                    key={`${color}-loose-${i}`}
+                    x1={GRID_PADDING + c.x1 * CELL_SIZE}
+                    y1={GRID_PADDING + c.y1 * CELL_SIZE}
+                    x2={GRID_PADDING + c.x2 * CELL_SIZE}
+                    y2={GRID_PADDING + c.y2 * CELL_SIZE}
+                    stroke={baseColor}
+                    strokeWidth={CELL_SIZE * 0.1} // Thin silk
+                    strokeLinecap="round"
+                    strokeOpacity={0.8} // Translucent
+                />
+           ))}
         </g>
     );
   };
@@ -425,16 +438,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             style={{ maxWidth: '100%', maxHeight: '100%' }}
         >
             <defs>
-            <filter id="goo-black">
-                <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.15} result="blur" />
-                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
-                <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
-            </filter>
-            <filter id="goo-white">
-                <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.15} result="blur" />
-                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
-                <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
-            </filter>
+                <filter id="goo-fill">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.08} result="blur" />
+                    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
+                    <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+                </filter>
+                
+                <filter id="goo-outline">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.08} result="blur" />
+                    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
+                    <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+                </filter>
             </defs>
 
             <g>{renderGridLines()}</g>
@@ -442,8 +456,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <circle key={`star-${i}`} cx={GRID_PADDING + x * CELL_SIZE} cy={GRID_PADDING + y * CELL_SIZE} r={boardSize > 13 ? 2 : 3} fill="#5c4033" />
             ))}
 
-            {renderStoneLayer('black')}
-            {renderStoneLayer('white')}
+            {/* Layer 1: Loose Silk (Behind main body, no border, translucent) */}
+            {renderLooseSilk('black')}
+            {renderLooseSilk('white')}
+
+            {/* Layer 2: Borders (Goo Filtered) */}
+            {renderSolidBody('black', 'outline')}
+            {renderSolidBody('white', 'outline')}
+
+            {/* Layer 3: Main Body Fill (Goo Filtered) */}
+            {renderSolidBody('black', 'fill')}
+            {renderSolidBody('white', 'fill')}
 
             <g>
             {groupFaces.map(face => (
@@ -455,11 +478,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         transform: `translate(${GRID_PADDING + face.x * CELL_SIZE}px, ${GRID_PADDING + face.y * CELL_SIZE}px)`
                     }}
                 >
-                    {/* Background glow for better visibility */}
-                    <circle 
-                        r={CELL_SIZE * 0.15 * face.scale} 
-                        fill="rgba(255,255,255,0.15)" 
-                    />
                     <g transform={`translate(${-CELL_SIZE/2}, ${-CELL_SIZE/2})`}>
                         <StoneFace
                             x={0}
