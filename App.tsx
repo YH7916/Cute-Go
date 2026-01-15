@@ -133,10 +133,6 @@ const App: React.FC = () => {
   // Refactored applyMove to separate UI click from Logic
   const applyMove = useCallback((x: number, y: number, isRemote: boolean = false) => {
       setBoard(prevBoard => {
-         // Need current state inside updater or use refs? 
-         // For simplicity, rely on closure state but be careful. 
-         // In a real app, useReducer is better. 
-         // Re-calculating attemptMove here is safe because it's deterministic based on board.
          const result = attemptMove(prevBoard, x, y, currentPlayer, gameType);
          if (result) {
             setLastMove({ x, y });
@@ -146,9 +142,6 @@ const App: React.FC = () => {
             else setWhiteCaptures(prev => prev + result.captured);
             
             if (gameType === 'Gomoku' && checkGomokuWin(result.newBoard, {x, y})) {
-               // We need to trigger end game outside, but inside setState is tricky.
-               // Let's use a side effect via local var or just check in useEffect.
-               // For now, simpler to do it in the click handler, but for Remote moves we need to trigger it.
                setTimeout(() => endGame(currentPlayer, '五子连珠！'), 0);
             }
             
@@ -158,7 +151,7 @@ const App: React.FC = () => {
          }
          return prevBoard;
       });
-  }, [currentPlayer, gameType, board]); // Note: board dependency might cause stale closures if not careful.
+  }, [currentPlayer, gameType, board]);
 
   // The wrapper for UI clicks
   const handleIntersectionClick = useCallback((x: number, y: number) => {
@@ -290,53 +283,48 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#f7e7ce] flex flex-col items-center justify-center relative select-none">
       
       {/* Header */}
-      <div className="w-full max-w-md px-6 py-4 flex justify-between items-center z-20">
-        <div className="flex items-center gap-2">
-            <div className="bg-white p-2 rounded-full shadow-md relative">
-                {gameMode === 'PvP' && onlineStatus !== 'connected' && <Users size={20} className="text-gray-600"/>}
-                {gameMode === 'PvAI' && <Cpu size={20} className="text-gray-600"/>}
-                {onlineStatus === 'connected' && (
-                    <>
-                        <Globe size={20} className="text-green-600"/>
-                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                        </span>
-                    </>
-                )}
-            </div>
-            <div className="flex flex-col">
-                <span className="font-bold text-gray-700 text-lg leading-tight">{gameType === 'Go' ? '围棋' : '五子棋'}</span>
-                <span className="text-xs font-semibold text-gray-500">{boardSize}x{boardSize} • {onlineStatus === 'connected' ? '在线对战' : (gameMode === 'PvAI' ? difficulty === 'Easy' ? '简单' : difficulty === 'Medium' ? '中等' : '困难' : '本地双人')}</span>
-            </div>
+      <div className="w-full max-w-md px-4 py-3 flex justify-between items-center z-20">
+        <div className="flex flex-col">
+            <span className="font-bold text-gray-700 text-lg leading-tight flex items-center gap-2">
+               {gameType === 'Go' ? '围棋' : '五子棋'}
+               <span className="text-xs font-normal text-gray-500 bg-white/50 px-2 py-0.5 rounded-full border border-gray-200">
+                 {boardSize}路 • {onlineStatus === 'connected' ? '在线' : (gameMode === 'PvAI' ? '人机' : '本地')}
+               </span>
+               {onlineStatus === 'connected' && (
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+               )}
+            </span>
         </div>
         
         <button 
           onClick={() => setShowMenu(true)}
-          className="bg-[#cba367] hover:bg-[#b89258] text-white p-2 rounded-full shadow-sm font-bold transition-all active:scale-95"
+          className="bg-[#cba367] hover:bg-[#b89258] text-white p-2 rounded-xl shadow-sm font-bold transition-all active:scale-95"
         >
-          <Settings size={24} />
+          <Settings size={20} />
         </button>
       </div>
 
-      {/* Score */}
-      <div className="flex justify-between w-full max-w-md px-8 mb-2 z-20">
-         <div className={`flex flex-col items-center p-3 rounded-2xl transition-all duration-300 ${currentPlayer === 'black' ? 'bg-black/10 scale-110 shadow-lg' : 'opacity-60'} ${onlineStatus === 'connected' && myColor === 'black' ? 'ring-2 ring-blue-400' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-[#2a2a2a] mb-1 shadow-inner border-2 border-[#444] relative flex items-center justify-center">
-               <span className="text-white text-xs">●</span>
-            </div>
-            <span className="font-bold text-gray-800">黑子</span>
-            {gameType === 'Go' && <span className="text-xs font-bold text-gray-600">提子: {blackCaptures}</span>}
-            {onlineStatus === 'connected' && myColor === 'black' && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 rounded-full mt-1">我</span>}
+      {/* Horizontal Compact Score Board */}
+      <div className="w-full max-w-md px-4 mb-2 z-20 grid grid-cols-2 gap-3">
+         {/* Black Player Pill */}
+         <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all duration-300 ${currentPlayer === 'black' ? 'bg-black/10 border-black/20 shadow-sm' : 'border-transparent opacity-60'} ${onlineStatus === 'connected' && myColor === 'black' ? 'ring-2 ring-blue-400' : ''}`}>
+             <div className="w-6 h-6 rounded-full bg-[#2a2a2a] shadow-inner border-2 border-[#444] shrink-0"></div>
+             <div className="flex flex-col leading-none">
+                 <span className="font-bold text-gray-800 text-sm">黑子 {onlineStatus === 'connected' && myColor === 'black' && '(我)'}</span>
+                 {gameType === 'Go' && <span className="text-[10px] text-gray-600 font-semibold">提子: {blackCaptures}</span>}
+             </div>
          </div>
 
-         <div className={`flex flex-col items-center p-3 rounded-2xl transition-all duration-300 ${currentPlayer === 'white' ? 'bg-white/50 scale-110 shadow-lg' : 'opacity-60'} ${onlineStatus === 'connected' && myColor === 'white' ? 'ring-2 ring-blue-400' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-[#f0f0f0] mb-1 shadow-inner border-2 border-white relative flex items-center justify-center">
-                 <span className="text-gray-800 text-xs">○</span>
-            </div>
-            <span className="font-bold text-gray-800">白子</span>
-            {gameType === 'Go' && <span className="text-xs font-bold text-gray-600">提子: {whiteCaptures}</span>}
-             {onlineStatus === 'connected' && myColor === 'white' && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 rounded-full mt-1">我</span>}
+         {/* White Player Pill */}
+         <div className={`flex items-center justify-end gap-2 px-3 py-2 rounded-xl border-2 transition-all duration-300 ${currentPlayer === 'white' ? 'bg-white/60 border-white/50 shadow-sm' : 'border-transparent opacity-60'} ${onlineStatus === 'connected' && myColor === 'white' ? 'ring-2 ring-blue-400' : ''}`}>
+             <div className="flex flex-col items-end leading-none">
+                 <span className="font-bold text-gray-800 text-sm">白子 {onlineStatus === 'connected' && myColor === 'white' && '(我)'}</span>
+                 {gameType === 'Go' && <span className="text-[10px] text-gray-600 font-semibold">提子: {whiteCaptures}</span>}
+             </div>
+             <div className="w-6 h-6 rounded-full bg-[#f0f0f0] shadow-inner border-2 border-white shrink-0"></div>
          </div>
       </div>
 

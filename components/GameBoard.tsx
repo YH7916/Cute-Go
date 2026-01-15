@@ -156,8 +156,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 x2={GRID_PADDING + c.x2 * CELL_SIZE}
                 y2={GRID_PADDING + c.y2 * CELL_SIZE}
                 stroke={stroke}
-                // VERY THIN diagonal lines for "silk" effect
-                strokeWidth={c.type === 'ortho' ? CELL_SIZE * 0.65 : CELL_SIZE * 0.15} 
+                // Ortho = 0.65, Diag = 0.35 (Visible but distinct)
+                strokeWidth={c.type === 'ortho' ? CELL_SIZE * 0.65 : CELL_SIZE * 0.35} 
                 strokeLinecap="round"
               />
            ))}
