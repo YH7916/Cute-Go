@@ -280,10 +280,10 @@ const App: React.FC = () => {
   const isOnlineLoss = onlineStatus === 'connected' && winner !== myColor;
 
   return (
-    <div className="min-h-screen bg-[#f7e7ce] flex flex-col items-center justify-center relative select-none">
+    <div className="h-full w-full bg-[#f7e7ce] flex flex-col items-center relative select-none overflow-hidden">
       
-      {/* Header */}
-      <div className="w-full max-w-md px-4 py-3 flex justify-between items-center z-20">
+      {/* Header - Compact padding */}
+      <div className="w-full max-w-md px-4 py-2 flex justify-between items-center z-20 shrink-0">
         <div className="flex flex-col">
             <span className="font-bold text-gray-700 text-lg leading-tight flex items-center gap-2">
                {gameType === 'Go' ? '围棋' : '五子棋'}
@@ -307,8 +307,8 @@ const App: React.FC = () => {
         </button>
       </div>
 
-      {/* Horizontal Compact Score Board */}
-      <div className="w-full max-w-md px-4 mb-2 z-20 grid grid-cols-2 gap-3">
+      {/* Score - Compact spacing */}
+      <div className="w-full max-w-md px-4 mb-1 z-20 grid grid-cols-2 gap-2 shrink-0">
          {/* Black Player Pill */}
          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all duration-300 ${currentPlayer === 'black' ? 'bg-black/10 border-black/20 shadow-sm' : 'border-transparent opacity-60'} ${onlineStatus === 'connected' && myColor === 'black' ? 'ring-2 ring-blue-400' : ''}`}>
              <div className="w-6 h-6 rounded-full bg-[#2a2a2a] shadow-inner border-2 border-[#444] shrink-0"></div>
@@ -328,8 +328,8 @@ const App: React.FC = () => {
          </div>
       </div>
 
-      {/* Board */}
-      <div className="relative z-10 flex-grow flex items-center justify-center w-full overflow-hidden">
+      {/* Board - Grow to fill space */}
+      <div className="relative z-10 flex-grow flex items-center justify-center w-full overflow-hidden min-h-0">
         <div className="transform transition-transform">
             <GameBoard 
             board={board} 
@@ -341,19 +341,19 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="w-full max-w-md px-6 py-6 flex justify-center gap-4 z-20">
+      {/* Controls - Compact padding */}
+      <div className="w-full max-w-md px-6 py-4 flex justify-center gap-3 z-20 shrink-0">
          <button 
            onClick={() => handlePass(false)}
            disabled={gameOver || showPassModal || (onlineStatus === 'connected' && currentPlayer !== myColor)}
-           className="flex items-center gap-2 bg-[#8c6b38] text-white px-6 py-3 rounded-xl shadow-md font-bold hover:bg-[#7a5c30] active:scale-95 transition-all border-b-4 border-[#5c4033] disabled:opacity-50 disabled:active:scale-100"
+           className="flex items-center gap-2 bg-[#8c6b38] text-white px-6 py-2.5 rounded-xl shadow-md font-bold hover:bg-[#7a5c30] active:scale-95 transition-all border-b-4 border-[#5c4033] disabled:opacity-50 disabled:active:scale-100"
          >
            <SkipForward size={18} /> 停着
          </button>
          
          <button 
            onClick={() => resetGame(false)}
-           className="flex items-center gap-2 bg-white text-gray-700 px-6 py-3 rounded-xl shadow-md font-bold hover:bg-gray-50 active:scale-95 transition-all border-b-4 border-gray-200"
+           className="flex items-center gap-2 bg-white text-gray-700 px-6 py-2.5 rounded-xl shadow-md font-bold hover:bg-gray-50 active:scale-95 transition-all border-b-4 border-gray-200"
          >
            <RotateCcw size={18} /> 重开
          </button>
