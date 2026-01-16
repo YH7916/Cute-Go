@@ -409,16 +409,13 @@ export const getAIMove = (
       return friendlyCount < neighbors.length; // At least one empty or enemy neighbor
   });
 
-  // LOGIC FIX: In Hard mode, if no productive moves exist (only Dame filling remains), 
+  // LOGIC FIX: In Medium/Hard mode, if no productive moves exist (only Dame filling remains), 
   // do NOT pass immediately. Fallback to playing ANY valid move (Dame) to ensure the game finishes properly.
-  // In Easy/Medium, we can be lazy and pass.
+  // In Easy, we can be lazy and pass.
   let pool = productiveMoves;
   if (pool.length === 0) {
-      if (difficulty === 'Hard') {
-          pool = candidates; // Play Dame/Neutral points
-      } else {
-          return null; // Pass
-      }
+      // Since Easy/Hell return early, we are in Medium/Hard here.
+      pool = candidates; // Play Dame/Neutral points
   }
 
   // If even candidates are empty (should be caught above, but safety check)

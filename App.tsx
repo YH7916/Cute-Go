@@ -50,6 +50,7 @@ const App: React.FC = () => {
   
   // Audio Ref
   const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   // Refs for State (Fix for Stale Closures & Logic Synchronization)
   const boardRef = useRef(board);
@@ -64,17 +65,33 @@ const App: React.FC = () => {
   useEffect(() => { myColorRef.current = myColor; }, [myColor]);
   useEffect(() => { onlineStatusRef.current = onlineStatus; }, [onlineStatus]);
 
-  // Handle BGM
+  // Handle BGM Playback Logic
+  // Browsers block autoplay until interaction. This listener attempts to play audio on first click.
+  useEffect(() => {
+    const startAudio = () => {
+        if (!hasInteracted) {
+            setHasInteracted(true);
+            if (bgmRef.current && musicVolume > 0 && bgmRef.current.paused) {
+                bgmRef.current.play().catch(e => console.log('Autoplay deferred:', e));
+            }
+        }
+    };
+    
+    document.addEventListener('click', startAudio);
+    return () => document.removeEventListener('click', startAudio);
+  }, [hasInteracted, musicVolume]);
+
   useEffect(() => {
     if (bgmRef.current) {
         bgmRef.current.volume = musicVolume;
-        if (musicVolume > 0 && bgmRef.current.paused) {
-             bgmRef.current.play().catch(e => console.log("Auto-play blocked", e));
+        // If we have already interacted (or if this is a user-initiated change), try playing
+        if (musicVolume > 0 && bgmRef.current.paused && hasInteracted) {
+             bgmRef.current.play().catch(e => console.log("Play blocked", e));
         } else if (musicVolume === 0) {
             bgmRef.current.pause();
         }
     }
-  }, [musicVolume]);
+  }, [musicVolume, hasInteracted]);
 
   useEffect(() => {
     resetGame();
@@ -303,11 +320,11 @@ const App: React.FC = () => {
   return (
     <div className="h-full w-full bg-[#f7e7ce] flex flex-col items-center relative select-none overflow-hidden">
       
-      {/* Background Audio */}
+      {/* Background Audio - Switched to a more robust, cute track */}
       <audio 
         ref={bgmRef} 
         loop 
-        src="https://cdn.pixabay.com/download/audio/2023/04/26/audio_959353995f.mp3?filename=cute-background-music-148186.mp3" 
+        src="https://cdn.pixabay.com/download/audio/2022/10/25/audio_2494548483.mp3?filename=playful-cat-123495.mp3" 
       />
 
       {/* Header */}
@@ -466,6 +483,9 @@ const App: React.FC = () => {
                         value={musicVolume} 
                         onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
                         className="cute-range"
+                        style={{
+                           background: `linear-gradient(to right, #8c6b38 0%, #8c6b38 ${musicVolume * 100}%, #e5e7eb ${musicVolume * 100}%, #e5e7eb 100%)`
+                        }}
                     />
                 </div>
             </div>
