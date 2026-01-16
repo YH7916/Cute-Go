@@ -443,7 +443,7 @@ const App: React.FC = () => {
       <audio 
         ref={bgmRef} 
         loop 
-        src="/public/bgm.mp3" 
+        src="https://ia800504.us.archive.org/11/items/Kevin_MacLeod_-_Daily_Beetle/Daily_Beetle.mp3" 
       />
 
       {/* --- TABLET/DESKTOP LAYOUT: Left Side Board --- */}
