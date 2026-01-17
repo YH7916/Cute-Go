@@ -11,6 +11,7 @@ interface GameBoardProps {
   lastMove: { x: number, y: number } | null;
   showQi: boolean;
   gameType: GameType;
+  showCoordinates?: boolean;
 }
 
 type ConnectionType = 'ortho' | 'loose';
@@ -29,15 +30,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onIntersectionClick, 
   lastMove,
   showQi,
-  gameType
+  gameType,
+  showCoordinates = false
 }) => {
   const boardSize = board.length;
-  // Dynamic cell size
-  const CELL_SIZE = boardSize === 9 ? 40 : boardSize === 13 ? 30 : 22;
-  // Reduced padding for larger boards to maximize 19x19 usage on small screens
-  const GRID_PADDING = boardSize === 19 ? 12 : 30;
+  // Dynamic cell size: Smaller boards have larger cells, maxing out at 19
+  const CELL_SIZE = Math.min(40, 420 / (boardSize + 1)); 
   
-  const STONE_RADIUS = CELL_SIZE * 0.45; // Slightly larger for better merging
+  // Increase padding if coordinates are shown
+  const BASE_PADDING = boardSize >= 19 ? 12 : 20;
+  const GRID_PADDING = showCoordinates ? BASE_PADDING + 15 : BASE_PADDING;
+  
+  const STONE_RADIUS = CELL_SIZE * 0.45; 
   
   const boardPixelSize = (boardSize - 1) * CELL_SIZE + GRID_PADDING * 2;
 
@@ -54,7 +58,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   useEffect(() => {
     setTransform({ scale: 1, x: 0, y: 0 });
-  }, [boardSize]);
+  }, [boardSize, showCoordinates]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
@@ -110,13 +114,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const isValid = (cx: number, cy: number) => cx >= 0 && cx < boardSize && cy >= 0 && cy < boardSize;
 
     if (gameType === 'Gomoku') {
-        // --- GOMOKU LOGIC: Ortho + Diagonal are both rendered in the body layer ('ortho') ---
-        // We use 'ortho' type so they are rendered in renderSolidBody, but we will adjust width there.
         for(let y=0; y<boardSize; y++) {
           for(let x=0; x<boardSize; x++) {
             const stone = board[y][x];
             if(!stone) continue;
-            
             // Check Right (1, 0)
             if(isValid(x+1, y) && board[y][x+1]?.color === stone.color) {
                lines.push({ x1: x, y1: y, x2: x+1, y2: y, color: stone.color, type: 'ortho' });
@@ -136,7 +137,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           }
         }
     } else {
-        // --- GO LOGIC: Ortho Strong, Knight/Large Loose ---
         for(let y=0; y<boardSize; y++) {
           for(let x=0; x<boardSize; x++) {
             const stone = board[y][x];
@@ -277,7 +277,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
              if (group.liberties === 1) mood = 'worried';
              else if (group.liberties <= 3) mood = 'neutral';
         } else {
-            // Gomoku Mood Logic
             if (count >= 4) mood = 'happy';
             else if (count === 3) mood = 'neutral';
             else mood = 'happy'; 
@@ -320,11 +319,66 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     return lines;
   };
 
+  const renderCoordinates = () => {
+      if (!showCoordinates) return null;
+      
+      const labels = [];
+      const colLabels = "ABCDEFGHJKLMNOPQRST".split("").slice(0, boardSize);
+      
+      for(let i=0; i<boardSize; i++) {
+          const pos = GRID_PADDING + i * CELL_SIZE;
+          
+          labels.push(
+            <text key={`col-top-${i}`} x={pos} y={GRID_PADDING - 12} textAnchor="middle" fontSize={boardSize > 13 ? "8" : "10"} fill="#5c4033" fontWeight="bold">
+                {colLabels[i]}
+            </text>
+          );
+          
+          const rowNum = boardSize - i;
+          
+          labels.push(
+            <text key={`row-left-${i}`} x={GRID_PADDING - 12} y={pos + 3} textAnchor="end" fontSize={boardSize > 13 ? "8" : "10"} fill="#5c4033" fontWeight="bold">
+                {rowNum}
+            </text>
+          );
+      }
+      return <g opacity="0.7">{labels}</g>;
+  };
+
   const starPoints = useMemo(() => {
-    if (boardSize === 9) return [[2, 2], [6, 2], [4, 4], [2, 6], [6, 6]];
-    if (boardSize === 13) return [[3, 3], [9, 3], [6, 6], [3, 9], [9, 9]];
-    if (boardSize === 19) return [[3, 3], [9, 3], [15, 3], [3, 9], [9, 9], [15, 9], [3, 15], [9, 15], [15, 15]];
-    return [];
+    const points: [number, number][] = [];
+    
+    if (boardSize < 7) {
+        // No star points for very small boards
+    } else if (boardSize % 2 !== 0) {
+        // Odd sizes have a center point (Tengen)
+        const center = Math.floor(boardSize / 2);
+        points.push([center, center]);
+        
+        if (boardSize >= 9) {
+            // Add corners
+            const offset = boardSize >= 13 ? 3 : 2; // 4th line for 13+, 3rd line for 9-12
+            points.push([offset, offset]);
+            points.push([boardSize - 1 - offset, offset]);
+            points.push([offset, boardSize - 1 - offset]);
+            points.push([boardSize - 1 - offset, boardSize - 1 - offset]);
+        }
+        
+        if (boardSize >= 19) {
+            // Add side stars
+            const offset = 3;
+            const center = Math.floor(boardSize / 2);
+            points.push([center, offset]);
+            points.push([center, boardSize - 1 - offset]);
+            points.push([offset, center]);
+            points.push([boardSize - 1 - offset, center]);
+        }
+    } else {
+        // Even sizes - usually no Tengen, but maybe symmetric 4 stars
+        // Just empty or custom logic if needed. keeping it clean for now.
+    }
+    
+    return points;
   }, [boardSize]);
 
   const renderIntersections = () => {
@@ -381,26 +435,25 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const baseColor = color === 'black' ? '#2a2a2a' : '#f0f0f0';
     const filterId = color === 'black' ? 'url(#jelly-black)' : 'url(#jelly-white)';
     
-    // VISUAL TWEAK: 
-    // For Go: Thick lines (0.95) merge stones into a single solid block.
-    // For Gomoku: Thin lines (0.22) create a "Metaball" effect (Dumbbells) 
-    // where stones are distinct but connected by a liquid neck.
-    const orthoWidth = gameType === 'Gomoku' ? CELL_SIZE * 0.22 : CELL_SIZE * 0.95;
+    const orthoWidth = gameType === 'Gomoku' ? CELL_SIZE * 0.2 : CELL_SIZE * 0.95;
+    const isGomoku = gameType === 'Gomoku';
 
     return (
         <g filter={filterId}>
-           {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => (
-                <line 
-                    key={`${color}-body-ortho-${i}`}
-                    x1={GRID_PADDING + c.x1 * CELL_SIZE}
-                    y1={GRID_PADDING + c.y1 * CELL_SIZE}
-                    x2={GRID_PADDING + c.x2 * CELL_SIZE}
-                    y2={GRID_PADDING + c.y2 * CELL_SIZE}
-                    stroke={baseColor}
-                    strokeWidth={orthoWidth}
-                    strokeLinecap="round"
-                />
-           ))}
+           <g className={isGomoku ? "animate-liquid-flow-gomoku" : ""}>
+             {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => (
+                  <line 
+                      key={`${color}-body-ortho-${i}`}
+                      x1={GRID_PADDING + c.x1 * CELL_SIZE}
+                      y1={GRID_PADDING + c.y1 * CELL_SIZE}
+                      x2={GRID_PADDING + c.x2 * CELL_SIZE}
+                      y2={GRID_PADDING + c.y2 * CELL_SIZE}
+                      stroke={baseColor}
+                      strokeWidth={orthoWidth}
+                      strokeLinecap="round"
+                  />
+             ))}
+           </g>
            {stones.filter(s => s.color === color).map(s => (
             <circle
               key={`${color}-body-base-${s.id}`}
@@ -465,6 +518,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         .animate-liquid-flow line {
             animation: liquidFlow 2.5s ease-in-out infinite;
         }
+        @keyframes liquidFlowGomoku {
+            0%, 100% { stroke-width: ${CELL_SIZE * 0.15}px; }
+            50% { stroke-width: ${CELL_SIZE * 0.25}px; }
+        }
+        .animate-liquid-flow-gomoku line {
+            animation: liquidFlowGomoku 3s ease-in-out infinite;
+        }
       `}</style>
       <div 
         className="w-full h-full relative transition-transform duration-75 ease-linear origin-center"
@@ -527,6 +587,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             {renderQiLayer()}
 
             <g>{renderGridLines()}</g>
+            
+            {renderCoordinates()}
+
             {starPoints.map(([x, y], i) => (
                 <circle key={`star-${i}`} cx={GRID_PADDING + x * CELL_SIZE} cy={GRID_PADDING + y * CELL_SIZE} r={boardSize > 13 ? 2 : 3} fill="#5c4033" />
             ))}

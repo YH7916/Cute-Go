@@ -1,5 +1,5 @@
 {
   "name": "Cute-Go",
-  "description": "A cute, slime-themed Go (Weiqi) game with merging stones and expressive faces.",
+  "description": "A cute, slime-themed Go (Weiqi) game with merging stones, review mode, and electronic board features.",
   "requestFramePermissions": []
 }

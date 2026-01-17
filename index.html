@@ -2,105 +2,179 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>PuyoGo Cute</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Cute-Go</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
     <style>
       html, body {
         height: 100%;
         margin: 0;
         padding: 0;
+        overscroll-behavior: none;
       }
       body {
-        font-family: 'Fredoka', sans-serif;
-        /* Handle Safe Areas properly within the box model */
+        font-family: 'Zen Maru Gothic', 'Fredoka', sans-serif;
         padding-top: env(safe-area-inset-top);
         padding-bottom: env(safe-area-inset-bottom);
         box-sizing: border-box; 
         background-color: #f7e7ce;
-        overflow: hidden; /* Prevent scrolling for app-like feel */
+        background-image: 
+          radial-gradient(#e3c086 15%, transparent 16%),
+          radial-gradient(#e3c086 15%, transparent 16%);
+        background-size: 20px 20px;
+        background-position: 0 0, 10px 10px;
+        color: #5c4033;
+        overflow: hidden;
       }
       #root {
         height: 100%;
         width: 100%;
       }
 
-      /* Custom Animations */
+      /* Animations */
       @keyframes popIn {
         0% { transform: scale(0); opacity: 0; }
-        60% { transform: scale(1.15); }
+        50% { transform: scale(1.25); }
+        80% { transform: scale(0.95); }
         100% { transform: scale(1); opacity: 1; }
       }
       
-      /* Instant appear animation: Stay at opacity 0 until the end */
+      .stone-enter {
+        animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+
+      .face-enter {
+        opacity: 0;
+        animation: appearInstant 0.3s step-end forwards;
+      }
       @keyframes appearInstant {
         0% { opacity: 0; }
         99% { opacity: 0; }
         100% { opacity: 1; }
       }
 
-      .stone-enter {
-        animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      /* 
+         Natural 3D Button Style 
+      */
+      .btn-retro {
+        position: relative;
+        border: 2px solid; 
+        border-bottom-width: 5px;
+        transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+        transform: translateY(0);
       }
       
-      /* Face stays hidden for 0.3s (during stone pop), then appears instantly */
-      .face-enter {
-        opacity: 0;
-        animation: appearInstant 0.3s step-end forwards;
+      .btn-retro:active:not(:disabled) {
+        transform: translateY(3px);
+        border-bottom-width: 2px;
+        margin-bottom: 3px;
+      }
+      
+      .btn-retro:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        filter: grayscale(0.5);
       }
 
-      /* --- UI COMPONENTS STYLING --- */
+      /* Recessed Container (Inset Shadow for Tracks) */
+      .inset-track {
+        background-color: #d4b483;
+        box-shadow: inset 0 3px 6px rgba(0,0,0,0.2), inset 0 1px 2px rgba(0,0,0,0.15);
+        border-bottom: 1px solid #fcf6ea;
+        border-top: 2px solid #a18252;
+      }
 
-      /* 1. Cute Range Slider */
+      /* Sliding Block (The active part of the toggle) */
+      .slider-block {
+        background-color: #fcf6ea;
+        box-shadow: 0 2px 0 #cba367, 0 4px 6px rgba(0,0,0,0.15);
+        color: #5c4033;
+        border-radius: 0.75rem; /* rounded-xl */
+      }
+
+      /* Button Themes */
+      .btn-brown {
+        background-color: #8c6b38;
+        border-color: #5c4033;
+        color: #f7e7ce;
+      }
+      .btn-brown:hover { background-color: #9c7b48; }
+
+      .btn-coffee {
+        background-color: #5d4037;
+        border-color: #3e2723;
+        color: #fff8e1;
+      }
+      .btn-coffee:hover { background-color: #6d4c41; }
+
+      /* Sand / Light Brown (New for lighter action buttons) */
+      .btn-sand {
+        background-color: #e6d5b8;
+        border-color: #bcaaa4;
+        color: #5d4037;
+      }
+      .btn-sand:hover { background-color: #f0dfc2; }
+
+      .btn-beige {
+        background-color: #fcf6ea;
+        border-color: #cba367;
+        color: #5c4033;
+      }
+      .btn-beige:hover { background-color: #fff; }
+
+      /* Range Slider */
       .cute-range {
         -webkit-appearance: none;
         width: 100%;
-        height: 8px; /* Slightly thicker for the gradient to show nicely */
-        border-radius: 10px;
-        /* Background is handled via inline style in React for the progress effect */
+        height: 12px;
+        border-radius: 99px;
+        background: transparent;
         cursor: pointer;
-      }
-      .cute-range::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        height: 22px;
-        width: 22px;
-        border-radius: 50%;
-        background: #cba367;
-        cursor: pointer;
-        margin-top: -7px; /* Align center with 8px track */
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        border: 3px solid #fff;
-        transition: transform 0.1s;
-      }
-      .cute-range::-webkit-slider-thumb:active {
-        transform: scale(1.2);
-      }
-      /* Remove default track styling so custom gradient works */
-      .cute-range::-webkit-slider-runnable-track {
-        width: 100%;
-        height: 8px;
-        border-radius: 10px;
-        border: none;
+        margin: 10px 0;
+        vertical-align: middle;
       }
       .cute-range:focus {
         outline: none;
       }
+      
+      /* Webkit Slider Thumb */
+      .cute-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 24px;
+        width: 24px;
+        border-radius: 50%;
+        background: #f7e7ce;
+        border: 4px solid #5d4037;
+        cursor: pointer;
+        margin-top: -6px; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        transition: transform 0.1s;
+      }
+      .cute-range::-webkit-slider-thumb:active {
+        transform: scale(1.1);
+      }
+      
+      /* Webkit Track */
+      .cute-range::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 12px;
+        cursor: pointer;
+        background: transparent;
+        border-radius: 99px;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+      }
 
-      /* 2. Custom Hidden/Cute Scrollbar */
+      /* Scrollbar */
       .custom-scrollbar::-webkit-scrollbar {
-        width: 4px; /* Thinner */
+        width: 6px;
       }
       .custom-scrollbar::-webkit-scrollbar-track {
         background: transparent;
-        margin: 10px 0;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
-        background-color: rgba(203, 163, 103, 0.3); /* Subtle theme color */
+        background-color: rgba(92, 64, 51, 0.15);
         border-radius: 20px;
-      }
-      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background-color: rgba(203, 163, 103, 0.6);
       }
     </style>
   <script type="importmap">
@@ -116,6 +190,36 @@
 </script>
 </head>
   <body>
+    <!-- Global SVG Filters for Jelly Stones -->
+    <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true">
+      <defs>
+        <filter id="global-jelly-black" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="blob" />
+            <feGaussianBlur in="blob" stdDeviation="1" result="blurBlob"/>
+            <feSpecularLighting in="blurBlob" surfaceScale="5" specularConstant="0.8" specularExponent="20" lightingColor="#ffffff" result="specular">
+                <fePointLight x="-500" y="-500" z="300" />
+            </feSpecularLighting>
+            <feComposite in="specular" in2="blob" operator="in" result="specularInBlob"/>
+            <feDropShadow dx="0" dy="2" stdDeviation="1" floodColor="#000000" floodOpacity="0.5" in="blob" result="shadow" />
+            <feComposite in="shadow" in2="blob" operator="over" result="shadowedBlob"/>
+            <feComposite in="specularInBlob" in2="shadowedBlob" operator="over" />
+        </filter>
+
+        <filter id="global-jelly-white" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="blob" />
+            <feGaussianBlur in="blob" stdDeviation="1" result="blurBlob"/>
+            <feSpecularLighting in="blurBlob" surfaceScale="5" specularConstant="1.2" specularExponent="15" lightingColor="#ffffff" result="specular">
+                <fePointLight x="-500" y="-500" z="300" />
+            </feSpecularLighting>
+            <feComposite in="specular" in2="blob" operator="in" result="specularInBlob"/>
+            <feDropShadow dx="0" dy="2" stdDeviation="1" floodColor="#5c4033" floodOpacity="0.3" in="blob" result="shadow" />
+            <feComposite in="shadow" in2="blob" operator="over" result="shadowedBlob"/>
+            <feComposite in="specularInBlob" in2="shadowedBlob" operator="over" />
+        </filter>
+      </defs>
+    </svg>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

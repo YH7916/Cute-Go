@@ -21,5 +21,5 @@ export interface Group {
 
 export type GameMode = 'PvP' | 'PvAI';
 export type GameType = 'Go' | 'Gomoku';
-export type BoardSize = 9 | 13 | 19;
-export type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Hell';
+export type BoardSize = number; 
+export type Difficulty = 'Easy' | 'Medium' | 'Hard';
