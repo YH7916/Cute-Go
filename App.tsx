@@ -11,21 +11,21 @@ const turnConfig = [
     // 1. 标准 UDP (速度最快，优先尝试)
     {
         urls: 'turn:turn.cloudflare.com:5349?transport=udp',
-        username: 'bc43ee30beac949e3717a1e3a6128089',
-        credential: '8b65f8ec9b8ca32b6ace1c09daf23baa9cc7955f8065b803b25332cdb460dfc8'
+        username: '3bb5ecca232b7084cba699da2a2786e8',
+        credential: 'ba05c592e0930be2ef64d5253744225627aadd7183f0198c3d34a13f5b0f23b1'
     },
     // 2. 标准 TCP (如果 UDP 被封，尝试这个)
     {
         urls: 'turn:turn.cloudflare.com:5349?transport=tcp',
-        username: 'bc43ee30beac949e3717a1e3a6128089',
-        credential: '8b65f8ec9b8ca32b6ace1c09daf23baa9cc7955f8065b803b25332cdb460dfc8'
+        username: '3bb5ecca232b7084cba699da2a2786e8',
+        credential: 'ba05c592e0930be2ef64d5253744225627aadd7183f0198c3d34a13f5b0f23b1'
     },
     // 3. 终极穿墙方案: TURNS over TLS (端口 443, 伪装成 HTTPS)
     // 这是最容易穿透防火墙的，但延迟稍微高一点点
     {
         urls: 'turns:turn.cloudflare.com:443?transport=tcp',
-        username: 'bc43ee30beac949e3717a1e3a6128089',
-        credential: '8b65f8ec9b8ca32b6ace1c09daf23baa9cc7955f8065b803b25332cdb460dfc8'
+        username: '3bb5ecca232b7084cba699da2a2786e8',
+        credential: 'ba05c592e0930be2ef64d5253744225627aadd7183f0198c3d34a13f5b0f23b1'
     }
 ];
 
@@ -315,41 +315,59 @@ const App: React.FC = () => {
   };
 
   const startPolling = (id: string) => {
-    // 先清除旧的，防止多重定时器
     if (pollingRef.current) clearInterval(pollingRef.current);
 
     pollingRef.current = window.setInterval(async () => {
         try {
+            // 1. 第一道防线：如果已经连上，直接退出
+            if (pcRef.current && (pcRef.current.signalingState === 'stable' || pcRef.current.iceConnectionState === 'connected')) {
+                console.log("✅ [轮询] 检测到连接已建立，停止轮询");
+                if (pollingRef.current) clearInterval(pollingRef.current);
+                setOnlineStatus('connected'); 
+                setMyColor('black');
+                return;
+            }
+
             const res = await fetch(`${WORKER_URL}/check-status?roomId=${id}`);
             const data = await res.json();
             
-            // 只有当状态是 connected 且有 guestSdp 时才处理
+            // 2. 只有拿到数据才处理
             if (data && data.status === 'connected' && data.guestSdp) {
                 
-                // 【核心修复】: 检查当前 WebRTC 状态
-                // 如果已经是 stable (已连接)，说明之前某次轮询已经成功了，直接停止即可
-                if (pcRef.current && pcRef.current.signalingState === 'stable') {
-                    console.log("检测到连接已建立，停止轮询");
+                // 3. 第二道防线：再次检查状态
+                if (pcRef.current && pcRef.current.signalingState !== 'have-local-offer') {
+                    // 如果状态不是 "等待应答" (比如已经是 stable)，说明可能别的线程处理了，或者是重入
+                    console.log(`⚠️ [轮询] 状态不匹配 (${pcRef.current.signalingState})，跳过处理`);
                     if (pollingRef.current) clearInterval(pollingRef.current);
-                    
-                    // 补救措施：确保 UI 状态更新（防止之前报错导致 UI 没变）
+                    // 强制认为成功，更新UI
                     setOnlineStatus('connected');
                     setMyColor('black');
-                    return; 
+                    return;
                 }
 
-                // 正常流程：停止轮询，设置对方 SDP
+                console.log("🚀 [轮询] 收到 Guest SDP，正在建立连接...");
+                
+                // 4. 终极防线：Try-Catch 包裹 setRemoteDescription
+                try {
+                    await pcRef.current?.setRemoteDescription(new RTCSessionDescription(data.guestSdp));
+                    console.log("🎉 连接建立成功！(Remote Description Set)");
+                } catch (err: any) {
+                    // 如果报错内容包含 "stable"，说明其实已经连上了，忽略这个错误
+                    if (err.message && err.message.includes("stable")) {
+                        console.log("⚠️ 忽略重复连接错误 (已连接)");
+                    } else {
+                        throw err; // 其他错误还是要抛出
+                    }
+                }
+                
+                // 停止轮询并更新 UI
                 if (pollingRef.current) clearInterval(pollingRef.current);
-                
-                console.log("收到 Guest SDP，正在建立连接...");
-                await pcRef.current?.setRemoteDescription(new RTCSessionDescription(data.guestSdp));
-                
-                // 设置 UI 状态
                 setOnlineStatus('connected');
                 setMyColor('black');
             }
         } catch (e) {
-            console.error("Polling Error", e);
+            // 忽略网络抖动带来的 fetch 错误
+            console.warn("Polling Check Skipped:", e);
         }
     }, 3000);
   };
