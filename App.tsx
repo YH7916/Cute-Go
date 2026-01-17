@@ -178,25 +178,19 @@ const App: React.FC = () => {
     dataChannelRef.current = dc;
     
     dc.onopen = () => {
-        // If we were connecting, we are now fully connected
         setOnlineStatus('connected');
         setShowOnlineMenu(false);
         setShowMenu(false);
         setGameMode('PvP');
         
-        // If I am Host (indicated by having myColor === 'black' set in startPolling success), 
-        // I need to sync game state now that the channel is open.
-        // Wait, myColor might be set asynchronously in startPolling. 
-        // A safer check: if I created the room (have a peerId) and I am connected.
-        // But startPolling sets myColor='black'.
+        // Host logic: Sync game state when channel opens
         if (myColorRef.current === 'black') {
              sendData({ 
                 type: 'SYNC', 
-                boardSize, 
+                boardSize: boardSize, // Use current state value
                 gameType: gameTypeRef.current, 
                 startColor: 'white' 
             });
-            // We don't resetGame here because Host already reset in startPolling
         }
     };
 
@@ -231,13 +225,11 @@ const App: React.FC = () => {
   };
 
   const createRoom = async () => {
-    if (pcRef.current && pcRef.current.signalingState !== 'closed') return; // Already setup or active
+    // Prevent duplicate init
+    if (pcRef.current && pcRef.current.signalingState !== 'closed') return;
 
     const id = Math.floor(100000 + Math.random() * 900000).toString();
     setPeerId(id);
-    
-    // We don't set status to 'connecting' yet to avoid blocking the ID display
-    // The user needs to see the ID to share it.
 
     const pc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -247,20 +239,25 @@ const App: React.FC = () => {
     const dc = pc.createDataChannel("game-channel");
     setupDataChannel(dc);
 
+    // --- Critical: Wait for ICE gathering to complete ---
+    pc.onicecandidate = async (event) => {
+        if (event.candidate === null) {
+            try {
+                // Only send offer when we have all candidates (Wait for null)
+                await fetch(`${WORKER_URL}/create-room`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomId: id, sdp: pc.localDescription })
+                });
+                startPolling(id);
+            } catch (e) {
+                console.error("Failed to upload Host SDP", e);
+            }
+        }
+    };
+
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-
-    try {
-        await fetch(`${WORKER_URL}/create-room`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomId: id, sdp: offer })
-        });
-        startPolling(id);
-    } catch (e) {
-        console.error("Signal Error", e);
-        // Don't alert immediately, might be temporary network blip
-    }
   };
 
   const startPolling = (id: string) => {
@@ -273,13 +270,9 @@ const App: React.FC = () => {
                 if (pollingRef.current) clearInterval(pollingRef.current);
                 await pcRef.current?.setRemoteDescription(new RTCSessionDescription(data.guestSdp));
                 
-                // HOST LOGIC:
-                // Once remote description is set, ICE checks will finish and channel will open.
-                // We prepare the game state here.
+                // Host logic: Set self as black, prepare for connection open
                 setOnlineStatus('connected');
                 setMyColor('black');
-                setShowOnlineMenu(false);
-                resetGame(true);
             }
         } catch (e) {
             console.error("Polling Error", e);
@@ -298,6 +291,23 @@ const App: React.FC = () => {
 
     pc.ondatachannel = (event) => setupDataChannel(event.channel);
 
+    // --- Critical: Wait for ICE gathering to complete ---
+    pc.onicecandidate = async (event) => {
+        if (event.candidate === null) {
+             try {
+                // Send answer only when ICE is complete
+                await fetch(`${WORKER_URL}/join-room`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomId: remotePeerId, guestSdp: pc.localDescription })
+                });
+                setMyColor('white'); // Guest is white
+             } catch (e) {
+                 console.error("Failed to upload Guest SDP", e);
+             }
+        }
+    };
+
     try {
         const res = await fetch(`${WORKER_URL}/join-room`, {
             method: 'POST',
@@ -308,8 +318,6 @@ const App: React.FC = () => {
         if (!res.ok) {
             alert("房间不存在或已过期");
             setOnlineStatus('disconnected');
-            pc.close();
-            pcRef.current = null;
             return;
         }
 
@@ -317,16 +325,7 @@ const App: React.FC = () => {
         await pc.setRemoteDescription(new RTCSessionDescription(hostSdp));
         
         const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        await fetch(`${WORKER_URL}/join-room`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomId: remotePeerId, guestSdp: answer })
-        });
-
-        setMyColor('white');
-        // Connection will open shortly via ICE
+        await pc.setLocalDescription(answer); // This triggers ICE gathering
     } catch (e) {
         console.error("Join Error", e);
         setOnlineStatus('disconnected');
