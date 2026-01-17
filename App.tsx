@@ -174,37 +174,46 @@ const App: React.FC = () => {
       }
   }, [showOnlineMenu, peerId, onlineStatus]);
 
-  const setupDataChannel = (dc: RTCDataChannel) => {
+  // 1. 增加 isHost 参数
+  const setupDataChannel = (dc: RTCDataChannel, isHost: boolean) => {
     dataChannelRef.current = dc;
     
     dc.onopen = () => {
-        console.log("🚀 数据通道竟然通了！"); // 看到这句话说明彻底成功
+        console.log("🚀 数据通道竟然通了！"); 
         setOnlineStatus('connected');
         setShowOnlineMenu(false);
         setShowMenu(false);
         setGameMode('PvP');
         
-        // Host logic: Sync game state when channel opens
-        if (myColorRef.current === 'black') {
-             sendData({ 
+        // 2. 直接使用 isHost 变量判断，不再依赖 myColorRef
+        if (isHost) {
+             console.log("我是房主，初始化为黑棋并发送 SYNC");
+             setMyColor('black'); // 立即设置自己为黑
+             
+             // 立即发送同步包，告诉对面它是白
+             const syncMsg: PeerMessage = { 
                 type: 'SYNC', 
-                boardSize: boardSize, // Use current state value
+                boardSize: boardSize, 
                 gameType: gameTypeRef.current, 
                 startColor: 'white' 
-            });
+            };
+            dc.send(JSON.stringify(syncMsg));
         }
     };
 
     dc.onmessage = (e) => {
+        // ... (保持原有逻辑不变)
         const msg = JSON.parse(e.data) as PeerMessage;
         if (msg.type === 'MOVE') {
             executeMove(msg.x, msg.y, true);
         } else if (msg.type === 'PASS') {
             handlePass(true);
         } else if (msg.type === 'SYNC') {
+            // 加入者收到 SYNC 后，设置自己为白
+            console.log("收到 SYNC，我是白棋");
             setBoardSize(msg.boardSize);
             setGameType(msg.gameType);
-            setMyColor(msg.startColor);
+            setMyColor(msg.startColor); 
             resetGame(true);
         } else if (msg.type === 'RESTART') {
             resetGame(true);
@@ -260,7 +269,7 @@ const App: React.FC = () => {
         pcRef.current = pc;
 
     const dc = pc.createDataChannel("game-channel");
-    setupDataChannel(dc);
+    setupDataChannel(dc, true);
 
     pc.oniceconnectionstatechange = () => {
         console.log("🧊 Host ICE 状态:", pc.iceConnectionState);
@@ -384,7 +393,7 @@ const App: React.FC = () => {
         });
         pcRef.current = pc;
 
-        pc.ondatachannel = (event) => setupDataChannel(event.channel);
+        pc.ondatachannel = (event) => setupDataChannel(event.channel, false);
 
         // --- 核心修复开始 ---
         
