@@ -8,7 +8,7 @@
   </p>
 
   <p align="center">
-    一款由 <strong>Gemini 3 Pro</strong> 强力驱动，基于 <strong>React</strong> 与 <strong>Capacitor</strong> 打造的现代化、高颜值围棋 Android 应用。
+    一款由<strong>Gemini 3 Pro</strong> 辅助编码，基于 <strong>React</strong> 与 <strong>Capacitor</strong> 打造的现代化、高颜值围棋 Android 应用。
   </p>
 
   <p align="center">
@@ -52,7 +52,7 @@
 | :--- | :--- | :--- |
 | **核心框架** | ![React](https://img.shields.io/badge/-React-black?style=flat-square&logo=react) | 构建用户界面的基石 |
 | **跨平台** | ![Capacitor](https://img.shields.io/badge/-Capacitor-black?style=flat-square&logo=capacitor) | Web 到 Android 的桥梁 |
-| **人工智能** | ![Gemini](https://img.shields.io/badge/-Gemini_3_Pro-black?style=flat-square&logo=google-gemini) | 智能辅助与逻辑分析 |
+| **AI Copilot** | ![Gemini](https://img.shields.io/badge/-Gemini_3_Pro-black?style=flat-square&logo=google-gemini) | 用于生成逻辑代码、Bug 修复与重构建议 |
 | **构建工具** | ![Vite](https://img.shields.io/badge/-Vite-black?style=flat-square&logo=vite) | 极速的开发与打包体验 |
 | **样式方案** | ![TailwindCSS](https://img.shields.io/badge/-Tailwind-black?style=flat-square&logo=tailwindcss) | (可选，根据实际情况修改) 优雅的样式原子 |
 
