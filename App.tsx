@@ -5,7 +5,7 @@ import { createBoard, attemptMove, getAIMove, checkGomokuWin, calculateScore, ca
 import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check, Wind, Volume2, VolumeX, BarChart3, Skull, Undo2, AlertCircle, X } from 'lucide-react';
 
 // --- Configuration ---
-const WORKER_URL = 'https://api.yesterhaze.codes';
+const WORKER_URL = 'yesterhaze.codes';
 
 // Types for P2P Messages
 type PeerMessage = 
@@ -232,7 +232,21 @@ const App: React.FC = () => {
     setPeerId(id);
 
     const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            // --- 关键：添加免费的 TURN 服务器中转 ---
+            {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelayproject',
+                password: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                password: 'openrelayproject'
+            }
+        ]
     });
     pcRef.current = pc;
 
@@ -285,7 +299,21 @@ const App: React.FC = () => {
     setOnlineStatus('connecting');
 
     const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            // --- 同样添加 TURN 服务器 ---
+            {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelayproject',
+                password: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                password: 'openrelayproject'
+            }
+        ]
     });
     pcRef.current = pc;
 
