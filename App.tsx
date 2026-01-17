@@ -268,14 +268,14 @@ const App: React.FC = () => {
       const turnServers = await getIceServers();
       const id = Math.floor(100000 + Math.random() * 900000).toString();
       setPeerId(id);
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, ...turnServers], iceTransportPolicy: 'all', bundlePolicy: 'max-bundle' });
+      const pc = new RTCPeerConnection({ iceServers: [...turnServers, { urls: 'stun:stun.l.google.com:19302' }], iceTransportPolicy: 'all', bundlePolicy: 'max-bundle' });
       pcRef.current = pc;
       const dc = pc.createDataChannel("game-channel");
       setupDataChannel(dc, true);
       let isOfferSent = false; 
       const doSendOffer = async () => { if (isOfferSent) return; isOfferSent = true; try { await fetch(`${WORKER_URL}/create-room`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId: id, sdp: pc.localDescription }) }); startPolling(id); } catch (e) {} };
       pc.onicecandidate = (event) => { if (event.candidate === null) doSendOffer(); };
-      setTimeout(doSendOffer, 2000);
+      setTimeout(doSendOffer, 800);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
   };
@@ -300,7 +300,7 @@ const App: React.FC = () => {
         if (!remotePeerId) return;
         setOnlineStatus('connecting');
         const turnServers = await getIceServers();
-        const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, ...turnServers], iceTransportPolicy: 'all', bundlePolicy: 'max-bundle' });
+        const pc = new RTCPeerConnection({ iceServers: [...turnServers, { urls: 'stun:stun.l.google.com:19302' }], iceTransportPolicy: 'all', bundlePolicy: 'max-bundle' });
         pcRef.current = pc;
         pc.ondatachannel = (event) => setupDataChannel(event.channel, false);
         let isAnswerSent = false;
