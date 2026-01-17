@@ -265,6 +265,16 @@ const App: React.FC = () => {
     });
     pcRef.current = pc;
 
+    pc.oniceconnectionstatechange = () => {
+        console.log("🧊 Host ICE 状态:", pc.iceConnectionState);
+        // 如果变成 "disconnected" 或 "failed"，说明防火墙还是拦住了
+        // 如果是 "connected" 或 "completed"，说明打洞成功！
+    };
+
+    pc.onconnectionstatechange = () => {
+        console.log("🤝 Host 连接状态:", pc.connectionState);
+    };
+
     const dc = pc.createDataChannel("game-channel");
     setupDataChannel(dc);
 
@@ -305,16 +315,36 @@ const App: React.FC = () => {
   };
 
   const startPolling = (id: string) => {
+    // 先清除旧的，防止多重定时器
     if (pollingRef.current) clearInterval(pollingRef.current);
+
     pollingRef.current = window.setInterval(async () => {
         try {
             const res = await fetch(`${WORKER_URL}/check-status?roomId=${id}`);
             const data = await res.json();
+            
+            // 只有当状态是 connected 且有 guestSdp 时才处理
             if (data && data.status === 'connected' && data.guestSdp) {
+                
+                // 【核心修复】: 检查当前 WebRTC 状态
+                // 如果已经是 stable (已连接)，说明之前某次轮询已经成功了，直接停止即可
+                if (pcRef.current && pcRef.current.signalingState === 'stable') {
+                    console.log("检测到连接已建立，停止轮询");
+                    if (pollingRef.current) clearInterval(pollingRef.current);
+                    
+                    // 补救措施：确保 UI 状态更新（防止之前报错导致 UI 没变）
+                    setOnlineStatus('connected');
+                    setMyColor('black');
+                    return; 
+                }
+
+                // 正常流程：停止轮询，设置对方 SDP
                 if (pollingRef.current) clearInterval(pollingRef.current);
+                
+                console.log("收到 Guest SDP，正在建立连接...");
                 await pcRef.current?.setRemoteDescription(new RTCSessionDescription(data.guestSdp));
                 
-                // Host logic: Set self as black, prepare for connection open
+                // 设置 UI 状态
                 setOnlineStatus('connected');
                 setMyColor('black');
             }
@@ -338,6 +368,16 @@ const App: React.FC = () => {
         bundlePolicy: 'max-bundle'
     });
     pcRef.current = pc;
+
+    pc.oniceconnectionstatechange = () => {
+        console.log("🧊 Host ICE 状态:", pc.iceConnectionState);
+        // 如果变成 "disconnected" 或 "failed"，说明防火墙还是拦住了
+        // 如果是 "connected" 或 "completed"，说明打洞成功！
+    };
+
+    pc.onconnectionstatechange = () => {
+        console.log("🤝 Host 连接状态:", pc.connectionState);
+    };
 
     // 2. 绑定数据通道事件 (Guest 是被动接收通道，所以是用 ondatachannel)
     pc.ondatachannel = (event) => setupDataChannel(event.channel);
