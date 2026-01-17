@@ -272,9 +272,6 @@ const App: React.FC = () => {
         console.log("🤝 Host 连接状态:", pc.connectionState);
     };
 
-    const dc = pc.createDataChannel("game-channel");
-    setupDataChannel(dc);
-
         let isOfferSent = false; // 防止重复发送的标记
 
     // 定义发送动作
