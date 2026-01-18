@@ -306,7 +306,7 @@ const isEye = (board: BoardState, x: number, y: number, color: Player): boolean 
     return true;
 }
 
-// Gomoku: Evaluate a line segment for patterns
+// Gomoku: Enhanced pattern evaluation
 const evaluateGomokuDirection = (board: BoardState, x: number, y: number, dx: number, dy: number, player: Player): number => {
   let count = 0;
   let blockedStart = false;
@@ -338,22 +338,33 @@ const evaluateGomokuDirection = (board: BoardState, x: number, y: number, dx: nu
   // Count includes the hypothetical stone placed at x,y
   const total = count + 1;
 
-  if (total >= 5) return 10000; // Win
+  // Scoring Weights (Exponential for strict tiering)
+  // Win
+  if (total >= 5) return 100000;
+  
+  // 4 in a row
   if (total === 4) {
-      if (!blockedStart && !blockedEnd) return 5000; // Open 4 (Win next)
-      if (!blockedStart || !blockedEnd) return 500;  // Blocked 4
+      if (!blockedStart && !blockedEnd) return 10000; // Live 4 (Unstoppable)
+      if (!blockedStart || !blockedEnd) return 1000;  // Dead 4 (Must block)
   }
+  
+  // 3 in a row
   if (total === 3) {
-      if (!blockedStart && !blockedEnd) return 400; // Open 3
-      if (!blockedStart || !blockedEnd) return 50;
+      if (!blockedStart && !blockedEnd) return 1000; // Live 3 (Very dangerous)
+      if (!blockedStart || !blockedEnd) return 100;  // Dead 3
   }
-  if (total === 2 && !blockedStart && !blockedEnd) return 10;
+  
+  // 2 in a row
+  if (total === 2) {
+      if (!blockedStart && !blockedEnd) return 100; // Live 2
+      if (!blockedStart || !blockedEnd) return 10;
+  }
   
   return 1;
 };
 
 // Gomoku: Score a position based on all 4 directions
-const getGomokuScore = (board: BoardState, x: number, y: number, player: Player, opponent: Player): number => {
+const getGomokuScore = (board: BoardState, x: number, y: number, player: Player, opponent: Player, difficulty: Difficulty): number => {
     const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
     let attackScore = 0;
     let defenseScore = 0;
@@ -363,10 +374,21 @@ const getGomokuScore = (board: BoardState, x: number, y: number, player: Player,
         defenseScore += evaluateGomokuDirection(board, x, y, dx, dy, opponent);
     }
     
-    // Attack is good, but Defense is critical if opponent is about to win
-    // If opponent has win (10000 or 5000), we MUST block
-    if (defenseScore >= 5000) return defenseScore * 1.5; // High priority block
-    
+    // In Hard mode, we prioritize defense slightly more if the opponent has a strong threat
+    if (difficulty === 'Hard') {
+        // If opponent has a winning move or a Live 4, blocking is top priority
+        if (defenseScore >= 9000) return defenseScore * 1.2; 
+        // If we have a win, take it
+        if (attackScore >= 9000) return attackScore * 1.5;
+        
+        // Block Live 3s heavily
+        if (defenseScore >= 900) return defenseScore * 1.1;
+    } 
+    // Medium Mode logic
+    else if (difficulty === 'Medium') {
+        if (defenseScore >= 5000) return defenseScore * 1.1;
+    }
+
     return attackScore + defenseScore;
 };
 
@@ -400,27 +422,53 @@ export const getAIMove = (
       let bestMoves: Point[] = [];
 
       // Determine error margin based on difficulty
-      const errorMargin = difficulty === 'Medium' ? 100 : 0;
+      const errorMargin = difficulty === 'Medium' ? 100 : 0; // No error margin for Hard
 
       for (const move of validMoves) {
-          // Central bias for opening moves
-          let centralBias = 0;
-          if (validMoves.length > size * size - 5) {
-               const distFromCenter = Math.abs(move.x - size/2) + Math.abs(move.y - size/2);
-               centralBias = (size - distFromCenter) * 2;
+          // Optimization: Only check moves near existing stones (Radius 2)
+          // For empty board, center is best.
+          const hasNeighbor = validMoves.length > size*size - 1 ? false : (() => {
+               for(let dy=-2; dy<=2; dy++) {
+                   for(let dx=-2; dx<=2; dx++) {
+                       if (dx===0 && dy===0) continue;
+                       const ny = move.y + dy;
+                       const nx = move.x + dx;
+                       if(nx>=0 && nx<size && ny>=0 && ny<size && board[ny][nx]) return true;
+                   }
+               }
+               return false;
+          })();
+
+          // First move logic
+          if (validMoves.length >= size*size - 1) {
+              if (move.x === Math.floor(size/2) && move.y === Math.floor(size/2)) return move;
           }
 
-          const score = getGomokuScore(board, move.x, move.y, player, opponent) + centralBias;
-          const fuzzyScore = score + (Math.random() * errorMargin);
+          if (!hasNeighbor && validMoves.length < size*size - 1) continue;
 
-          if (fuzzyScore > bestScore) {
-              bestScore = fuzzyScore;
+          let score = getGomokuScore(board, move.x, move.y, player, opponent, difficulty);
+          
+          // Positional Bias (Center is better)
+          const distFromCenter = Math.abs(move.x - size/2) + Math.abs(move.y - size/2);
+          score += (size - distFromCenter);
+
+          // Fuzzy Logic for Medium
+          if (difficulty === 'Medium') {
+             score += (Math.random() * errorMargin);
+          }
+
+          if (score > bestScore) {
+              bestScore = score;
               bestMoves = [move];
-          } else if (Math.abs(fuzzyScore - bestScore) < 10) {
+          } else if (Math.abs(score - bestScore) < 10) { // Keep moves with similar scores
               bestMoves.push(move);
           }
       }
-      return bestMoves.length > 0 ? bestMoves[Math.floor(Math.random() * bestMoves.length)] : null;
+      
+      // If no strategic moves found (e.g. only distant valid moves), pick random
+      if (bestMoves.length === 0) return validMoves[Math.floor(Math.random() * validMoves.length)];
+      
+      return bestMoves[Math.floor(Math.random() * bestMoves.length)];
   }
 
   // --- GO AI ---

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameBoard } from './components/GameBoard';
 import { BoardState, Player, GameMode, GameType, BoardSize, Difficulty } from './types';
 import { createBoard, attemptMove, getAIMove, checkGomokuWin, calculateScore, calculateWinRate, serializeGame, deserializeGame } from './utils/goLogic';
-import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check, Wind, Volume2, VolumeX, BarChart3, Skull, Undo2, AlertCircle, X, Eye, FileUp, Hash, Eraser, PenTool, LayoutGrid, Zap } from 'lucide-react';
+import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check, Wind, Volume2, VolumeX, BarChart3, Skull, Undo2, AlertCircle, X, Eye, FileUp, Hash, Eraser, PenTool, LayoutGrid, Zap, Smartphone } from 'lucide-react';
 
 // --- 1. 引入 Supabase ---
 import { createClient } from '@supabase/supabase-js';
@@ -22,7 +22,7 @@ type SignalMessage =
 // 原有的 Worker URL 可以保留用于获取额外 TURN (可选)，或者直接删掉
 const WORKER_URL = 'https://api.yesterhaze.codes';
 
-// ... (这里保留你的 HistoryItem, PeerMessage 类型定义，AppMode 等，不用变) ...
+// Undo History Item
 interface HistoryItem {
     board: BoardState;
     currentPlayer: Player;
@@ -31,28 +31,32 @@ interface HistoryItem {
     lastMove: { x: number, y: number } | null;
     consecutivePasses: number;
 }
+
 type AppMode = 'playing' | 'review' | 'setup';
 
 const App: React.FC = () => {
-  // ... (保留原本的 state: boardSize, gameType 等等，直到 "Online State") ...
-  
   // --- Global App State ---
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
   const [gameType, setGameType] = useState<GameType>('Go');
   const [gameMode, setGameMode] = useState<GameMode>('PvP');
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
   
+  // New: Player Color Preference (vs AI)
+  const [userColor, setUserColor] = useState<Player>('black');
+  
   // Visual/Audio Settings
   const [showQi, setShowQi] = useState<boolean>(false);
   const [showWinRate, setShowWinRate] = useState<boolean>(true);
   const [showCoordinates, setShowCoordinates] = useState<boolean>(false);
   const [musicVolume, setMusicVolume] = useState<number>(0.3);
+  const [hapticEnabled, setHapticEnabled] = useState<boolean>(true); // New: Haptic
 
   // Settings Modal Local State
   const [tempBoardSize, setTempBoardSize] = useState<BoardSize>(9);
   const [tempGameType, setTempGameType] = useState<GameType>('Go');
   const [tempGameMode, setTempGameMode] = useState<GameMode>('PvP');
   const [tempDifficulty, setTempDifficulty] = useState<Difficulty>('Medium');
+  const [tempUserColor, setTempUserColor] = useState<Player>('black'); // Temp state for settings
 
   // Game State
   const [board, setBoard] = useState<BoardState>(createBoard(9));
@@ -84,7 +88,7 @@ const App: React.FC = () => {
   const [showPassModal, setShowPassModal] = useState(false); 
   const [isThinking, setIsThinking] = useState(false); 
 
-  // --- Online State (移除了 pollingRef) ---
+  // Online State
   const [showOnlineMenu, setShowOnlineMenu] = useState(false);
   const [peerId, setPeerId] = useState<string>('');
   const [remotePeerId, setRemotePeerId] = useState<string>('');
@@ -96,9 +100,9 @@ const App: React.FC = () => {
   // WebRTC Refs
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null); // 新增：用于清理 Supabase 频道
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Audio Refs ... (保留原样)
+  // Audio Refs
   const bgmRef = useRef<HTMLAudioElement | null>(null);
   const sfxMove = useRef<HTMLAudioElement | null>(null);
   const sfxCapture = useRef<HTMLAudioElement | null>(null);
@@ -108,7 +112,7 @@ const App: React.FC = () => {
 
   const [hasInteracted, setHasInteracted] = useState(false);
 
-  // Refs for State ... (保留原样)
+  // Refs for State
   const boardRef = useRef(board);
   const currentPlayerRef = useRef(currentPlayer);
   const gameTypeRef = useRef(gameType);
@@ -121,7 +125,7 @@ const App: React.FC = () => {
   useEffect(() => { myColorRef.current = myColor; }, [myColor]);
   useEffect(() => { onlineStatusRef.current = onlineStatus; }, [onlineStatus]);
 
-  // Handle Audio Initialization ... (保留原样)
+  // Handle Audio Initialization
   useEffect(() => {
      sfxMove.current = new Audio('/move.mp3');
      sfxCapture.current = new Audio('/capture.mp3');
@@ -130,9 +134,16 @@ const App: React.FC = () => {
      sfxLose.current = new Audio('/lose.mp3');
   }, []);
 
+  // Haptic Helper
+  const vibrate = useCallback((pattern: number | number[]) => {
+      if (hapticEnabled && navigator.vibrate) {
+          navigator.vibrate(pattern);
+      }
+  }, [hapticEnabled]);
+
   const playSfx = (type: 'move' | 'capture' | 'error' | 'win' | 'lose') => {
-      // ... (保留原样)
       if (musicVolume === 0) return; 
+      
       const play = (ref: React.MutableRefObject<HTMLAudioElement | null>) => {
           if (ref.current) {
               ref.current.currentTime = 0;
@@ -140,6 +151,7 @@ const App: React.FC = () => {
               ref.current.play().catch(() => {});
           }
       };
+
       switch(type) {
           case 'move': play(sfxMove); break;
           case 'capture': play(sfxCapture); break;
@@ -149,24 +161,103 @@ const App: React.FC = () => {
       }
   };
 
-  // ... (保留 Audio useEffects, Settings sync, applySettingsAndRestart) ...
   useEffect(() => {
-    const startAudio = () => { if (!hasInteracted) { setHasInteracted(true); if (bgmRef.current && musicVolume > 0 && bgmRef.current.paused) { bgmRef.current.play().catch(e => console.log('Autoplay deferred:', e)); } } };
+    const startAudio = () => {
+        if (!hasInteracted) {
+            setHasInteracted(true);
+            if (bgmRef.current && musicVolume > 0 && bgmRef.current.paused) {
+                bgmRef.current.play().catch(e => console.log('Autoplay deferred:', e));
+            }
+        }
+    };
+    
     document.addEventListener('click', startAudio);
     return () => document.removeEventListener('click', startAudio);
   }, [hasInteracted, musicVolume]);
 
-  useEffect(() => { if (bgmRef.current) { bgmRef.current.volume = musicVolume; if (musicVolume > 0 && bgmRef.current.paused && hasInteracted) { bgmRef.current.play().catch(e => console.log("Play blocked", e)); } else if (musicVolume === 0) { bgmRef.current.pause(); } } }, [musicVolume, hasInteracted]);
+  useEffect(() => {
+    if (bgmRef.current) {
+        bgmRef.current.volume = musicVolume;
+        if (musicVolume > 0 && bgmRef.current.paused && hasInteracted) {
+             bgmRef.current.play().catch(e => console.log("Play blocked", e));
+        } else if (musicVolume === 0) {
+            bgmRef.current.pause();
+        }
+    }
+  }, [musicVolume, hasInteracted]);
 
-  useEffect(() => { if (showMenu) { setTempBoardSize(boardSize); setTempGameType(gameType); setTempDifficulty(difficulty); setTempGameMode(gameMode); } }, [showMenu, boardSize, gameType, difficulty, gameMode]);
+  // Sync temp settings when menu opens
+  useEffect(() => {
+      if (showMenu) {
+          setTempBoardSize(boardSize);
+          setTempGameType(gameType);
+          setTempDifficulty(difficulty);
+          setTempGameMode(gameMode);
+          setTempUserColor(userColor);
+      }
+  }, [showMenu, boardSize, gameType, difficulty, gameMode, userColor]);
 
   const applySettingsAndRestart = () => {
-      // ... (保留原样，但在最后加入 cleanupOnline 逻辑)
-      setBoardSize(tempBoardSize); setGameType(tempGameType); setDifficulty(tempDifficulty); setGameMode(tempGameMode);
-      setBoard(createBoard(tempBoardSize)); setCurrentPlayer('black'); setBlackCaptures(0); setWhiteCaptures(0); setLastMove(null); setGameOver(false); setWinner(null); setWinReason(''); setConsecutivePasses(0); setPassNotificationDismissed(false); setFinalScore(null); setHistory([]); setShowMenu(false); setShowPassModal(false); setIsThinking(false); setAppMode('playing');
+      vibrate(20);
+      setBoardSize(tempBoardSize);
+      setGameType(tempGameType);
+      setDifficulty(tempDifficulty);
+      setGameMode(tempGameMode);
+      setUserColor(tempUserColor);
       
-      cleanupOnline(); // 清理在线状态
+      // Reset logic
+      setBoard(createBoard(tempBoardSize));
+      setCurrentPlayer('black'); // Always start with black turn internally
+      setBlackCaptures(0);
+      setWhiteCaptures(0);
+      setLastMove(null);
+      setGameOver(false);
+      setWinner(null);
+      setWinReason('');
+      setConsecutivePasses(0);
+      setPassNotificationDismissed(false);
+      setFinalScore(null);
+      setHistory([]);
+      setShowMenu(false);
+      setShowPassModal(false);
+      setIsThinking(false);
+      setAppMode('playing');
+      
+      cleanupOnline();
+      
+      // If PvAI and User is White, trigger AI for Black immediately
+      if (tempGameMode === 'PvAI' && tempUserColor === 'white') {
+           // We need to trigger the effect that watches currentPlayer
+           // Since currentPlayer is already 'black' and we are 'white', the effect [currentPlayer] needs to fire.
+           // However, if we just set it to black (which it is default), effect might not trigger if it didn't change.
+           // But since we mount the component, the effect `useEffect` below handling AI should pick it up.
+           // Actually, let's ensure the Thinking state starts if needed.
+           // The existing useEffect checks: `gameMode === 'PvAI' && currentPlayer === 'white'`.
+           // Wait, if user is White, AI is Black. So we need to change AI trigger condition.
+      }
   };
+
+  // --- AI Turn Trigger Update ---
+  // If PvAI:
+  // - If User is Black: AI plays when current is White.
+  // - If User is White: AI plays when current is Black.
+  useEffect(() => {
+    if (appMode !== 'playing' || gameMode !== 'PvAI' || gameOver || showPassModal) return;
+
+    const aiColor = userColor === 'black' ? 'white' : 'black';
+    
+    if (currentPlayer === aiColor) {
+      setIsThinking(true);
+      const timer = setTimeout(() => {
+        let prevHash = null; if (history.length > 0) prevHash = getBoardHash(history[history.length-1].board);
+        const move = getAIMove(board, aiColor, gameType, difficulty, prevHash);
+        if (move) executeMove(move.x, move.y, false); else handlePass();
+        setIsThinking(false);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [currentPlayer, gameMode, board, gameOver, gameType, difficulty, showPassModal, appMode, userColor, history]);
+
 
   // --- Helper: Board Stringify for Ko ---
   const getBoardHash = (b: BoardState) => {
@@ -175,320 +266,114 @@ const App: React.FC = () => {
       return str;
   };
 
-  // ----------------------------------------------------------------
-  // --- 核心网络逻辑重构开始 ---
-  // ----------------------------------------------------------------
-
-  // 1. 获取 ICE 服务器 (加入国内优化)
+  // --- Online Logic (Simplified for this update context) ---
   const getIceServers = async () => {
-    // 国内极速 STUN
-    const publicStunServers = [
-        "stun:stun.qq.com:3478",
-        "stun:stun.miwifi.com:3478",
-        "stun:stun.chat.bilibili.com:3478"
-    ];
-
+    const publicStunServers = ["stun:stun.qq.com:3478", "stun:stun.miwifi.com:3478", "stun:stun.chat.bilibili.com:3478"];
     let turnServers = [];
-    // 尝试获取 TURN 作为备用 (可选)
-    try {
-        const res = await fetch(`${WORKER_URL}/ice-servers`, { method: 'POST' });
-        const data = await res.json();
-        if (data && data.iceServers) turnServers = data.iceServers;
-    } catch (e) {
-        console.log("TURN 获取失败，仅使用 STUN");
-    }
-
-    return [
-        { urls: publicStunServers }, 
-        ...turnServers
-    ];
+    try { const res = await fetch(`${WORKER_URL}/ice-servers`, { method: 'POST' }); const data = await res.json(); if (data && data.iceServers) turnServers = data.iceServers; } catch (e) {}
+    return [{ urls: publicStunServers }, ...turnServers];
   };
 
-  // 2. 发送信号到 Supabase 频道
   const sendSignal = async (roomId: string, payload: SignalMessage) => {
-    console.log(`[发送信号] -> 类型: ${payload.type}`, payload);
-    try {
-        await supabase.channel(`room_${roomId}`).send({
-            type: 'broadcast',
-            event: 'signal',
-            payload
-        });
-    } catch (error) {
-        console.error("信号发送失败:", error);
-    }
+    try { await supabase.channel(`room_${roomId}`).send({ type: 'broadcast', event: 'signal', payload }); } catch (error) {}
   };
 
-  // 找到原本的 setupPeerConnection，替换为：
-    const setupPeerConnection = async (roomId: string, isHost: boolean) => {
-        console.log(`%c[WebRTC] 初始化 PeerConnection (Host: ${isHost})`, 'color: #00ff00; font-weight: bold;');
-        
-        if (pcRef.current) {
-            console.log(`[WebRTC] 清理旧连接...`);
-            pcRef.current.close();
-        }
+  const setupPeerConnection = async (roomId: string, isHost: boolean) => {
+      if (pcRef.current) pcRef.current.close();
+      const iceServers = await getIceServers();
+      const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: 'all', bundlePolicy: 'max-bundle' });
+      pcRef.current = pc;
+      pc.oniceconnectionstatechange = () => {
+          if (pc.iceConnectionState === 'connected') setOnlineStatus('connected');
+          else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') setOnlineStatus('disconnected');
+      };
+      pc.onicecandidate = (event) => { if (event.candidate) sendSignal(roomId, { type: 'ice', candidate: event.candidate.toJSON() }); };
+      if (isHost) { const dc = pc.createDataChannel("game-channel"); setupDataChannel(dc, true); } 
+      else { pc.ondatachannel = (event) => setupDataChannel(event.channel, false); }
+      return pc;
+  };
 
-        const iceServers = await getIceServers();
-        console.log(`[WebRTC] 使用 ICE Servers:`, iceServers);
+  const setupDataChannel = (dc: RTCDataChannel, isHost: boolean) => {
+      dataChannelRef.current = dc;
+      dc.onopen = () => {
+          setOnlineStatus('connected'); setShowOnlineMenu(false); setShowMenu(false); setGameMode('PvP');
+          if (isHost) { setMyColor('black'); resetGame(true); if (dc.readyState === 'open') dc.send(JSON.stringify({ type: 'SYNC', boardSize: boardSize, gameType: gameTypeRef.current, startColor: 'white' })); }
+      };
+      dc.onmessage = (e) => {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'MOVE') executeMove(msg.x, msg.y, true);
+          else if (msg.type === 'PASS') handlePass(true);
+          else if (msg.type === 'SYNC') { setBoardSize(msg.boardSize); setGameType(msg.gameType); setMyColor(msg.startColor); resetGame(true); }
+          else if (msg.type === 'RESTART') resetGame(true);
+      };
+      dc.onclose = () => { setOnlineStatus('disconnected'); setMyColor(null); };
+  };
 
-        const pc = new RTCPeerConnection({
-            iceServers,
-            iceTransportPolicy: 'all',
-            bundlePolicy: 'max-bundle'
-        });
-        pcRef.current = pc;
-
-        // --- 调试：监听连接状态变化 ---
-        pc.onconnectionstatechange = () => {
-            console.log(`%c[WebRTC] 🔄 Connection State: ${pc.connectionState}`, 'color: orange');
-            if (pc.connectionState === 'failed') {
-                console.error('[WebRTC] 连接失败，请检查防火墙或 STUN/TURN 服务器');
-            }
-        };
-
-        pc.onsignalingstatechange = () => {
-            console.log(`[WebRTC] 🚦 Signaling State: ${pc.signalingState}`);
-        };
-
-        pc.oniceconnectionstatechange = () => {
-            console.log(`[WebRTC] 🧊 ICE Connection State: ${pc.iceConnectionState}`);
-            if (pc.iceConnectionState === 'connected') {
-                console.log(`%c[WebRTC] ✅ P2P 连接建立成功!`, 'color: #00ff00; font-weight: bold; font-size: 14px;');
-                setOnlineStatus('connected');
-            } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-                setOnlineStatus('disconnected');
-                console.warn("[WebRTC] ICE 连接断开/失败");
-            }
-        };
-
-        // --- 调试：打印具体的 ICE 候选 ---
-        pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                console.log(`[WebRTC] 🧊 收集到 ICE 候选: ${event.candidate.type} - ${event.candidate.protocol} ${event.candidate.address}:${event.candidate.port}`);
-                sendSignal(roomId, { type: 'ice', candidate: event.candidate.toJSON() });
-            } else {
-                console.log(`[WebRTC] 🧊 ICE 候选收集完成 (End of Candidates)`);
-            }
-        };
-
-        if (isHost) {
-            console.log("[WebRTC] (Host) 创建 DataChannel 'game-channel'...");
-            const dc = pc.createDataChannel("game-channel");
-            setupDataChannel(dc, true);
-        } else {
-            pc.ondatachannel = (event) => {
-                console.log(`[WebRTC] (Guest) 收到 DataChannel: ${event.channel.label}`);
-                setupDataChannel(event.channel, false);
-            };
-        }
-
-        return pc;
-    };
-  // 4. 数据通道逻辑 (处理游戏消息)
-    const setupDataChannel = (dc: RTCDataChannel, isHost: boolean) => {
-        dataChannelRef.current = dc;
-        
-        dc.onopen = () => {
-            console.log(`%c[DataChannel] ✅ 通道已打开 (ReadyState: ${dc.readyState})`, 'color: cyan; font-weight: bold;');
-            setOnlineStatus('connected');
-            setShowOnlineMenu(false);
-            setShowMenu(false);
-            setGameMode('PvP');
-            
-            if (isHost) {
-                console.log(`[DataChannel] Host 发送 SYNC 初始状态...`);
-                setMyColor('black');
-                resetGame(true);
-                if (dc.readyState === 'open') {
-                    dc.send(JSON.stringify({ 
-                        type: 'SYNC', 
-                        boardSize: boardSize, 
-                        gameType: gameTypeRef.current, 
-                        startColor: 'white' 
-                    }));
-                }
-            }
-        };
-
-        dc.onmessage = (e) => {
-            const msg = JSON.parse(e.data);
-            console.log(`[DataChannel] 📩 收到消息:`, msg.type, msg); // 调试输出收到的指令
-            
-            if (msg.type === 'MOVE') executeMove(msg.x, msg.y, true);
-            else if (msg.type === 'PASS') handlePass(true);
-            else if (msg.type === 'SYNC') { 
-                console.log(`[DataChannel] 执行 SYNC 同步`);
-                setBoardSize(msg.boardSize); 
-                setGameType(msg.gameType); 
-                setMyColor(msg.startColor); 
-                resetGame(true); 
-            }
-            else if (msg.type === 'RESTART') {
-                console.log(`[DataChannel] 对手请求重置`);
-                resetGame(true);
-            }
-        };
-
-        dc.onerror = (error) => {
-            console.error(`[DataChannel] ❌ 发生错误:`, error);
-        };
-
-        dc.onclose = () => { 
-            console.log("[DataChannel] ⚠️ 通道关闭");
-            setOnlineStatus('disconnected'); 
-            setMyColor(null); 
-        };
-    };
-
-  // 清理函数
   const cleanupOnline = () => {
-      if (channelRef.current) {
-          supabase.removeChannel(channelRef.current);
-          channelRef.current = null;
-      }
-      if (pcRef.current) {
-          pcRef.current.close();
-          pcRef.current = null;
-      }
+      if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
+      if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
       setOnlineStatus('disconnected');
   };
 
-  useEffect(() => {
-      return () => cleanupOnline();
-  }, []);
+  useEffect(() => { return () => cleanupOnline(); }, []);
 
-  // --- 创建房间 (Host) ---
   const createRoom = async () => {
-      cleanupOnline(); // 先清理
-
+      cleanupOnline();
       const id = Math.floor(100000 + Math.random() * 900000).toString();
       setPeerId(id);
-      setOnlineStatus('connecting');
-      console.log(`[Supabase] 正在创建房间 ${id}，订阅频道...`);
-
       const channel = supabase.channel(`room_${id}`);
       channelRef.current = channel;
-
-      channel
-        .on('broadcast', { event: 'signal' }, async ({ payload }: { payload: SignalMessage }) => {
-            const pc = pcRef.current;
-            console.log(`[Supabase] 收到信号: ${payload.type}`);
-
-            if (payload.type === 'join') {
-                // 客人加入了 -> 创建 Offer
-                console.log("[流程] 客人加入，开始创建 Offer...");
-                const newPc = await setupPeerConnection(id, true);
-                const offer = await newPc.createOffer();
-                await newPc.setLocalDescription(offer);
-                await sendSignal(id, { type: 'offer', sdp: newPc.localDescription! });
-            }
-            else if (payload.type === 'answer' && payload.sdp && pc) {
-                console.log("[流程] 收到 Answer，设置远程描述...");
-                await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-            }
-            else if (payload.type === 'ice' && payload.candidate && pc) {
-                console.log("[流程] 添加对方 ICE 候选...");
-                await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-            }
-        })
-        .subscribe((status, err) => {
-            if (status === 'SUBSCRIBED') {
-                console.log(`%c[Supabase] ✅ 成功订阅频道 room_${id}，等待客人...`, 'color: yellow');
-            } else {
-                console.error(`[Supabase] ❌ 订阅状态: ${status}`, err);
-            }
-        });
+      channel.on('broadcast', { event: 'signal' }, async ({ payload }: { payload: SignalMessage }) => {
+          const pc = pcRef.current;
+          if (payload.type === 'join') { const newPc = await setupPeerConnection(id, true); const offer = await newPc.createOffer(); await newPc.setLocalDescription(offer); await sendSignal(id, { type: 'offer', sdp: newPc.localDescription! }); }
+          else if (payload.type === 'answer' && payload.sdp && pc) await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+          else if (payload.type === 'ice' && payload.candidate && pc) await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+      }).subscribe();
   };
 
-  // --- 加入房间 (Guest) ---
   const joinRoom = async () => {
       if (!remotePeerId) return;
-      cleanupOnline(); // 先清理
-
+      cleanupOnline();
       setOnlineStatus('connecting');
-      console.log(`[Supabase] 正在加入房间 ${remotePeerId}...`);
-
       const channel = supabase.channel(`room_${remotePeerId}`);
       channelRef.current = channel;
-
-      channel
-        .on('broadcast', { event: 'signal' }, async ({ payload }: { payload: SignalMessage }) => {
-            console.log(`[Supabase] 收到信号: ${payload.type}`);
-            let pc = pcRef.current;
-
-            if (payload.type === 'offer' && payload.sdp) {
-                console.log("[流程] 收到 Offer，开始创建 Answer...");
-                if (!pc) pc = await setupPeerConnection(remotePeerId, false);
-                
-                await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                
-                await sendSignal(remotePeerId, { type: 'answer', sdp: pc.localDescription! });
-            }
-            else if (payload.type === 'ice' && payload.candidate) {
-                // 如果收到 ICE 时 PC 还没好，可能需要暂存，但 Supabase 速度通常够快
-                if (pc) {
-                    console.log("[流程] 添加对方 ICE 候选...");
-                    await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-                }
-            }
-        })
-        .subscribe(async (status, err) => {
-            if (status === 'SUBSCRIBED') {
-                console.log(`%c[Supabase] ✅ 成功订阅频道 room_${remotePeerId}，发送 JOIN 信号...`, 'color: yellow');
-                await setupPeerConnection(remotePeerId, false);
-                await sendSignal(remotePeerId, { type: 'join' });
-            } else {
-                console.error(`[Supabase] ❌ 订阅状态: ${status}`, err);
-            }
-        });
+      channel.on('broadcast', { event: 'signal' }, async ({ payload }: { payload: SignalMessage }) => {
+          let pc = pcRef.current;
+          if (payload.type === 'offer' && payload.sdp) { if (!pc) pc = await setupPeerConnection(remotePeerId, false); await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp)); const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); await sendSignal(remotePeerId, { type: 'answer', sdp: pc.localDescription! }); }
+          else if (payload.type === 'ice' && payload.candidate && pc) await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+      }).subscribe(async (status) => { if (status === 'SUBSCRIBED') { await setupPeerConnection(remotePeerId, false); await sendSignal(remotePeerId, { type: 'join' }); }});
   };
-    useEffect(() => {
-        // 当联机菜单打开(showOnlineMenu)，且没有房间号(peerId)，且状态是断开时
-        // 自动触发创建房间
-        if (showOnlineMenu && !peerId && onlineStatus === 'disconnected') {
-            createRoom();
-        }
-    }, [showOnlineMenu, peerId, onlineStatus]);
-  // ----------------------------------------------------------------
-  // --- 网络逻辑重构结束 ---
-  // ----------------------------------------------------------------
+
+  useEffect(() => { if (showOnlineMenu && !peerId && onlineStatus === 'disconnected') createRoom(); }, [showOnlineMenu, peerId, onlineStatus]);
 
   const resetGame = (keepOnline: boolean = false) => {
     setBoard(createBoard(boardSize)); setCurrentPlayer('black'); setBlackCaptures(0); setWhiteCaptures(0); setLastMove(null); setGameOver(false); setWinner(null); setWinReason(''); setConsecutivePasses(0); setPassNotificationDismissed(false); setFinalScore(null); setHistory([]); setShowMenu(false); setShowPassModal(false); setIsThinking(false); setAppMode('playing');
+    if (onlineStatusRef.current === 'connected' && !keepOnline && dataChannelRef.current?.readyState === 'open') dataChannelRef.current.send(JSON.stringify({ type: 'RESTART' }));
+    if (!keepOnline) { cleanupOnline(); setMyColor(null); }
     
-    // 如果是本地重置，发个消息给对面
-    if (onlineStatusRef.current === 'connected' && !keepOnline) {
-        if (dataChannelRef.current?.readyState === 'open') {
-             dataChannelRef.current.send(JSON.stringify({ type: 'RESTART' }));
-        }
-    }
-    
-    if (!keepOnline) { 
-        cleanupOnline();
-        setMyColor(null);
-    }
+    // AI First Move Check triggered by effect
   };
 
   const sendData = (msg: any) => { if (dataChannelRef.current?.readyState === 'open') dataChannelRef.current.send(JSON.stringify(msg)); };
   
-  const copyId = () => { navigator.clipboard.writeText(peerId); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  const copyGameState = () => { const stateStr = serializeGame(board, currentPlayer, gameType, blackCaptures, whiteCaptures); navigator.clipboard.writeText(stateStr); setGameCopied(true); setTimeout(() => setGameCopied(false), 2000); };
+  const copyId = () => { navigator.clipboard.writeText(peerId); setCopied(true); setTimeout(() => setCopied(false), 2000); vibrate(10); };
+  const copyGameState = () => { const stateStr = serializeGame(board, currentPlayer, gameType, blackCaptures, whiteCaptures); navigator.clipboard.writeText(stateStr); setGameCopied(true); setTimeout(() => setGameCopied(false), 2000); vibrate(10); };
 
   const handleImportGame = () => {
       const gameState = deserializeGame(importKey);
       if (gameState) {
           setBoard(gameState.board); setCurrentPlayer(gameState.currentPlayer); setGameType(gameState.gameType); setBoardSize(gameState.boardSize); setBlackCaptures(gameState.blackCaptures); setWhiteCaptures(gameState.whiteCaptures);
-          setHistory([]); setGameOver(false); setWinner(null); setConsecutivePasses(0); setAppMode('playing'); setShowImportModal(false); setShowMenu(false); playSfx('move');
+          setHistory([]); setGameOver(false); setWinner(null); setConsecutivePasses(0); setAppMode('playing'); setShowImportModal(false); setShowMenu(false); playSfx('move'); vibrate(20);
       } else { alert('无效的棋局密钥'); }
   };
   
-  // ... (保留 handleUndo, executeMove, handleIntersectionClick, handlePass, endGame 等逻辑) ...
-  // 注意：executeMove 里调用的 sendData 逻辑已经适配了上面的修改
   const handleUndo = () => {
       if (history.length === 0 || isThinking || gameOver || onlineStatus === 'connected') return;
+      vibrate(10);
       let stepsToUndo = 1;
-      if (gameMode === 'PvAI' && currentPlayer === 'black' && history.length >= 2) stepsToUndo = 2;
+      if (gameMode === 'PvAI' && userColor === currentPlayer && history.length >= 2) stepsToUndo = 2; // Normal case: Undo user's move + AI's move
+      else if (gameMode === 'PvAI' && userColor !== currentPlayer && history.length >= 1) stepsToUndo = 1; // Special case: Undo during AI thinking or odd state
+
       const prev = history[history.length - stepsToUndo];
       setBoard(prev.board); setCurrentPlayer(prev.currentPlayer); setBlackCaptures(prev.blackCaptures); setWhiteCaptures(prev.whiteCaptures); setLastMove(prev.lastMove); setConsecutivePasses(prev.consecutivePasses); setPassNotificationDismissed(false); 
       setHistory(prevHistory => prevHistory.slice(0, prevHistory.length - stepsToUndo));
@@ -500,35 +385,38 @@ const App: React.FC = () => {
       if (history.length > 0) prevHash = getBoardHash(history[history.length - 1].board);
       const result = attemptMove(currentBoard, x, y, activePlayer, currentType, prevHash);
       if (result) {
-          if (result.captured > 0) playSfx('capture'); else playSfx('move');
+          if (result.captured > 0) { playSfx('capture'); vibrate([20, 30, 20]); } 
+          else { playSfx('move'); vibrate(15); }
+          
           if (!isRemote) setHistory(prev => [...prev, { board: currentBoard, currentPlayer: activePlayer, blackCaptures, whiteCaptures, lastMove, consecutivePasses }]);
           setBoard(result.newBoard); setLastMove({ x, y }); setConsecutivePasses(0); setPassNotificationDismissed(false); 
           if (result.captured > 0) { if (activePlayer === 'black') setBlackCaptures(prev => prev + result.captured); else setWhiteCaptures(prev => prev + result.captured); }
           if (currentType === 'Gomoku' && checkGomokuWin(result.newBoard, {x, y})) { setTimeout(() => endGame(activePlayer, '五子连珠！'), 0); return; }
           setCurrentPlayer(prev => prev === 'black' ? 'white' : 'black');
-      } else { if (!isRemote) playSfx('error'); }
+      } else { if (!isRemote) { playSfx('error'); vibrate([10, 50]); } }
   };
 
   const handleIntersectionClick = useCallback((x: number, y: number) => {
     if (appMode === 'review') return; 
     if (appMode === 'setup') {
         const newBoard = board.map(row => row.map(s => s));
-        if (setupTool === 'erase') { if (newBoard[y][x]) { newBoard[y][x] = null; playSfx('capture'); } } 
-        else { newBoard[y][x] = { color: setupTool, x, y, id: `setup-${setupTool}-${Date.now()}` }; playSfx('move'); }
+        if (setupTool === 'erase') { if (newBoard[y][x]) { newBoard[y][x] = null; playSfx('capture'); vibrate(10); } } 
+        else { newBoard[y][x] = { color: setupTool, x, y, id: `setup-${setupTool}-${Date.now()}` }; playSfx('move'); vibrate(15); }
         setBoard(newBoard); return;
     }
     if (gameOver || isThinking) return;
-    if (gameMode === 'PvAI' && currentPlayer === 'white') return;
-    // 在线逻辑
-    if (onlineStatus === 'connected') { 
-        if (currentPlayer !== myColor) return; // 不是我的回合
-        sendData({ type: 'MOVE', x, y }); 
-    }
+    
+    // PvAI check: if it's AI's turn, block user
+    const aiColor = userColor === 'black' ? 'white' : 'black';
+    if (gameMode === 'PvAI' && currentPlayer === aiColor) return;
+
+    if (onlineStatus === 'connected') { if (currentPlayer !== myColor) return; sendData({ type: 'MOVE', x, y }); }
     executeMove(x, y, false);
-  }, [gameOver, gameMode, currentPlayer, onlineStatus, myColor, isThinking, appMode, setupTool, board]);
+  }, [gameOver, gameMode, currentPlayer, onlineStatus, myColor, isThinking, appMode, setupTool, board, userColor]);
 
   const handlePass = useCallback((isRemote: boolean = false) => {
     if (gameOver) return;
+    vibrate(10);
     if (!isRemote) setHistory(prev => [...prev, { board: boardRef.current, currentPlayer: currentPlayerRef.current, blackCaptures, whiteCaptures, lastMove, consecutivePasses }]);
     if (onlineStatusRef.current === 'connected' && !isRemote) { if (currentPlayerRef.current !== myColorRef.current) return; sendData({ type: 'PASS' }); }
     setConsecutivePasses(prev => {
@@ -540,30 +428,26 @@ const App: React.FC = () => {
     if (consecutivePasses < 1) { setCurrentPlayer(prev => prev === 'black' ? 'white' : 'black'); setLastMove(null); }
   }, [gameOver, gameMode, consecutivePasses, blackCaptures, whiteCaptures, lastMove]); 
 
-  const endGame = (winner: Player, reason: string) => { setGameOver(true); setWinner(winner); setWinReason(reason); if (gameMode === 'PvAI') { if (winner === 'black') playSfx('win'); else playSfx('lose'); } else if (onlineStatus === 'connected') { if (winner === myColor) playSfx('win'); else playSfx('lose'); } else { playSfx('win'); } };
-
-  // AI Turn Handling ... (保留)
-  useEffect(() => {
-    if (appMode === 'playing' && gameMode === 'PvAI' && currentPlayer === 'white' && !gameOver && !showPassModal) {
-      setIsThinking(true);
-      const timer = setTimeout(() => {
-        let prevHash = null; if (history.length > 0) prevHash = getBoardHash(history[history.length-1].board);
-        const move = getAIMove(board, 'white', gameType, difficulty, prevHash);
-        if (move) executeMove(move.x, move.y, false); else handlePass();
-        setIsThinking(false);
-      }, 700);
-      return () => clearTimeout(timer);
-    }
-  }, [currentPlayer, gameMode, board, gameOver, gameType, difficulty, showPassModal, handlePass, history, appMode]);
+  const endGame = (winner: Player, reason: string) => { 
+      setGameOver(true); setWinner(winner); setWinReason(reason); 
+      vibrate([50, 50, 50, 50]);
+      if (gameMode === 'PvAI') { if (winner === userColor) playSfx('win'); else playSfx('lose'); } 
+      else if (onlineStatus === 'connected') { if (winner === myColor) playSfx('win'); else playSfx('lose'); } 
+      else { playSfx('win'); } 
+  };
 
   const startReview = () => { setAppMode('review'); setReviewIndex(history.length - 1); setGameOver(false); };
   const startSetup = () => { resetGame(false); setAppMode('setup'); setShowMenu(false); };
   const finishSetup = () => { setAppMode('playing'); setHistory([]); };
 
-  // ... (保留 Render 逻辑和 UI) ...
   const currentDisplayBoard = appMode === 'review' && history[reviewIndex] ? history[reviewIndex].board : board;
   const currentDisplayLastMove = appMode === 'review' && history[reviewIndex] ? history[reviewIndex].lastMove : lastMove;
-  const winRate = showWinRate && !gameOver && appMode === 'playing' ? calculateWinRate(board) : 50;
+  
+  // Win Rate Logic with Color Flip
+  const rawWinRate = showWinRate && !gameOver && appMode === 'playing' ? calculateWinRate(board) : 50;
+  // If user is White, show White's win rate (which is 100 - Black's win rate)
+  const displayWinRate = userColor === 'white' ? (100 - rawWinRate) : rawWinRate;
+  
   const getSliderBackground = (val: number, min: number, max: number) => { const percentage = ((val - min) / (max - min)) * 100; return `linear-gradient(to right, #5d4037 ${percentage}%, #d4b483 ${percentage}%)`; };
 
   const RenderStoneIcon = ({ color }: { color: 'black' | 'white' }) => {
@@ -578,15 +462,12 @@ const App: React.FC = () => {
     );
   };
 
-  // ... (保留 JSX 返回部分，UI 代码不需要改动) ...
-  // 只需要确保 UI 中的按钮调用的是更新后的 joinRoom 和 createRoom 即可 (名字没变，逻辑变了)
   return (
     <div className="h-full w-full bg-[#f7e7ce] flex flex-col md:flex-row items-center relative select-none overflow-hidden text-[#5c4033]">
       
       <audio ref={bgmRef} loop src="/bgm.mp3" />
 
       {/* --- BOARD AREA --- */}
-      {/* ... (这里代码保持不变) ... */}
        <div className="relative flex-grow h-[60%] md:h-full w-full flex items-center justify-center p-2 order-2 md:order-1 min-h-0">
           <div className="w-full h-full max-w-full max-h-full aspect-square flex items-center justify-center">
              <div className="transform transition-transform w-full h-full">
@@ -608,7 +489,6 @@ const App: React.FC = () => {
               </div>
           )}
           
-          {/* ... (Pass Notification UI 保持不变) ... */}
           {consecutivePasses === 1 && !gameOver && !passNotificationDismissed && (
                <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
                     <div className="bg-[#fff8e1] border-4 border-[#cba367] text-[#5c4033] px-6 py-6 rounded-3xl shadow-2xl flex flex-col items-center animate-in zoom-in duration-300 w-64 pointer-events-auto">
@@ -631,7 +511,6 @@ const App: React.FC = () => {
       </div>
 
       {/* --- SIDEBAR --- */}
-      {/* ... (这里代码保持不变) ... */}
       <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 p-4 z-20 shrink-0 bg-[#f7e7ce] md:bg-[#f2e6d6] md:h-full md:border-l-4 md:border-[#e3c086] order-1 md:order-2 shadow-xl md:shadow-none">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -653,14 +532,13 @@ const App: React.FC = () => {
             </div>
             
             <button 
-                onClick={() => setShowMenu(true)}
+                onClick={() => { setShowMenu(true); vibrate(10); }}
                 className="btn-retro btn-brown p-3 rounded-xl"
             >
                 <Settings size={20} />
             </button>
         </div>
 
-        {/* ... (Score Card 保持不变) ... */}
         {/* Score Card */}
         <div className="flex flex-col gap-2">
             <div className="grid grid-cols-2 gap-3">
@@ -689,15 +567,17 @@ const App: React.FC = () => {
 
             {showWinRate && gameType === 'Go' && appMode === 'playing' && (
                 <div className="relative w-full h-5 rounded-full overflow-hidden flex shadow-inner mt-2 border border-[#5c4033]/30">
-                    <div className="h-full bg-gradient-to-r from-[#2a2a2a] to-[#5c4033] transition-all duration-1000 ease-in-out relative flex items-center" style={{ width: `${winRate}%` }}>
-                         <span className="absolute right-2 text-[10px] font-bold text-white/90 whitespace-nowrap">{Math.round(winRate)}%</span>
+                     {/* Win Rate Bar Visuals adapted for User Color */}
+                    <div className="h-full bg-gradient-to-r from-[#2a2a2a] to-[#5c4033] transition-all duration-1000 ease-in-out relative flex items-center" style={{ width: `${userColor === 'white' ? (100 - displayWinRate) : displayWinRate}%` }}>
+                         {userColor === 'black' && <span className="absolute right-2 text-[10px] font-bold text-white/90 whitespace-nowrap">{Math.round(displayWinRate)}%</span>}
                     </div>
-                    <div className="h-full bg-gradient-to-r from-[#f0f0f0] to-[#ffffff] transition-all duration-1000 ease-in-out" style={{ width: `${100 - winRate}%` }} />
+                    <div className="h-full bg-gradient-to-r from-[#f0f0f0] to-[#ffffff] transition-all duration-1000 ease-in-out relative flex items-center justify-end" style={{ width: `${userColor === 'white' ? displayWinRate : (100 - displayWinRate)}%` }}>
+                        {userColor === 'white' && <span className="absolute left-2 text-[10px] font-bold text-gray-600 whitespace-nowrap">{Math.round(displayWinRate)}%</span>}
+                    </div>
                 </div>
             )}
         </div>
 
-        {/* ... (Control Buttons 保持不变) ... */}
          {/* Action Controls */}
         <div className="mt-auto">
             {/* SETUP MODE CONTROLS */}
@@ -762,8 +642,7 @@ const App: React.FC = () => {
         <div className="hidden md:block flex-grow"></div>
       </div>
 
-      {/* --- SETTINGS MENU (保持不变) --- */}
-      {/* ... (这里代码保持不变) ... */}
+      {/* --- SETTINGS MENU --- */}
       {showMenu && (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-[#fcf6ea] rounded-[2rem] w-full max-w-sm shadow-2xl border-[6px] border-[#8c6b38] flex flex-col max-h-[90vh] overflow-hidden relative">
@@ -782,66 +661,37 @@ const App: React.FC = () => {
                     
                     {/* Game Type & Mode Toggles */}
                     <div className="space-y-4">
-                        
-                        {/* Type Slider */}
                         <div className="inset-track rounded-xl p-1 relative h-12 flex items-center">
                             <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${tempGameType === 'Gomoku' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
-                            <button 
-                                onClick={() => setTempGameType('Go')} 
-                                className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Go' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}
-                            >
-                                围棋
-                            </button>
-                            <button 
-                                onClick={() => setTempGameType('Gomoku')} 
-                                className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Gomoku' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}
-                            >
-                                五子棋
-                            </button>
+                            <button onClick={() => setTempGameType('Go')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Go' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>围棋</button>
+                            <button onClick={() => setTempGameType('Gomoku')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Gomoku' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>五子棋</button>
                         </div>
 
-                        {/* Mode Slider */}
                         <div className="inset-track rounded-xl p-1 relative h-12 flex items-center">
                              <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${tempGameMode === 'PvAI' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
-                            <button 
-                                onClick={() => setTempGameMode('PvP')} 
-                                className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameMode === 'PvP' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}
-                            >
-                                双人对战
-                            </button>
-                            <button 
-                                onClick={() => setTempGameMode('PvAI')} 
-                                className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameMode === 'PvAI' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}
-                            >
-                                挑战 AI
-                            </button>
+                            <button onClick={() => setTempGameMode('PvP')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameMode === 'PvP' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>双人对战</button>
+                            <button onClick={() => setTempGameMode('PvAI')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameMode === 'PvAI' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>挑战 AI</button>
                         </div>
                     </div>
 
-                    {/* Board Size */}
-                    <div className="px-2 pt-2">
-                        <div className="flex justify-between items-end mb-2">
-                            <span className="text-sm font-bold text-[#5c4033]">棋盘大小</span>
-                            <div className="relative">
-                                <span className="text-sm font-black text-[#fcf6ea] bg-[#5d4037] px-3 py-1 rounded-lg shadow-sm border-b-2 border-[#3e2723] z-10 relative">
-                                    {tempBoardSize} 路
-                                </span>
+                    {/* NEW: Player Color Selection (PvAI only) */}
+                    {tempGameMode === 'PvAI' && (
+                        <div className="flex gap-2 items-center bg-[#fff] p-2 rounded-xl border-2 border-[#e3c086] animate-in fade-in slide-in-from-top-2">
+                            <span className="text-xs font-bold text-[#8c6b38] px-2 shrink-0">我执:</span>
+                            <div className="flex-1 flex gap-2">
+                                <button onClick={() => setTempUserColor('black')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${tempUserColor === 'black' ? 'bg-[#5c4033] text-[#fcf6ea]' : 'bg-[#fcf6ea] text-[#5c4033]'}`}>
+                                    <div className="w-3 h-3 rounded-full bg-black border border-gray-500"></div> 黑子
+                                </button>
+                                <button onClick={() => setTempUserColor('white')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${tempUserColor === 'white' ? 'bg-[#5c4033] text-[#fcf6ea]' : 'bg-[#fcf6ea] text-[#5c4033]'}`}>
+                                    <div className="w-3 h-3 rounded-full bg-white border border-gray-400"></div> 白子
+                                </button>
                             </div>
                         </div>
-                        <div className="bg-[#fff] px-3 py-1 rounded-full border-2 border-[#e3c086] shadow-sm">
-                            <input 
-                                type="range" min="4" max="19" step="1"
-                                value={tempBoardSize} 
-                                onChange={(e) => setTempBoardSize(parseInt(e.target.value))}
-                                className="cute-range"
-                                style={{ background: getSliderBackground(tempBoardSize, 4, 19) }}
-                            />
-                        </div>
-                    </div>
+                    )}
 
                     {/* Difficulty */}
                     {tempGameMode === 'PvAI' && (
-                        <div className="grid grid-cols-3 gap-2 animate-in fade-in slide-in-from-top-2 pt-2">
+                        <div className="grid grid-cols-3 gap-2 animate-in fade-in slide-in-from-top-2">
                             {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map((level) => (
                                 <button key={level} onClick={() => setTempDifficulty(level)} className={`btn-retro py-2 rounded-xl font-bold text-sm transition-all ${tempDifficulty === level ? 'bg-[#8c6b38] text-[#fcf6ea] border-[#5c4033]' : 'bg-[#fff] text-[#8c6b38] border-[#e3c086]'}`}>
                                     {level === 'Easy' ? '简单' : level === 'Medium' ? '中等' : '困难'}
@@ -849,6 +699,32 @@ const App: React.FC = () => {
                             ))}
                         </div>
                     )}
+                </div>
+                
+                {/* --- REDESIGNED SLIDER 1: BOARD SIZE --- */}
+                <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
+                    <div className="flex justify-between items-center px-1">
+                        <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
+                            <LayoutGrid size={16} className="text-[#8c6b38]"/> 棋盘大小
+                        </span>
+                        <span className="text-xs font-black text-[#fcf6ea] bg-[#8c6b38] px-2 py-0.5 rounded-md shadow-sm">
+                            {tempBoardSize} 路
+                        </span>
+                    </div>
+                    
+                    <div className="relative h-8 flex items-center px-2">
+                         {/* Custom Tooltip Logic would go here, but for simplicity we rely on the visual bubble above */}
+                         <input 
+                            type="range" min="4" max="19" step="1"
+                            value={tempBoardSize} 
+                            onChange={(e) => setTempBoardSize(parseInt(e.target.value))}
+                            className="cute-range w-full"
+                            style={{ 
+                                background: getSliderBackground(tempBoardSize, 4, 19),
+                                touchAction: 'none'
+                            }}
+                        />
+                    </div>
                 </div>
 
                 <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
@@ -858,31 +734,49 @@ const App: React.FC = () => {
                     <h3 className="text-sm font-bold text-[#8c6b38] uppercase tracking-widest mb-1">辅助与音效</h3>
                     
                     <div className="flex gap-2 justify-between">
-                        <button onClick={() => setShowWinRate(!showWinRate)} className={`btn-retro flex-1 flex flex-row items-center justify-center gap-2 px-2 py-3 rounded-xl ${showWinRate ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
+                        <button onClick={() => setShowWinRate(!showWinRate)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showWinRate ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
                             <BarChart3 size={18} />
-                            <span className="text-sm font-bold">胜率</span>
+                            <span className="text-xs font-bold">胜率</span>
                         </button>
-                        <button onClick={() => setShowCoordinates(!showCoordinates)} className={`btn-retro flex-1 flex flex-row items-center justify-center gap-2 px-2 py-3 rounded-xl ${showCoordinates ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
+                        <button onClick={() => setShowCoordinates(!showCoordinates)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showCoordinates ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
                             <LayoutGrid size={18} />
-                            <span className="text-sm font-bold">坐标</span>
+                            <span className="text-xs font-bold">坐标</span>
                         </button>
-                        <button onClick={() => setShowQi(!showQi)} className={`btn-retro flex-1 flex flex-row items-center justify-center gap-2 px-2 py-3 rounded-xl ${showQi ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
+                        <button onClick={() => setShowQi(!showQi)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showQi ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
                             <Wind size={18} />
-                            <span className="text-sm font-bold">气</span>
+                            <span className="text-xs font-bold">气</span>
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-3 bg-[#fff] p-3 rounded-2xl border-2 border-[#e3c086]">
-                        <button onClick={() => setMusicVolume(musicVolume > 0 ? 0 : 0.3)} className="text-[#8c6b38]">
-                            {musicVolume > 0 ? <Volume2 size={20}/> : <VolumeX size={20}/>}
+                    {/* REDESIGNED SLIDER 2: VOLUME (Shorter, safer) & HAPTIC */}
+                    <div className="flex gap-3">
+                         {/* Volume Control */}
+                        <div className="flex-[2] flex items-center gap-3 bg-[#fff] px-3 py-2 rounded-2xl border-2 border-[#e3c086]">
+                            <button onClick={() => setMusicVolume(musicVolume > 0 ? 0 : 0.3)} className="text-[#8c6b38] shrink-0">
+                                {musicVolume > 0 ? <Volume2 size={20}/> : <VolumeX size={20}/>}
+                            </button>
+                            <div className="flex-grow max-w-[120px]">
+                                <input 
+                                    type="range" min="0" max="1" step="0.1" 
+                                    value={musicVolume} 
+                                    onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
+                                    className="cute-range w-full"
+                                    style={{ 
+                                        background: getSliderBackground(musicVolume, 0, 1),
+                                        touchAction: 'none'
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Haptic Toggle */}
+                        <button 
+                            onClick={() => { setHapticEnabled(!hapticEnabled); vibrate(10); }}
+                            className={`flex-1 btn-retro rounded-xl border-2 flex items-center justify-center gap-2 ${hapticEnabled ? 'bg-[#e3c086] text-[#5c4033] border-[#c4ae88]' : 'bg-[#fff] text-[#d7ccc8] border-[#e0e0e0]'}`}
+                        >
+                            <Smartphone size={18} className={hapticEnabled ? 'animate-pulse' : ''}/>
+                            <span className="text-xs font-bold">振动</span>
                         </button>
-                        <input 
-                            type="range" min="0" max="1" step="0.1" 
-                            value={musicVolume} 
-                            onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
-                            className="cute-range flex-grow"
-                            style={{ background: getSliderBackground(musicVolume, 0, 1) }}
-                        />
                     </div>
                 </div>
 
@@ -917,18 +811,16 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* ONLINE MENU (保持不变) */}
-      {/* ... (这里代码保持不变) ... */}
+      {/* ... (Online Menu, Import Modal, Game Over Modal - Keeping existing code structure implied) ... */}
+      {/* ONLINE MENU */}
       {showOnlineMenu && (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
              <div className="bg-[#fcf6ea] rounded-3xl p-6 w-full max-w-sm shadow-2xl border-[6px] border-[#5c4033] relative overflow-hidden text-center">
                 <button onClick={() => setShowOnlineMenu(false)} className="absolute top-4 right-4 text-[#8c6b38] hover:text-[#5c4033]"><X size={24}/></button>
-                
                 <div className="w-16 h-16 bg-[#e3c086] rounded-full flex items-center justify-center text-[#5c4033] mx-auto mb-4 border-2 border-[#5c4033]">
                     <Globe size={32} />
                 </div>
                 <h2 className="text-2xl font-black text-[#5c4033] mb-6">联机对战</h2>
-                
                 <div className="w-full space-y-4">
                     <div className="bg-[#fff] p-4 rounded-xl border-2 border-[#e3c086]">
                         <p className="text-xs font-bold text-[#8c6b38] uppercase mb-2">我的房间号</p>
@@ -939,25 +831,13 @@ const App: React.FC = () => {
                             </button>
                         </div>
                     </div>
-
                     <div className="relative">
                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                             <Hash size={18} className="text-[#8c6b38]" />
                         </div>
-                        <input 
-                            type="text" 
-                            placeholder="输入对方房间号"
-                            value={remotePeerId}
-                            onChange={(e) => setRemotePeerId(e.target.value.replace(/[^0-9]/g, '').slice(0,6))}
-                            className="w-full pl-10 pr-4 py-3 bg-[#fff] border-2 border-[#e3c086] rounded-xl focus:border-[#5c4033] focus:ring-0 font-mono text-lg font-bold text-center outline-none transition-all text-[#5c4033]"
-                        />
+                        <input type="text" placeholder="输入对方房间号" value={remotePeerId} onChange={(e) => setRemotePeerId(e.target.value.replace(/[^0-9]/g, '').slice(0,6))} className="w-full pl-10 pr-4 py-3 bg-[#fff] border-2 border-[#e3c086] rounded-xl focus:border-[#5c4033] focus:ring-0 font-mono text-lg font-bold text-center outline-none transition-all text-[#5c4033]"/>
                     </div>
-
-                    <button 
-                        onClick={joinRoom}
-                        disabled={remotePeerId.length < 6 || onlineStatus === 'connecting'}
-                        className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2"
-                    >
+                    <button onClick={joinRoom} disabled={remotePeerId.length < 6 || onlineStatus === 'connecting'} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
                         {onlineStatus === 'connecting' ? '连接中...' : '加入房间'}
                     </button>
                 </div>
@@ -965,14 +845,12 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* IMPORT / EXPORT MODAL (保持不变) */}
-      {/* ... (这里代码保持不变) ... */}
+      {/* IMPORT / EXPORT MODAL */}
       {showImportModal && (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-[#fcf6ea] rounded-3xl p-6 w-full max-w-sm shadow-2xl border-[6px] border-[#5c4033] relative">
                 <button onClick={() => setShowImportModal(false)} className="absolute top-4 right-4 text-[#8c6b38] hover:text-[#5c4033]"><X size={24}/></button>
                 <h2 className="text-xl font-black text-[#5c4033] mb-4 flex items-center gap-2"><FileUp className="text-[#5c4033]"/> 导入/导出棋局</h2>
-                
                 <div className="space-y-4">
                     <div className="bg-[#fff] p-3 rounded-xl border-2 border-[#e3c086]">
                         <p className="text-xs font-bold text-[#8c6b38] uppercase mb-2">导出当前棋局</p>
@@ -981,30 +859,17 @@ const App: React.FC = () => {
                              {gameCopied ? '已复制' : '复制棋局代码'}
                         </button>
                     </div>
-
                     <div className="bg-[#fff] p-3 rounded-xl border-2 border-[#e3c086]">
                         <p className="text-xs font-bold text-[#8c6b38] uppercase mb-2">导入棋局</p>
-                        <textarea 
-                            className="w-full p-2 text-xs font-mono bg-[#fcf6ea] border border-[#e3c086] rounded-lg h-20 resize-none outline-none focus:border-[#5c4033] text-[#5c4033]"
-                            placeholder="在此粘贴棋局代码..."
-                            value={importKey}
-                            onChange={(e) => setImportKey(e.target.value)}
-                        />
-                        <button 
-                            onClick={handleImportGame}
-                            disabled={!importKey}
-                            className="btn-retro btn-brown w-full mt-2 py-2 rounded-lg"
-                        >
-                            加载棋局
-                        </button>
+                        <textarea className="w-full p-2 text-xs font-mono bg-[#fcf6ea] border border-[#e3c086] rounded-lg h-20 resize-none outline-none focus:border-[#5c4033] text-[#5c4033]" placeholder="在此粘贴棋局代码..." value={importKey} onChange={(e) => setImportKey(e.target.value)}/>
+                        <button onClick={handleImportGame} disabled={!importKey} className="btn-retro btn-brown w-full mt-2 py-2 rounded-lg">加载棋局</button>
                     </div>
                 </div>
             </div>
         </div>
       )}
 
-      {/* GAME OVER MODAL (保持不变) */}
-      {/* ... (这里代码保持不变) ... */}
+      {/* GAME OVER MODAL */}
       {gameOver && !showMenu && (
         <div className="absolute inset-0 z-40 flex items-center justify-center p-4 pointer-events-auto">
             <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" onClick={() => {}} />
@@ -1022,7 +887,6 @@ const App: React.FC = () => {
                 </div>
                 <h2 className="text-3xl font-black text-[#5c4033] mb-2">{winner === 'black' ? '黑方获胜!' : '白方获胜!'}</h2>
                 <p className="text-[#8c6b38] font-bold mb-6 bg-[#e3c086]/30 px-3 py-1 rounded-full text-sm">{winReason}</p>
-                
                 {finalScore && (
                      <div className="flex gap-8 mb-6 text-sm font-bold text-[#5c4033]">
                         <div className="flex flex-col items-center">
@@ -1036,7 +900,6 @@ const App: React.FC = () => {
                         </div>
                      </div>
                 )}
-
                 <div className="flex flex-col gap-3 w-full">
                     <button onClick={() => resetGame(true)} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
                         <RotateCcw size={18} /> 再来一局
