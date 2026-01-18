@@ -101,6 +101,8 @@ const App: React.FC = () => {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const connectionTimeoutRef = useRef<number | null>(null);
+  const isManualDisconnect = useRef<boolean>(false);
 
   // Audio Refs
   const bgmRef = useRef<HTMLAudioElement | null>(null);
@@ -224,17 +226,6 @@ const App: React.FC = () => {
       setAppMode('playing');
       
       cleanupOnline();
-      
-      // If PvAI and User is White, trigger AI for Black immediately
-      if (tempGameMode === 'PvAI' && tempUserColor === 'white') {
-           // We need to trigger the effect that watches currentPlayer
-           // Since currentPlayer is already 'black' and we are 'white', the effect [currentPlayer] needs to fire.
-           // However, if we just set it to black (which it is default), effect might not trigger if it didn't change.
-           // But since we mount the component, the effect `useEffect` below handling AI should pick it up.
-           // Actually, let's ensure the Thinking state starts if needed.
-           // The existing useEffect checks: `gameMode === 'PvAI' && currentPlayer === 'white'`.
-           // Wait, if user is White, AI is Black. So we need to change AI trigger condition.
-      }
   };
 
   // --- AI Turn Trigger Update ---
@@ -293,8 +284,15 @@ const App: React.FC = () => {
       const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: 'all', bundlePolicy: 'max-bundle' });
       pcRef.current = pc;
       pc.oniceconnectionstatechange = () => {
-          if (pc.iceConnectionState === 'connected') setOnlineStatus('connected');
-          else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') setOnlineStatus('disconnected');
+          if (pc.iceConnectionState === 'connected') {
+              setOnlineStatus('connected');
+              if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+          } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+              setOnlineStatus('disconnected');
+              if (!isManualDisconnect.current) {
+                  alert("连接异常中断 (对方可能已离开)");
+              }
+          }
       };
       pc.onicecandidate = (event) => { if (event.candidate) sendSignal(roomId, { type: 'ice', candidate: event.candidate.toJSON() }); };
       if (isHost) { const dc = pc.createDataChannel("game-channel"); setupDataChannel(dc, true); } 
@@ -315,18 +313,26 @@ const App: React.FC = () => {
           else if (msg.type === 'SYNC') { setBoardSize(msg.boardSize); setGameType(msg.gameType); setMyColor(msg.startColor); resetGame(true); }
           else if (msg.type === 'RESTART') resetGame(true);
       };
-      dc.onclose = () => { setOnlineStatus('disconnected'); setMyColor(null); };
+      dc.onclose = () => { 
+          setOnlineStatus('disconnected'); 
+          setMyColor(null); 
+          if (!isManualDisconnect.current) {
+              alert("与对方的连接已断开");
+          }
+      };
   };
 
   const cleanupOnline = () => {
       if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
       if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
+      if (connectionTimeoutRef.current) { clearTimeout(connectionTimeoutRef.current); connectionTimeoutRef.current = null; }
       setOnlineStatus('disconnected');
   };
 
   useEffect(() => { return () => cleanupOnline(); }, []);
 
   const createRoom = async () => {
+      isManualDisconnect.current = false;
       cleanupOnline();
       const id = Math.floor(100000 + Math.random() * 900000).toString();
       setPeerId(id);
@@ -342,8 +348,20 @@ const App: React.FC = () => {
 
   const joinRoom = async () => {
       if (!remotePeerId) return;
+      isManualDisconnect.current = false;
       cleanupOnline();
       setOnlineStatus('connecting');
+      
+      // Connection Timeout Logic
+      connectionTimeoutRef.current = window.setTimeout(() => {
+          if (onlineStatusRef.current !== 'connected') {
+              isManualDisconnect.current = true; // prevent double alert
+              cleanupOnline();
+              alert("连接超时：房间可能不存在或对方离线");
+              setOnlineStatus('disconnected');
+          }
+      }, 15000); // 15s timeout
+
       const channel = supabase.channel(`room_${remotePeerId}`);
       channelRef.current = channel;
       channel.on('broadcast', { event: 'signal' }, async ({ payload }: { payload: SignalMessage }) => {
@@ -357,10 +375,18 @@ const App: React.FC = () => {
 
   const resetGame = (keepOnline: boolean = false) => {
     setBoard(createBoard(boardSize)); setCurrentPlayer('black'); setBlackCaptures(0); setWhiteCaptures(0); setLastMove(null); setGameOver(false); setWinner(null); setWinReason(''); setConsecutivePasses(0); setPassNotificationDismissed(false); setFinalScore(null); setHistory([]); setShowMenu(false); setShowPassModal(false); setIsThinking(false); setAppMode('playing');
-    if (onlineStatusRef.current === 'connected' && !keepOnline && dataChannelRef.current?.readyState === 'open') dataChannelRef.current.send(JSON.stringify({ type: 'RESTART' }));
-    if (!keepOnline) { cleanupOnline(); setMyColor(null); }
     
-    // AI First Move Check triggered by effect
+    // Always send RESTART if connected, so opponent resets too
+    if (onlineStatusRef.current === 'connected' && dataChannelRef.current?.readyState === 'open') {
+        dataChannelRef.current.send(JSON.stringify({ type: 'RESTART' }));
+    }
+    
+    // Only disconnect if explicitly told NOT to keep online
+    if (!keepOnline) { 
+        isManualDisconnect.current = true;
+        cleanupOnline(); 
+        setMyColor(null); 
+    }
   };
 
   const sendData = (msg: any) => { if (dataChannelRef.current?.readyState === 'open') dataChannelRef.current.send(JSON.stringify(msg)); };
@@ -641,7 +667,7 @@ const App: React.FC = () => {
                     <button onClick={() => handlePass(false)} disabled={gameOver || (onlineStatus === 'connected' && currentPlayer !== myColor)} className={`btn-retro btn-coffee flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50 ${consecutivePasses === 1 ? 'animate-pulse' : ''}`}>
                         <SkipForward size={20} /> <span className="text-xs">{consecutivePasses === 1 ? '结算' : '停着'}</span>
                     </button>
-                    <button onClick={() => resetGame(false)} className="btn-retro btn-beige flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold">
+                    <button onClick={() => resetGame(onlineStatus === 'connected')} className="btn-retro btn-beige flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold">
                         <RotateCcw size={20} /> <span className="text-xs">重开</span>
                     </button>
                 </div>
@@ -846,7 +872,7 @@ const App: React.FC = () => {
                         </div>
                         <input type="text" placeholder="输入对方房间号" value={remotePeerId} onChange={(e) => setRemotePeerId(e.target.value.replace(/[^0-9]/g, '').slice(0,6))} className="w-full pl-10 pr-4 py-3 bg-[#fff] border-2 border-[#e3c086] rounded-xl focus:border-[#5c4033] focus:ring-0 font-mono text-lg font-bold text-center outline-none transition-all text-[#5c4033]"/>
                     </div>
-                    <button onClick={joinRoom} disabled={remotePeerId.length < 6 || onlineStatus === 'connecting'} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                    <button onClick={joinRoom} disabled={remotePeerId.length < 6 || onlineStatus === 'connecting' || onlineStatus === 'connected'} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
                         {onlineStatus === 'connecting' ? '连接中...' : '加入房间'}
                     </button>
                 </div>
