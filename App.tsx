@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameBoard } from './components/GameBoard';
 import { BoardState, Player, GameMode, GameType, BoardSize, Difficulty } from './types';
 import { createBoard, attemptMove, getAIMove, checkGomokuWin, calculateScore, calculateWinRate, serializeGame, deserializeGame } from './utils/goLogic';
-import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check, Wind, Volume2, VolumeX, BarChart3, Skull, Undo2, AlertCircle, X, Eye, FileUp, Hash, Eraser, PenTool, LayoutGrid, Zap, Smartphone } from 'lucide-react';
+import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check, Wind, Volume2, VolumeX, BarChart3, Skull, Undo2, AlertCircle, X, Eye, FileUp, Hash, Eraser, PenTool, LayoutGrid, Zap, Smartphone, Info, Heart, Download, RefreshCw, ExternalLink, QrCode } from 'lucide-react';
 
 // --- 1. 引入 Supabase ---
 import { createClient } from '@supabase/supabase-js';
@@ -33,6 +33,27 @@ interface HistoryItem {
 }
 
 type AppMode = 'playing' | 'review' | 'setup';
+
+// --- 常量配置 ---
+const CURRENT_VERSION = '1.8.0';
+// 默认下载链接（官网或Fallback）
+const DEFAULT_DOWNLOAD_LINK = 'https://yesterhaze.codes'; 
+
+// 简单的语义化版本比较函数
+// 返回 1 (v1 > v2), -1 (v1 < v2), 0 (相等)
+const compareVersions = (v1: string, v2: string) => {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+  const len = Math.max(parts1.length, parts2.length);
+
+  for (let i = 0; i < len; i++) {
+    const num1 = parts1[i] || 0;
+    const num2 = parts2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  return 0;
+};
 
 const App: React.FC = () => {
   // --- Global App State ---
@@ -79,6 +100,15 @@ const App: React.FC = () => {
   // Import/Export
   const [showImportModal, setShowImportModal] = useState(false);
   const [importKey, setImportKey] = useState('');
+
+  // About & Support
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [donationMethod, setDonationMethod] = useState<'wechat' | 'alipay'>('wechat');
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState('');
+  const [downloadUrl, setDownloadUrl] = useState<string>(DEFAULT_DOWNLOAD_LINK);
+  const [newVersionFound, setNewVersionFound] = useState(false);
+  const [socialTip, setSocialTip] = useState('');
   
   // Undo Stack
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -228,6 +258,59 @@ const App: React.FC = () => {
       cleanupOnline();
   };
 
+  // Check Version Logic - Using Supabase
+  const handleCheckUpdate = async () => {
+      setCheckingUpdate(true);
+      setUpdateMsg('');
+      setNewVersionFound(false); // Reset on check
+      try {
+          // 从 Supabase 的 app_config 表中获取 key 为 'latest_release' 的数据
+          const { data, error } = await supabase
+              .from('app_config')
+              .select('value')
+              .eq('key', 'latest_release')
+              .single();
+
+          if (error) {
+            console.error('Supabase query error:', error);
+            if (error.code === 'PGRST116') {
+                setUpdateMsg('未找到版本信息');
+            } else {
+                throw error;
+            }
+            return;
+          }
+
+          if (data && data.value) {
+              const remoteVersion = data.value.version;
+              const remoteUrl = data.value.downloadUrl;
+              const releaseNote = data.value.message;
+
+              // 如果 Supabase 里的版本 > 当前代码里的版本
+              if (compareVersions(remoteVersion, CURRENT_VERSION) > 0) {
+                  setUpdateMsg(`发现新版本: v${remoteVersion} ${releaseNote ? `(${releaseNote})` : ''}`);
+                  if (remoteUrl) setDownloadUrl(remoteUrl);
+                  setNewVersionFound(true); // Only show button if update found
+              } else {
+                  setUpdateMsg('当前已是最新版本');
+                  setNewVersionFound(false);
+              }
+          }
+      } catch (e) {
+          console.error(e);
+          setUpdateMsg('检查失败，请检查网络');
+      } finally {
+          setCheckingUpdate(false);
+      }
+  };
+
+  const copySocial = (id: string, platform: string) => {
+    navigator.clipboard.writeText(id);
+    vibrate(10);
+    setSocialTip(`已复制 ${platform} ID`);
+    setTimeout(() => setSocialTip(''), 2000);
+  };
+
   // --- AI Turn Trigger Update ---
   // If PvAI:
   // - If User is Black: AI plays when current is White.
@@ -310,7 +393,18 @@ const App: React.FC = () => {
           const msg = JSON.parse(e.data);
           if (msg.type === 'MOVE') executeMove(msg.x, msg.y, true);
           else if (msg.type === 'PASS') handlePass(true);
-          else if (msg.type === 'SYNC') { setBoardSize(msg.boardSize); setGameType(msg.gameType); setMyColor(msg.startColor); resetGame(true); }
+          else if (msg.type === 'SYNC') { 
+              // 关键修复：当收到 SYNC 信号时，先同步状态
+              setBoardSize(msg.boardSize); 
+              setTempBoardSize(msg.boardSize); // 确保设置菜单也同步
+              setGameType(msg.gameType); 
+              setTempGameType(msg.gameType);
+              setMyColor(msg.startColor); 
+              
+              // 关键修复：直接传递接收到的 boardSize 给 resetGame，而不依赖异步的 state 更新
+              resetGame(true, msg.boardSize); 
+              vibrate(20);
+          }
           else if (msg.type === 'RESTART') resetGame(true);
       };
       dc.onclose = () => { 
@@ -373,8 +467,12 @@ const App: React.FC = () => {
 
   useEffect(() => { if (showOnlineMenu && !peerId && onlineStatus === 'disconnected') createRoom(); }, [showOnlineMenu, peerId, onlineStatus]);
 
-  const resetGame = (keepOnline: boolean = false) => {
-    setBoard(createBoard(boardSize)); setCurrentPlayer('black'); setBlackCaptures(0); setWhiteCaptures(0); setLastMove(null); setGameOver(false); setWinner(null); setWinReason(''); setConsecutivePasses(0); setPassNotificationDismissed(false); setFinalScore(null); setHistory([]); setShowMenu(false); setShowPassModal(false); setIsThinking(false); setAppMode('playing');
+  const resetGame = (keepOnline: boolean = false, explicitSize?: number) => {
+    // 优先使用传入的 explicitSize，否则使用当前的 state
+    const sizeToUse = explicitSize !== undefined ? explicitSize : boardSize;
+    
+    setBoard(createBoard(sizeToUse)); 
+    setCurrentPlayer('black'); setBlackCaptures(0); setWhiteCaptures(0); setLastMove(null); setGameOver(false); setWinner(null); setWinReason(''); setConsecutivePasses(0); setPassNotificationDismissed(false); setFinalScore(null); setHistory([]); setShowMenu(false); setShowPassModal(false); setIsThinking(false); setAppMode('playing');
     
     // Always send RESTART if connected, so opponent resets too
     if (onlineStatusRef.current === 'connected' && dataChannelRef.current?.readyState === 'open') {
@@ -479,7 +577,7 @@ const App: React.FC = () => {
   const currentDisplayLastMove = appMode === 'review' && history[reviewIndex] ? history[reviewIndex].lastMove : lastMove;
   
   // Win Rate Logic with Color Flip
-  const rawWinRate = showWinRate && !gameOver && appMode === 'playing' ? calculateWinRate(board) : 50;
+  const rawWinRate = showWinRate && !gameOver && appMode === 'playing' && gameType === 'Go' ? calculateWinRate(board) : 50;
   // If user is White, show White's win rate (which is 100 - Black's win rate)
   const displayWinRate = userColor === 'white' ? (100 - rawWinRate) : rawWinRate;
   
@@ -828,6 +926,11 @@ const App: React.FC = () => {
                     <button onClick={() => setShowOnlineMenu(true)} className="btn-retro col-span-2 flex items-center justify-center gap-2 bg-[#90caf9] text-[#1565c0] border-[#64b5f6] py-3 rounded-xl font-bold text-sm">
                         <Globe size={18}/> 联机对战
                     </button>
+                    
+                    {/* Add About & Support Button */}
+                    <button onClick={() => { setShowAboutModal(true); setShowMenu(false); }} className="btn-retro col-span-2 flex items-center justify-center gap-2 bg-[#ffccbc] text-[#d84315] border-[#ffab91] py-3 rounded-xl font-bold text-sm">
+                        <Heart size={18} fill="#ff5722" className="animate-pulse" /> 关于与赞赏
+                    </button>
                 </div>
 
             </div>
@@ -842,6 +945,158 @@ const App: React.FC = () => {
                 </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* --- ABOUT & SUPPORT MODAL --- */}
+      {showAboutModal && (
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={(e) => { if(e.target === e.currentTarget) setShowAboutModal(false) }}>
+          <div className="bg-[#fcf6ea] rounded-[2rem] w-full max-w-sm shadow-2xl border-[6px] border-[#8c6b38] flex flex-col max-h-[85vh] relative overflow-hidden">
+            
+            {/* Fixed Close Button Layer */}
+            <div className="absolute top-0 left-0 right-0 p-4 flex justify-end z-20 pointer-events-none bg-gradient-to-b from-[#fcf6ea] via-[#fcf6ea]/80 to-transparent h-20">
+                <button onClick={() => setShowAboutModal(false)} className="pointer-events-auto text-[#8c6b38] hover:text-[#5c4033] bg-[#fff] rounded-full w-10 h-10 flex items-center justify-center border-2 border-[#e3c086] transition-colors shadow-sm"><X size={20}/></button>
+            </div>
+            
+            {/* Scrollable Content */}
+            <div className="p-6 pt-16 flex flex-col gap-5 text-center overflow-y-auto custom-scrollbar overscroll-contain">
+                <div className="flex flex-col items-center gap-2 mt-2">
+                    <div className="w-20 h-20 bg-[#5c4033] rounded-3xl flex items-center justify-center shadow-lg border-4 border-[#8c6b38] text-[#f7e7ce]">
+                        <Info size={40} />
+                    </div>
+                    <h2 className="text-2xl font-black text-[#5c4033] tracking-wide">Cute-Go</h2>
+                    <p className="text-xs font-bold text-[#8c6b38] opacity-80">可爱的围棋/五子棋对战助手<br/>Made with ❤️ by Yohaku</p>
+                </div>
+
+                <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
+
+                {/* Version & Update */}
+                <div className="bg-[#fff]/50 p-4 rounded-2xl border border-[#e3c086]">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-bold text-[#5c4033]">当前版本</span>
+                        <span className="bg-[#8c6b38] text-[#fcf6ea] text-xs font-bold px-2 py-1 rounded-lg">v{CURRENT_VERSION}</span>
+                    </div>
+                    <button 
+                        onClick={handleCheckUpdate}
+                        disabled={checkingUpdate}
+                        className="w-full btn-retro btn-beige py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+                    >
+                        {checkingUpdate ? <RefreshCw size={14} className="animate-spin"/> : <RefreshCw size={14}/>}
+                        {checkingUpdate ? '检查中...' : '检查更新'}
+                    </button>
+                    {updateMsg && (
+                        <p className={`text-xs font-bold mt-2 ${updateMsg.includes('新版本') ? 'text-green-600' : 'text-[#8c6b38]'}`}>
+                            {updateMsg}
+                        </p>
+                    )}
+                </div>
+
+                 {/* Download Link */}
+                 {newVersionFound && (
+                     <a 
+                        href={downloadUrl} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="btn-retro bg-[#81c784] border-[#388e3c] text-white py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg animate-in fade-in slide-in-from-top-2"
+                     >
+                        <Download size={18} /> 
+                        {updateMsg.includes('发现新版本') ? '下载更新' : '访问官网 / 下载'}
+                    </a>
+                 )}
+
+                <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
+
+                {/* Social Media (已更新本地图片和ID) */}
+                <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086] relative">
+                    {socialTip && (
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] rounded-2xl flex items-center justify-center z-10 animate-in fade-in duration-200">
+                            <div className="bg-white px-3 py-1 rounded-full flex items-center gap-2">
+                                <Check size={12} className="text-green-500"/>
+                                <span className="text-xs font-bold text-[#5c4033]">{socialTip}</span>
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                         <div className="h-px bg-[#e3c086]/50 flex-1"></div>
+                         <span className="text-xs font-bold text-[#8c6b38]">点击图标复制 ID</span>
+                         <div className="h-px bg-[#e3c086]/50 flex-1"></div>
+                    </div>
+                    
+                    <div className="flex justify-around px-2">
+                         {/* Bilibili: 1245921330 */}
+                         <button onClick={() => copySocial('1245921330', 'B站')} className="flex flex-col items-center gap-2 group">
+                             <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#23ade5] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
+                                 {/* 请确保 public 文件夹中有 bili.png */}
+                                 <img src="/bili.jpg" alt="Bili" className="w-full h-full object-cover" />
+                             </div>
+                             <span className="text-[10px] font-bold text-[#5c4033]">Bilibili</span>
+                         </button>
+
+                         {/* 小红书: 7848618811 */}
+                         <button onClick={() => copySocial('7848618811', '小红书')} className="flex flex-col items-center gap-2 group">
+                             <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#ff2442] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
+                                 {/* 请确保 public 文件夹中有 rednote.png */}
+                                 <img src="/rednote.jpg" alt="RedNote" className="w-full h-full object-cover" />
+                             </div>
+                             <span className="text-[10px] font-bold text-[#5c4033]">小红书</span>
+                         </button>
+
+                         {/* 抖音: 47891107161 */}
+                         <button onClick={() => copySocial('47891107161', '抖音')} className="flex flex-col items-center gap-2 group">
+                             <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#1c1c1c] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
+                                  {/* 请确保 public 文件夹中有 douyin.png */}
+                                  <img src="/douyin.jpg" alt="Douyin" className="w-full h-full object-cover" />
+                             </div>
+                             <span className="text-[10px] font-bold text-[#5c4033]">抖音</span>
+                         </button>
+                    </div>
+                </div>
+
+                <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
+
+                {/* Donation / Support (已更新本地二维码) */}
+                <div className="flex flex-col gap-3 pb-4">
+                    <div className="flex items-center justify-center gap-2">
+                         <Heart size={16} fill="#e57373" className="text-[#e57373] animate-pulse"/>
+                         <h3 className="text-sm font-bold text-[#5c4033] uppercase">支持开发者</h3>
+                         <Heart size={16} fill="#e57373" className="text-[#e57373] animate-pulse"/>
+                    </div>
+                    <p className="text-[10px] font-bold text-[#8c6b38] leading-tight">如果喜欢这个应用，<br/>欢迎投喂一杯奶茶☕️！<br/>你们的支持是我更新的动力🤗 </p>
+
+                    <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086]">
+                        {/* Toggle */}
+                        <div className="inset-track rounded-xl p-1 relative h-10 flex items-center mb-4">
+                            <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${donationMethod === 'alipay' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
+                            <button onClick={() => setDonationMethod('wechat')} className={`flex-1 relative z-10 font-bold text-xs transition-colors duration-200 flex items-center justify-center gap-1 ${donationMethod === 'wechat' ? 'text-[#07c160]' : 'text-[#8c6b38]/60'}`}>
+                                微信支付
+                            </button>
+                            <button onClick={() => setDonationMethod('alipay')} className={`flex-1 relative z-10 font-bold text-xs transition-colors duration-200 flex items-center justify-center gap-1 ${donationMethod === 'alipay' ? 'text-[#1677ff]' : 'text-[#8c6b38]/60'}`}>
+                                支付宝
+                            </button>
+                        </div>
+
+                        {/* QR Code Area - 使用本地图片 */}
+                        <div className="w-full aspect-square bg-[#fcf6ea] rounded-xl border-2 border-dashed border-[#e3c086] flex items-center justify-center relative overflow-hidden group">
+                             {/* 请确保 public 文件夹中有 wechat_pay.png 和 alipay_pay.png */}
+                             <img 
+                                src={donationMethod === 'wechat' 
+                                    ? '/wechat_pay.jpg' 
+                                    : '/alipay_pay.jpg'
+                                } 
+                                alt={donationMethod === 'wechat' ? "WeChat QR" : "Alipay QR"}
+                                className="w-full h-full object-contain p-2" 
+                             />
+                             {/* 扫光特效 */}
+                             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 pointer-events-none"></div>
+                        </div>
+                        <p className="text-[10px] text-[#8c6b38] mt-2 font-bold opacity-75">
+                            (个人收款码不支持直接跳转，请截图或长按保存扫码)
+                        </p>
+                    </div>
+                </div>
+
+            </div>
           </div>
         </div>
       )}

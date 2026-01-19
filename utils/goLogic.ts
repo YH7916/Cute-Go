@@ -45,7 +45,14 @@ export const getGroup = (board: BoardState, start: Point): Group | null => {
     }
   }
 
-  return { stones: group, liberties: liberties.size };
+  return { 
+      stones: group, 
+      liberties: liberties.size,
+      libertyPoints: Array.from(liberties).map(s => {
+          const [x, y] = s.split(',').map(Number);
+          return {x, y};
+      })
+  };
 };
 
 export const getAllGroups = (board: BoardState): Group[] => {
@@ -287,9 +294,21 @@ export const calculateScore = (board: BoardState): { black: number, white: numbe
 };
 
 export const calculateWinRate = (board: BoardState): number => {
+    // 1. Check game phase. If it's early game (< 10 stones), assume 50/50.
+    // This prevents the Komi (7.5) from making it look like White is crushing Black at start.
+    let stoneCount = 0;
+    for(let y=0; y<board.length; y++) {
+        for(let x=0; x<board.length; x++) {
+            if (board[y][x]) stoneCount++;
+        }
+    }
+    if (stoneCount < 10) return 50;
+
     const score = calculateScore(board);
     const diff = score.black - score.white; 
-    const k = 0.15; 
+    
+    // Lower k factor to make the curve less steep/volatile
+    const k = 0.12; 
     return (1 / (1 + Math.exp(-k * diff))) * 100;
 };
 

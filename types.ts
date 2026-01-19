@@ -17,6 +17,7 @@ export type BoardState = (Stone | null)[][];
 export interface Group {
   stones: Stone[];
   liberties: number;
+  libertyPoints: Point[]; // Added for face direction logic
 }
 
 export type GameMode = 'PvP' | 'PvAI';
