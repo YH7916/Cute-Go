@@ -961,13 +961,22 @@ const App: React.FC = () => {
             
             {/* Scrollable Content */}
             <div className="p-6 pt-16 flex flex-col gap-5 text-center overflow-y-auto custom-scrollbar overscroll-contain">
+                
+                {/* --- 修改开始：应用图标区域 --- */}
                 <div className="flex flex-col items-center gap-2 mt-2">
-                    <div className="w-20 h-20 bg-[#5c4033] rounded-3xl flex items-center justify-center shadow-lg border-4 border-[#8c6b38] text-[#f7e7ce]">
-                        <Info size={40} />
+                    {/* 原本是 <div ...><Info size={40}/></div>，现在替换为图片 */}
+                    <div className="w-20 h-20 bg-[#5c4033] rounded-3xl shadow-lg border-4 border-[#8c6b38] overflow-hidden">
+                        {/* 请确保 public 文件夹中有 logo.png */}
+                        <img 
+                            src="/logo.png" 
+                            alt="App Icon" 
+                            className="w-full h-full object-cover"
+                        />
                     </div>
                     <h2 className="text-2xl font-black text-[#5c4033] tracking-wide">Cute-Go</h2>
                     <p className="text-xs font-bold text-[#8c6b38] opacity-80">可爱的围棋/五子棋对战助手<br/>Made with ❤️ by Yohaku</p>
                 </div>
+                {/* --- 修改结束 --- */}
 
                 <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
 
