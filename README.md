@@ -54,7 +54,7 @@
 | **跨平台** | ![Capacitor](https://img.shields.io/badge/-Capacitor-black?style=flat-square&logo=capacitor) | Web 到 Android 的桥梁 |
 | **AI Copilot** | ![Gemini](https://img.shields.io/badge/-Gemini_3_Pro-black?style=flat-square&logo=google-gemini) | 用于生成逻辑代码、Bug 修复与重构建议 |
 | **构建工具** | ![Vite](https://img.shields.io/badge/-Vite-black?style=flat-square&logo=vite) | 极速的开发与打包体验 |
-| **样式方案** | ![TailwindCSS](https://img.shields.io/badge/-Tailwind-black?style=flat-square&logo=tailwindcss) | (可选，根据实际情况修改) 优雅的样式原子 |
+| **样式方案** | ![TailwindCSS](https://img.shields.io/badge/-Tailwind-black?style=flat-square&logo=tailwindcss) | 优雅的样式原子 |
 
 ## 📸 界面预览
 
@@ -134,3 +134,4 @@ npx cap open android
 <div align="center">
 Made with ❤️ by Yohaku
 </div>
+
