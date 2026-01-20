@@ -2,18 +2,15 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameBoard } from './components/GameBoard';
 import { BoardState, Player, GameMode, GameType, BoardSize, Difficulty } from './types';
 import { createBoard, attemptMove, getAIMove, checkGomokuWin, calculateScore, calculateWinRate, serializeGame, deserializeGame } from './utils/goLogic';
-import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check, Wind, Volume2, VolumeX, BarChart3, Skull, Undo2, AlertCircle, X, Eye, FileUp, Hash, Eraser, PenTool, LayoutGrid, Zap, Smartphone, Info, Heart, Download, RefreshCw, ExternalLink, QrCode } from 'lucide-react';
+import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check, Wind, Volume2, VolumeX, BarChart3, Skull, Undo2, AlertCircle, X, Eye, FileUp, Hash, Eraser, PenTool, LayoutGrid, Zap, Smartphone, Info, Heart, Download, RefreshCw, ExternalLink, QrCode, LogIn, LogOut, User as UserIcon, Shield, Egg, Feather, Crown, Medal, Sword, Disc, Utensils, Clover } from 'lucide-react';
 
 // [新增] 引入 AI Hook
 import { useKataGo, sliderToVisits, visitsToSlider, ExtendedDifficulty } from './hooks/useKataGo'; 
+import { useAchievements } from './hooks/useAchievements';
 
 // --- 1. 引入 Supabase ---
-import { createClient } from '@supabase/supabase-js';
-
-// --- 2. 配置 Supabase (使用你提供的信息) ---
-const SUPABASE_URL = 'https://ibtgczhypjybiibtapcn.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlidGdjemh5cGp5YmlpYnRhcGNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2NTExMDIsImV4cCI6MjA4NDIyNzEwMn0.duXCEXmxLSppLlw0q-9JoFD7EpIBUw6fc1zmDiRwTPU'; 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+import { Session } from '@supabase/supabase-js';
+import { supabase } from './utils/supabaseClient';
 
 // --- 3. 定义信令消息类型 ---
 type SignalMessage = 
@@ -58,6 +55,47 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
+// --- ELO 计算逻辑 ---
+const calculateElo = (myRating: number, opponentRating: number, result: 'win' | 'loss'): number => {
+        const kFactor = 32; // 权重系数
+        const expectedScore = 1 / (1 + Math.pow(10, (opponentRating - myRating) / 400));
+        const actualScore = result === 'win' ? 1 : 0;
+        return Math.round(myRating + kFactor * (actualScore - expectedScore));
+};
+
+const calculateNewRating = (
+    playerRating: number,
+    opponentRating: number,
+    result: 0 | 0.5 | 1,
+    kFactor: number = 16
+): number => {
+    const expectedScore = 1 / (1 + Math.pow(10, (opponentRating - playerRating) / 400));
+    const newRating = Math.round(playerRating + kFactor * (result - expectedScore));
+    return Math.max(0, newRating);
+};
+
+const getAiRating = (diff: ExtendedDifficulty): number => {
+    switch (diff) {
+            case 'Easy':
+                    return 850;
+            case 'Medium':
+                    return 1350;
+            case 'Hard':
+                    return 1800;
+            case 'Custom':
+                    return 1800;
+            default:
+                    return 1350;
+    }
+};
+
+const getRankBadge = (elo: number) => {
+  if (elo >= 1800) return { Icon: Crown, color: 'text-yellow-500', label: '皇冠' };
+  if (elo >= 1500) return { Icon: Trophy, color: 'text-gray-500', label: '奖杯' };
+  if (elo >= 1200) return { Icon: Feather, color: 'text-[#8c6b38]', label: '羽毛' };
+  return { Icon: Egg, color: 'text-[#c4ae88]', label: '蛋' };
+};
+
 // 在 App 组件外部定义扩展类型
 // ExtendedDifficulty type imported from useKataGo
 
@@ -71,6 +109,23 @@ const App: React.FC = () => {
       return fallback;
     }
   };
+
+    // --- Auth & Profile State ---
+    const [session, setSession] = useState<Session | null>(null);
+    const [userProfile, setUserProfile] = useState<{ nickname: string; elo: number } | null>(null);
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [loginMode, setLoginMode] = useState<'signin' | 'signup'>('signin');
+    const [authEmail, setAuthEmail] = useState('');
+    const [authPassword, setAuthPassword] = useState('');
+    const [authNickname, setAuthNickname] = useState('');
+
+    // --- Matchmaking State ---
+    const [isMatching, setIsMatching] = useState(false);
+    const [matchTime, setMatchTime] = useState(0);
+    const [queueCounts, setQueueCounts] = useState<{ [key: string]: number }>({});
+    const [opponentProfile, setOpponentProfile] = useState<{ id: string; elo: number } | null>(null);
+
+    const matchTimerRef = useRef<number | null>(null);
 
   // --- 2. Global App State (使用 loadState 初始化) ---
   const [boardSize, setBoardSize] = useState<BoardSize>(() => loadState('boardSize', 9));
@@ -116,6 +171,45 @@ const App: React.FC = () => {
   const [tempMaxVisits, setTempMaxVisits] = useState<number>(1000);
   const [tempUserColor, setTempUserColor] = useState<Player>('black'); // Temp state for settings
 
+  const fetchProfile = async (userId: string) => {
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (data) setUserProfile({ nickname: data.nickname, elo: data.elo_rating });
+  };
+
+  const handleAuth = async () => {
+      if (loginMode === 'signin') {
+          const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+          if (error) alert('登录失败: ' + error.message);
+      } else {
+          const { error } = await supabase.auth.signUp({
+              email: authEmail,
+              password: authPassword,
+              options: { data: { nickname: authNickname || '棋手' } }
+          });
+          if (error) alert('注册失败: ' + error.message);
+          else alert('注册成功！请直接登录。');
+      }
+  };
+
+  // --- Auth Initialization ---
+  useEffect(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+          setSession(session);
+          if (session) fetchProfile(session.user.id);
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          setSession(session);
+          if (session) {
+              fetchProfile(session.user.id);
+              setShowLoginModal(false);
+          } else {
+              setUserProfile(null);
+          }
+      });
+      return () => subscription.unsubscribe();
+  }, []);
+
   // Game State
   const [board, setBoard] = useState<BoardState>(createBoard(9));
   const [currentPlayer, setCurrentPlayer] = useState<Player>('black');
@@ -152,10 +246,24 @@ const App: React.FC = () => {
   
   // UI State
   const [showMenu, setShowMenu] = useState(false);
+    const [showUserPage, setShowUserPage] = useState(false);
   const [showPassModal, setShowPassModal] = useState(false); 
   const [isThinking, setIsThinking] = useState(false); 
+    const [eloDiffText, setEloDiffText] = useState<string | null>(null);
+    const [eloDiffStyle, setEloDiffStyle] = useState<'gold' | 'normal' | 'negative' | null>(null);
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // [新增] --- 初始化 PC 端 AI 引擎 ---
+    // [新增] 初始化成就系统
+  const { 
+    newUnlocked, 
+    clearNewUnlocked, 
+    checkEndGameAchievements, 
+    checkMoveAchievements,
+    achievementsList,
+    userAchievements
+  } = useAchievements(session?.user?.id);
+
   const aiEngine = useKataGo({
     boardSize,
     // AI 落子时的回调（复用现有的 executeMove，视为非远程操作以记录历史）
@@ -205,6 +313,7 @@ const App: React.FC = () => {
 
   // Online State
   const [showOnlineMenu, setShowOnlineMenu] = useState(false);
+    const [matchBoardSize, setMatchBoardSize] = useState<BoardSize>(() => ([9, 13, 19].includes(boardSize) ? boardSize : 9));
   const [peerId, setPeerId] = useState<string>('');
   const [remotePeerId, setRemotePeerId] = useState<string>('');
   const [onlineStatus, setOnlineStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
@@ -242,13 +351,26 @@ const App: React.FC = () => {
   useEffect(() => { myColorRef.current = myColor; }, [myColor]);
   useEffect(() => { onlineStatusRef.current = onlineStatus; }, [onlineStatus]);
 
+  const getSfxVolume = useCallback(() => Math.min(1, Math.max(0, musicVolume + 0.2)), [musicVolume]);
+
+  const setAllSfxVolume = useCallback((volume: number) => {
+      [sfxMove, sfxCapture, sfxError, sfxWin, sfxLose].forEach((ref) => {
+          if (ref.current) ref.current.volume = volume;
+      });
+  }, []);
+
   // Handle Audio Initialization
   useEffect(() => {
-     sfxMove.current = new Audio('/move.mp3');
-     sfxCapture.current = new Audio('/capture.mp3');
-     sfxError.current = new Audio('/error.mp3');
-     sfxWin.current = new Audio('/win.mp3');
-     sfxLose.current = new Audio('/lose.mp3');
+     const initSfx = (ref: React.MutableRefObject<HTMLAudioElement | null>, src: string) => {
+         const audio = new Audio(src);
+         audio.preload = 'auto';
+         ref.current = audio;
+     };
+     initSfx(sfxMove, '/move.wav');
+     initSfx(sfxCapture, '/capture.wav');
+     initSfx(sfxError, '/error.wav');
+     initSfx(sfxWin, '/win.wav');
+     initSfx(sfxLose, '/lose.wav');
   }, []);
 
   // Haptic Helper
@@ -264,7 +386,6 @@ const App: React.FC = () => {
       const play = (ref: React.MutableRefObject<HTMLAudioElement | null>) => {
           if (ref.current) {
               ref.current.currentTime = 0;
-              ref.current.volume = Math.min(1, musicVolume + 0.2); 
               ref.current.play().catch(() => {});
           }
       };
@@ -303,6 +424,24 @@ const App: React.FC = () => {
     }
   }, [musicVolume, hasInteracted]);
 
+  useEffect(() => {
+      const handleVisibilityChange = () => {
+          if (!bgmRef.current) return;
+          if (document.hidden) {
+              bgmRef.current.pause();
+          } else if (musicVolume > 0 && hasInteracted) {
+              bgmRef.current.play().catch(() => {});
+          }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [musicVolume, hasInteracted]);
+
+    useEffect(() => {
+            setAllSfxVolume(getSfxVolume());
+    }, [getSfxVolume, setAllSfxVolume]);
+
   // Sync temp settings when menu opens
   useEffect(() => {
       if (showMenu) {
@@ -321,6 +460,14 @@ const App: React.FC = () => {
       setDifficulty(tempDifficulty);
       setGameMode(tempGameMode);
       setUserColor(tempUserColor);
+
+      if (tempGameMode === 'PvAI' && userProfile?.elo !== undefined) {
+          const lowAi = tempDifficulty === 'Easy' || tempDifficulty === 'Medium';
+          if (userProfile.elo >= 1450 && lowAi) {
+              setToastMsg('以你现在的实力，战胜这个难度的 AI 将无法获得积分，建议挑战更高级别或联机对战！');
+              setTimeout(() => setToastMsg(null), 3500);
+          }
+      }
       
       // Reset logic
       setBoard(createBoard(tempBoardSize));
@@ -339,6 +486,8 @@ const App: React.FC = () => {
       setShowPassModal(false);
       setIsThinking(false);
       setAppMode('playing');
+    setEloDiffText(null);
+    setEloDiffStyle(null);
       
       cleanupOnline();
 
@@ -476,7 +625,7 @@ const App: React.FC = () => {
     try { await supabase.channel(`room_${roomId}`).send({ type: 'broadcast', event: 'signal', payload }); } catch (error) {}
   };
 
-  const setupPeerConnection = async (roomId: string, isHost: boolean) => {
+    const setupPeerConnection = async (roomId: string, isHost: boolean, shouldCreateDataChannel: boolean) => {
       if (pcRef.current) pcRef.current.close();
       const iceServers = await getIceServers();
       const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: 'all', bundlePolicy: 'max-bundle' });
@@ -493,32 +642,62 @@ const App: React.FC = () => {
           }
       };
       pc.onicecandidate = (event) => { if (event.candidate) sendSignal(roomId, { type: 'ice', candidate: event.candidate.toJSON() }); };
-      if (isHost) { const dc = pc.createDataChannel("game-channel"); setupDataChannel(dc, true); } 
-      else { pc.ondatachannel = (event) => setupDataChannel(event.channel, false); }
+      if (shouldCreateDataChannel) { const dc = pc.createDataChannel("game-channel"); setupDataChannel(dc, isHost); } 
+      else { pc.ondatachannel = (event) => setupDataChannel(event.channel, isHost); }
       return pc;
   };
 
   const setupDataChannel = (dc: RTCDataChannel, isHost: boolean) => {
       dataChannelRef.current = dc;
       dc.onopen = () => {
-          setOnlineStatus('connected'); setShowOnlineMenu(false); setShowMenu(false); setGameMode('PvP');
-          if (isHost) { setMyColor('black'); resetGame(true); if (dc.readyState === 'open') dc.send(JSON.stringify({ type: 'SYNC', boardSize: boardSize, gameType: gameTypeRef.current, startColor: 'white' })); }
+          setOnlineStatus('connected'); setIsMatching(false); setShowOnlineMenu(false); setShowMenu(false); setGameMode('PvP');
+
+          if (isHost) {
+              // Host (白棋) 发送 Sync（使用房主的棋盘大小）
+              setMyColor('white');
+              resetGame(true);
+
+              const syncPayload: any = {
+                  type: 'SYNC',
+                  boardSize,
+                  gameType: gameTypeRef.current,
+                  startColor: 'black'
+              };
+              if (session && userProfile) {
+                  syncPayload.opponentInfo = { id: session.user.id, elo: userProfile.elo };
+              }
+              dc.send(JSON.stringify(syncPayload));
+          } else {
+              // Joiner (黑棋) 等待 Sync
+          }
       };
       dc.onmessage = (e) => {
           const msg = JSON.parse(e.data);
           if (msg.type === 'MOVE') executeMove(msg.x, msg.y, true);
           else if (msg.type === 'PASS') handlePass(true);
           else if (msg.type === 'SYNC') { 
-              // 关键修复：当收到 SYNC 信号时，先同步状态
               setBoardSize(msg.boardSize); 
-              setTempBoardSize(msg.boardSize); // 确保设置菜单也同步
+              setTempBoardSize(msg.boardSize);
               setGameType(msg.gameType); 
               setTempGameType(msg.gameType);
-              setMyColor(msg.startColor); 
-              
-              // 关键修复：直接传递接收到的 boardSize 给 resetGame，而不依赖异步的 state 更新
-              resetGame(true, msg.boardSize); 
+              setMyColor(msg.startColor);
+
+              if (msg.opponentInfo) {
+                  setOpponentProfile(msg.opponentInfo);
+                  if (session && userProfile) {
+                      dc.send(JSON.stringify({
+                          type: 'SYNC_REPLY',
+                          opponentInfo: { id: session.user.id, elo: userProfile.elo }
+                      }));
+                  }
+              }
+              resetGame(true, msg.boardSize);
               vibrate(20);
+          }
+          else if (msg.type === 'SYNC_REPLY') {
+              if (msg.opponentInfo) {
+                  setOpponentProfile(msg.opponentInfo);
+              }
           }
           else if (msg.type === 'RESTART') resetGame(true);
       };
@@ -536,9 +715,135 @@ const App: React.FC = () => {
       if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
       if (connectionTimeoutRef.current) { clearTimeout(connectionTimeoutRef.current); connectionTimeoutRef.current = null; }
       setOnlineStatus('disconnected');
+      setOpponentProfile(null);
   };
 
   useEffect(() => { return () => cleanupOnline(); }, []);
+
+  const cancelMatchmaking = async () => {
+      if (matchTimerRef.current) {
+          clearInterval(matchTimerRef.current);
+          matchTimerRef.current = null;
+      }
+      setIsMatching(false);
+      setMatchTime(0);
+      if (peerId) {
+          await supabase.from('matchmaking_queue').delete().eq('peer_id', peerId);
+      }
+      cleanupOnline();
+  };
+
+  const startMatchmaking = async (sizeOverride?: BoardSize) => {
+      if (!session || !userProfile) {
+          setShowLoginModal(true);
+          return;
+      }
+
+      const validSizes: BoardSize[] = [9, 13, 19];
+      const sizeToMatch = sizeOverride ?? matchBoardSize;
+      if (!validSizes.includes(sizeToMatch)) {
+          alert("排位匹配仅支持 9路、13路 或 19路 棋盘。\n请在设置中调整棋盘大小。");
+          setShowMenu(true);
+          return;
+      }
+
+      if (onlineStatus === 'connected') return;
+
+      if (isMatching) {
+          if (sizeToMatch === matchBoardSize) return;
+          await cancelMatchmaking();
+      }
+
+      setMatchBoardSize(sizeToMatch);
+      setBoardSize(sizeToMatch);
+      setTempBoardSize(sizeToMatch);
+      setIsMatching(true);
+      setMatchTime(0);
+
+      const myTempPeerId = Math.floor(100000 + Math.random() * 900000).toString();
+      setPeerId(myTempPeerId);
+
+      matchTimerRef.current = window.setInterval(() => setMatchTime(prev => prev + 1), 1000);
+
+    const myElo = userProfile.elo;
+
+      const findOpponent = async (attempt: number): Promise<any> => {
+          const range = attempt === 1 ? 100 : (attempt === 2 ? 300 : 9999);
+
+          const { data: opponents } = await supabase
+              .from('matchmaking_queue')
+              .select('*')
+              .eq('game_type', gameType)
+              .eq('board_size', sizeToMatch)
+              .neq('user_id', session.user.id)
+              .gte('elo_rating', myElo - range)
+              .lte('elo_rating', myElo + range)
+              .limit(1);
+
+          return opponents && opponents.length > 0 ? opponents[0] : null;
+      };
+
+      try {
+          let opponent = await findOpponent(1);
+          if (!opponent) {
+               await new Promise(r => setTimeout(r, 1000));
+               opponent = await findOpponent(2);
+          }
+
+          if (opponent) {
+              const { error } = await supabase.from('matchmaking_queue').delete().eq('id', opponent.id);
+
+              if (!error) {
+                  setOpponentProfile({ id: opponent.user_id, elo: opponent.elo_rating });
+                  if (matchTimerRef.current) clearInterval(matchTimerRef.current);
+                  setIsMatching(false);
+
+                  setRemotePeerId(opponent.peer_id);
+                  setOnlineStatus('connecting');
+                  await joinRoom(opponent.peer_id, 'black');
+                  return;
+              }
+          }
+
+          isManualDisconnect.current = false;
+          cleanupOnline();
+          setOnlineStatus('connecting');
+          const channel = supabase.channel(`room_${myTempPeerId}`);
+          channelRef.current = channel;
+
+          channel.on('broadcast', { event: 'signal' }, async ({ payload }: { payload: SignalMessage }) => {
+               const pc = pcRef.current;
+               if (payload.type === 'offer' && payload.sdp) {
+                   supabase.from('matchmaking_queue').delete().eq('peer_id', myTempPeerId).then();
+                   if (matchTimerRef.current) clearInterval(matchTimerRef.current);
+                   setIsMatching(false);
+                   setOnlineStatus('connecting');
+                   let hostPc = pc;
+                   if (!hostPc) hostPc = await setupPeerConnection(myTempPeerId, true, false);
+                   await hostPc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                   const answer = await hostPc.createAnswer();
+                   await hostPc.setLocalDescription(answer);
+                   await sendSignal(myTempPeerId, { type: 'answer', sdp: hostPc.localDescription! });
+               }
+               else if (payload.type === 'ice' && payload.candidate && pc) await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          }).subscribe(async (status) => {
+               if (status === 'SUBSCRIBED') {
+                   await supabase.from('matchmaking_queue').insert({
+                       peer_id: myTempPeerId,
+                       game_type: gameType,
+                       board_size: sizeToMatch,
+                       elo_rating: myElo,
+                       user_id: session.user.id
+                   });
+                   setOnlineStatus('disconnected');
+               }
+          });
+
+      } catch (e) {
+          console.error(e);
+          cancelMatchmaking();
+      }
+  };
 
   const createRoom = async () => {
       isManualDisconnect.current = false;
@@ -548,15 +853,22 @@ const App: React.FC = () => {
       const channel = supabase.channel(`room_${id}`);
       channelRef.current = channel;
       channel.on('broadcast', { event: 'signal' }, async ({ payload }: { payload: SignalMessage }) => {
-          const pc = pcRef.current;
-          if (payload.type === 'join') { const newPc = await setupPeerConnection(id, true); const offer = await newPc.createOffer(); await newPc.setLocalDescription(offer); await sendSignal(id, { type: 'offer', sdp: newPc.localDescription! }); }
+          let pc = pcRef.current;
+          if (payload.type === 'offer' && payload.sdp) {
+              if (!pc) pc = await setupPeerConnection(id, true, false);
+              await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              await sendSignal(id, { type: 'answer', sdp: pc.localDescription! });
+          }
           else if (payload.type === 'answer' && payload.sdp && pc) await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
           else if (payload.type === 'ice' && payload.candidate && pc) await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
       }).subscribe();
   };
 
-  const joinRoom = async () => {
-      if (!remotePeerId) return;
+  const joinRoom = async (roomId?: string, forcedColor?: Player) => {
+      const targetId = roomId || remotePeerId;
+      if (!targetId) return;
       isManualDisconnect.current = false;
       cleanupOnline();
       setOnlineStatus('connecting');
@@ -571,16 +883,50 @@ const App: React.FC = () => {
           }
       }, 15000); // 15s timeout
 
-      const channel = supabase.channel(`room_${remotePeerId}`);
+      const channel = supabase.channel(`room_${targetId}`);
       channelRef.current = channel;
       channel.on('broadcast', { event: 'signal' }, async ({ payload }: { payload: SignalMessage }) => {
           let pc = pcRef.current;
-          if (payload.type === 'offer' && payload.sdp) { if (!pc) pc = await setupPeerConnection(remotePeerId, false); await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp)); const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); await sendSignal(remotePeerId, { type: 'answer', sdp: pc.localDescription! }); }
+          if (payload.type === 'answer' && payload.sdp && pc) await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
           else if (payload.type === 'ice' && payload.candidate && pc) await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-      }).subscribe(async (status) => { if (status === 'SUBSCRIBED') { await setupPeerConnection(remotePeerId, false); await sendSignal(remotePeerId, { type: 'join' }); }});
+      }).subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+              if (forcedColor) setMyColor(forcedColor);
+              const newPc = await setupPeerConnection(targetId, false, true);
+              const offer = await newPc.createOffer();
+              await newPc.setLocalDescription(offer);
+              await sendSignal(targetId, { type: 'offer', sdp: newPc.localDescription! });
+          }
+      });
   };
 
   useEffect(() => { if (showOnlineMenu && !peerId && onlineStatus === 'disconnected') createRoom(); }, [showOnlineMenu, peerId, onlineStatus]);
+
+  useEffect(() => {
+      if (!showOnlineMenu) return;
+      const updateCounts = async () => {
+          const sizes: BoardSize[] = [9, 13, 19];
+          const results = await Promise.all(
+              sizes.map(size =>
+                  supabase.from('matchmaking_queue')
+                      .select('*', { count: 'exact', head: true })
+                      .eq('game_type', gameType)
+                      .eq('board_size', size)
+              )
+          );
+          setQueueCounts(prev => {
+              const next = { ...prev };
+              sizes.forEach((size, idx) => {
+                  const count = results[idx].count || 0;
+                  next[`${gameType}-${size}`] = count;
+              });
+              return next;
+          });
+      };
+      updateCounts();
+      const timer = setInterval(updateCounts, 5000);
+      return () => clearInterval(timer);
+  }, [showOnlineMenu, gameType]);
 
   const resetGame = (keepOnline: boolean = false, explicitSize?: number) => {
     // 优先使用传入的 explicitSize，否则使用当前的 state
@@ -638,6 +984,16 @@ const App: React.FC = () => {
       if (history.length > 0) prevHash = getBoardHash(history[history.length - 1].board);
       const result = attemptMove(currentBoard, x, y, activePlayer, currentType, prevHash);
       if (result) {
+          // [新增] 成就检测：每一步落子
+          if (!isRemote && session?.user?.id) {
+             checkMoveAchievements({
+               x, y, 
+               color: activePlayer, 
+               moveNumber: history.length + 1, 
+               boardSize 
+             });
+          }
+
           if (result.captured > 0) { playSfx('capture'); vibrate([20, 30, 20]); } 
           else { playSfx('move'); vibrate(15); }
           
@@ -678,6 +1034,20 @@ const App: React.FC = () => {
     vibrate(10);
     if (!isRemote) setHistory(prev => [...prev, { board: boardRef.current, currentPlayer: currentPlayerRef.current, blackCaptures, whiteCaptures, lastMove, consecutivePasses }]);
     if (onlineStatusRef.current === 'connected' && !isRemote) { if (currentPlayerRef.current !== myColorRef.current) return; sendData({ type: 'PASS' }); }
+    const isUserPassInPvAI = !isRemote && gameMode === 'PvAI' && gameType === 'Go' && currentPlayerRef.current === userColor;
+    if (isUserPassInPvAI) {
+        if (isPcAiAvailable && isPcAiThinking) {
+            aiEngine.stopThinking();
+        }
+        setIsThinking(false);
+        const score = calculateScore(boardRef.current);
+        setFinalScore(score);
+        setShowPassModal(false);
+        setConsecutivePasses(2);
+        if (score.black > score.white) endGame('black', `比分: 黑 ${score.black} - 白 ${score.white}`);
+        else endGame('white', `比分: 白 ${score.white} - 黑 ${score.black}`);
+        return;
+    }
     setConsecutivePasses(prev => {
         const newPasses = prev + 1;
         if (newPasses >= 2) { setTimeout(() => { const score = calculateScore(boardRef.current); setFinalScore(score); setShowPassModal(false); if (score.black > score.white) endGame('black', `比分: 黑 ${score.black} - 白 ${score.white}`); else endGame('white', `比分: 白 ${score.white} - 黑 ${score.black}`); }, 0); }
@@ -685,14 +1055,80 @@ const App: React.FC = () => {
     });
     setPassNotificationDismissed(false); 
     if (consecutivePasses < 1) { setCurrentPlayer(prev => prev === 'black' ? 'white' : 'black'); setLastMove(null); }
-  }, [gameOver, gameMode, consecutivePasses, blackCaptures, whiteCaptures, lastMove]); 
+  }, [gameOver, gameMode, gameType, consecutivePasses, blackCaptures, whiteCaptures, lastMove, userColor, isPcAiAvailable, isPcAiThinking, aiEngine]); 
 
-  const endGame = (winner: Player, reason: string) => { 
-      setGameOver(true); setWinner(winner); setWinReason(reason); 
+  const endGame = async (winnerColor: Player, reason: string) => { 
+      setGameOver(true);
+      setWinner(winnerColor);
+      setWinReason(reason);
       vibrate([50, 50, 50, 50]);
-      if (gameMode === 'PvAI') { if (winner === userColor) playSfx('win'); else playSfx('lose'); } 
-      else if (onlineStatus === 'connected') { if (winner === myColor) playSfx('win'); else playSfx('lose'); } 
-      else { playSfx('win'); } 
+      playSfx('win');
+
+      // [新增] 成就检测
+      if (session?.user?.id && (gameMode === 'PvAI' || onlineStatus === 'connected')) {
+          const myPlayerColor = onlineStatus === 'connected' ? myColor : userColor;
+          const currentScore = calculateScore(boardRef.current);
+
+          checkEndGameAchievements({
+             winner: winnerColor,
+             myColor: myPlayerColor || 'black', 
+             score: currentScore,
+             captures: { black: blackCaptures, white: whiteCaptures },
+             boardSize
+          });
+      }
+
+      if (onlineStatus === 'connected' && session && userProfile && opponentProfile && myColor) {
+          const isWin = myColor === winnerColor;
+          const result = isWin ? 'win' : 'loss';
+
+          const newElo = calculateElo(userProfile.elo, opponentProfile.elo, result);
+          const eloDiff = newElo - userProfile.elo;
+          const diffText = eloDiff > 0 ? `+${eloDiff}` : `${eloDiff}`;
+
+          setWinReason(`${reason} (积分 ${diffText})`);
+          setEloDiffText(diffText);
+          setEloDiffStyle(eloDiff > 0 ? 'normal' : 'negative');
+
+          if (isWin) {
+              const winnerNewElo = calculateElo(userProfile.elo, opponentProfile.elo, 'win');
+              const loserNewElo = calculateElo(opponentProfile.elo, userProfile.elo, 'loss');
+
+              await supabase.rpc('update_game_elo', {
+                  winner_id: session.user.id,
+                  loser_id: opponentProfile.id,
+                  winner_new_elo: winnerNewElo,
+                  loser_new_elo: loserNewElo
+              });
+
+              fetchProfile(session.user.id);
+          } else {
+              setTimeout(() => fetchProfile(session.user.id), 2000);
+          }
+      } else if (gameMode === 'PvAI' && session && userProfile) {
+          const isWin = winnerColor === userColor;
+          const resultScore: 0 | 0.5 | 1 = isWin ? 1 : 0;
+          const aiRating = getAiRating(difficulty);
+          const kFactor = 16;
+          const newElo = calculateNewRating(userProfile.elo, aiRating, resultScore, kFactor);
+          const eloDiff = newElo - userProfile.elo;
+          const diffText = eloDiff > 0 ? `+${eloDiff}` : `${eloDiff}`;
+
+          if (isWin && userProfile.elo <= 1200 && aiRating >= 1800) {
+              setWinReason(`史诗级胜利！战胜了强敌！ (积分 ${diffText})`);
+              setEloDiffStyle('gold');
+          } else {
+              setWinReason(`${reason} (积分 ${diffText})`);
+              setEloDiffStyle(eloDiff > 0 ? 'normal' : 'negative');
+          }
+          setEloDiffText(diffText);
+
+          await supabase.from('profiles')
+              .update({ elo_rating: newElo })
+              .eq('id', session.user.id);
+
+          fetchProfile(session.user.id);
+      }
   };
 
   const startReview = () => { setAppMode('review'); setReviewIndex(history.length - 1); setGameOver(false); };
@@ -727,6 +1163,52 @@ const App: React.FC = () => {
     <div className="h-full w-full bg-[#f7e7ce] flex flex-col md:flex-row items-center relative select-none overflow-hidden text-[#5c4033]">
       
       <audio ref={bgmRef} loop src="/bgm.mp3" />
+
+      {toastMsg && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[80] bg-[#5c4033] text-[#fcf6ea] px-4 py-2 rounded-full text-xs font-bold shadow-lg border-2 border-[#8c6b38] animate-in fade-in">
+              {toastMsg}
+          </div>
+      )}
+
+      {/* 成就解锁通知 */}
+      {/* 动画效果：从顶部滑入，带有弹性和模糊背景 */}
+      <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 ease-spring ${newUnlocked ? 'translate-y-0 opacity-100' : '-translate-y-20 opacity-0 pointer-events-none'}`}>
+        {newUnlocked && (
+            <div className="relative group cursor-pointer" onClick={clearNewUnlocked}>
+                {/* 外部光晕动画 */}
+                <div className="absolute -inset-1 bg-gradient-to-r from-[#ffd700] via-[#ffecb3] to-[#ffd700] rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
+                
+                {/* 主体卡片 */}
+                <div className="relative bg-[#fff] bg-opacity-95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-[#ffd700]/50 flex items-center gap-4 min-w-[320px] overflow-hidden">
+                    
+                    {/* 左侧图标区 */}
+                    <div className="relative shrink-0">
+                        <div className="absolute inset-0 bg-[#ffd700] rounded-full blur opacity-40 animate-pulse"></div>
+                        <div className="relative bg-gradient-to-br from-[#fff9c4] to-[#ffecb3] p-3 rounded-full border-2 border-[#ffc107] text-[#5c4033] shadow-md">
+                            {newUnlocked.icon === 'Heart' && <Heart size={24} fill="#f44336" className="text-[#f44336] animate-heartbeat" />}
+                            {newUnlocked.icon === 'Crown' && <Crown size={24} className="text-[#ff9800] animate-bounce-slow" />}
+                            {newUnlocked.icon === 'Medal' && <Medal size={24} className="text-[#ff9800] animate-pulse" />}
+                            {!['Heart', 'Crown', 'Medal'].includes(newUnlocked.icon) && <Trophy size={24} className="animate-bounce-slow" />}
+                        </div>
+                    </div>
+
+                    {/* 中间文字区 */}
+                    <div className="flex flex-col flex-grow">
+                        <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[10px] font-black text-[#ff6f00] uppercase tracking-widest bg-[#ffecb3]/50 px-1.5 rounded border border-[#ffe082]">
+                                Achievement Unlocked
+                            </span>
+                        </div>
+                        <span className="text-lg font-black text-[#5c4033] leading-tight group-hover:text-[#ff6f00] transition-colors">{newUnlocked.name}</span>
+                        <span className="text-xs font-medium text-[#8c6b38] line-clamp-1">{newUnlocked.description}</span>
+                    </div>
+
+                    {/* 右侧流光装饰 */}
+                    <div className="absolute top-0 right-0 w-16 h-full bg-gradient-to-l from-white/40 to-transparent skew-x-[-20deg] translate-x-full animate-shimmer-fast"></div>
+                </div>
+            </div>
+        )}
+      </div>
 
       {/* --- BOARD AREA --- */}
        <div className="relative flex-grow h-[60%] md:h-full w-full flex items-center justify-center p-2 order-2 md:order-1 min-h-0">
@@ -792,12 +1274,20 @@ const App: React.FC = () => {
                 </span>
             </div>
             
-            <button 
-                onClick={() => { setShowMenu(true); vibrate(10); }}
-                className="btn-retro btn-brown p-3 rounded-xl"
-            >
-                <Settings size={20} />
-            </button>
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={() => { setShowUserPage(true); vibrate(10); }}
+                    className="btn-retro btn-brown p-3 rounded-xl"
+                >
+                    <UserIcon size={20} />
+                </button>
+                <button 
+                    onClick={() => { setShowMenu(true); vibrate(10); }}
+                    className="btn-retro btn-brown p-3 rounded-xl"
+                >
+                    <Settings size={20} />
+                </button>
+            </div>
         </div>
 
         {/* Score Card */}
@@ -1113,6 +1603,96 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* --- USER PAGE --- */}
+      {showUserPage && (
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#fcf6ea] rounded-[2rem] w-full max-w-sm shadow-2xl border-[6px] border-[#8c6b38] flex flex-col max-h-[90vh] overflow-hidden relative">
+            {/* Header */}
+            <div className="bg-[#fcf6ea] border-b-2 border-[#e3c086] border-dashed p-4 flex justify-between items-center shrink-0">
+                <h2 className="text-2xl font-black text-[#5c4033] tracking-wide">我的资料</h2>
+                <button onClick={() => setShowUserPage(false)} className="text-[#8c6b38] hover:text-[#5c4033] bg-[#fff] rounded-full p-2 border-2 border-[#e3c086] transition-colors"><X size={20}/></button>
+            </div>
+
+            <div className="p-6 overflow-y-auto custom-scrollbar flex flex-col gap-6">
+                <div className="bg-[#fff]/60 p-4 rounded-2xl border border-[#e3c086] flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-[#5c4033] rounded-full flex items-center justify-center text-[#fcf6ea] border-2 border-[#8c6b38]">
+                            <UserIcon size={24} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-black text-[#5c4033]">{userProfile?.nickname || '未登录'}</span>
+                            <span className="text-xs font-bold text-[#8c6b38] bg-[#e3c086]/20 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                <Shield size={12} /> Rating: {userProfile?.elo ?? '—'}
+                            </span>
+                        </div>
+                    </div>
+                    {(() => {
+                        const badge = getRankBadge(userProfile?.elo ?? 0);
+                        return (
+                            <div className={`w-9 h-9 rounded-full bg-white border-2 border-[#e3c086] flex items-center justify-center ${badge.color}`} title={badge.label}>
+                                <badge.Icon size={18} />
+                            </div>
+                        );
+                    })()}
+                </div>
+
+                <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086] flex flex-col gap-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-[#8c6b38]">
+                        <span>账号状态</span>
+                        <span className="text-[#5c4033]">{session ? '已登录' : '未登录'}</span>
+                    </div>
+
+                    {session ? (
+                        <button onClick={() => supabase.auth.signOut()} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                            <LogOut size={16}/> 退出登录
+                        </button>
+                    ) : (
+                        <button onClick={() => { setShowLoginModal(true); setShowUserPage(false); }} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                            <LogIn size={16}/> 登录 / 注册
+                        </button>
+                    )}
+                </div>
+
+                <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086] flex flex-col gap-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    <div className="flex items-center gap-2 mb-1">
+                        <Medal size={16} className="text-[#8c6b38]" />
+                        <span className="text-sm font-bold text-[#5c4033]">成就墙</span>
+                        <span className="text-xs font-bold text-[#8c6b38] ml-auto">
+                            {Object.values(userAchievements).filter((u: any) => u.is_unlocked).length} / {achievementsList.length}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
+                        {achievementsList.map((ach) => {
+                            const unlocked = userAchievements[ach.code]?.is_unlocked;
+                            return (
+                                <div key={ach.code} className={`flex items-center gap-3 p-2 rounded-xl border-2 transition-all ${unlocked ? 'bg-[#fff8e1] border-[#ffca28]' : 'bg-gray-50 border-gray-200 opacity-60 grayscale'}`}>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${unlocked ? 'bg-[#ffecb3] border-[#ffc107] text-[#5c4033]' : 'bg-gray-200 border-gray-300 text-gray-400'}`}>
+                                        {ach.icon === 'Sword' && <Sword size={18}/>}
+                                        {ach.icon === 'Trophy' && <Trophy size={18}/>}
+                                        {ach.icon === 'Disc' && <Disc size={18}/>}
+                                        {ach.icon === 'Utensils' && <Utensils size={18}/>}
+                                        {ach.icon === 'Clover' && <Clover size={18}/>}
+                                        {ach.icon === 'Heart' && <Heart size={18}/>}
+                                        {ach.icon === 'Medal' && <Medal size={18}/>}
+                                        {ach.icon === 'Crown' && <Crown size={18}/>}
+                                        {!['Sword','Trophy','Disc','Utensils','Clover','Heart','Medal','Crown'].includes(ach.icon) && <Trophy size={18}/>}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-black text-[#5c4033]">{ach.name}</span>
+                                        <span className="text-[10px] text-[#8c6b38]">{ach.description}</span>
+                                    </div>
+                                    {unlocked && <Check size={16} className="ml-auto text-green-500" />}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- ABOUT & SUPPORT MODAL --- */}
       {showAboutModal && (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={(e) => { if(e.target === e.currentTarget) setShowAboutModal(false) }}>
@@ -1132,7 +1712,7 @@ const App: React.FC = () => {
                     <div className="w-20 h-20 bg-[#5c4033] rounded-3xl shadow-lg border-4 border-[#8c6b38] overflow-hidden">
                         {/* 请确保 public 文件夹中有 logo.png */}
                         <img 
-                            src="/logo.png" 
+                            src="./logo.png" 
                             alt="App Icon" 
                             className="w-full h-full object-cover"
                         />
@@ -1279,12 +1859,43 @@ const App: React.FC = () => {
       {showOnlineMenu && (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
              <div className="bg-[#fcf6ea] rounded-3xl p-6 w-full max-w-sm shadow-2xl border-[6px] border-[#5c4033] relative overflow-hidden text-center">
-                <button onClick={() => setShowOnlineMenu(false)} className="absolute top-4 right-4 text-[#8c6b38] hover:text-[#5c4033]"><X size={24}/></button>
+                <button onClick={() => { setShowOnlineMenu(false); if (isMatching) cancelMatchmaking(); }} className="absolute top-4 right-4 text-[#8c6b38] hover:text-[#5c4033]"><X size={24}/></button>
                 <div className="w-16 h-16 bg-[#e3c086] rounded-full flex items-center justify-center text-[#5c4033] mx-auto mb-4 border-2 border-[#5c4033]">
                     <Globe size={32} />
                 </div>
                 <h2 className="text-2xl font-black text-[#5c4033] mb-6">联机对战</h2>
                 <div className="w-full space-y-4">
+                    <div className="bg-[#fff] p-4 rounded-xl border-2 border-[#e3c086]">
+                        <div className="grid grid-cols-3 gap-2">
+                            {[9, 13, 19].map((size) => (
+                                <button
+                                    key={size}
+                                    onClick={() => startMatchmaking(size as BoardSize)}
+                                    disabled={isMatching || onlineStatus === 'connecting' || onlineStatus === 'connected'}
+                                    className={`btn-retro py-2 rounded-xl font-bold text-xs ${matchBoardSize === size ? 'bg-[#8c6b38] text-[#fcf6ea] border-[#5c4033]' : 'bg-[#fff] text-[#8c6b38] border-[#e3c086]'}`}
+                                >
+                                    匹配 {size} 路
+                                </button>
+                            ))}
+                        </div>
+                        {isMatching && (
+                            <button onClick={cancelMatchmaking} className="btn-retro btn-coffee w-full py-2 rounded-xl font-bold text-xs mt-3">
+                                取消匹配 ({matchTime}s)
+                            </button>
+                        )}
+                        <p className="text-[10px] text-[#8c6b38] text-center mt-2 font-bold">
+                           {(() => {
+                               const sizes: BoardSize[] = [9, 13, 19];
+                               const best = sizes.reduce((acc, size) => {
+                                   const count = queueCounts[`${gameType}-${size}`] || 0;
+                                   return count > acc.count ? { size, count } : acc;
+                               }, { size: 9 as BoardSize, count: queueCounts[`${gameType}-9`] || 0 });
+                               return (
+                                   <>当前匹配最快：<span className="text-[#d84315] text-sm">{best.size} 路（{best.count}人）</span></>
+                               );
+                           })()}
+                        </p>
+                    </div>
                     <div className="bg-[#fff] p-4 rounded-xl border-2 border-[#e3c086]">
                         <p className="text-xs font-bold text-[#8c6b38] uppercase mb-2">我的房间号</p>
                         <div className="flex items-center justify-center gap-2">
@@ -1300,7 +1911,7 @@ const App: React.FC = () => {
                         </div>
                         <input type="text" placeholder="输入对方房间号" value={remotePeerId} onChange={(e) => setRemotePeerId(e.target.value.replace(/[^0-9]/g, '').slice(0,6))} className="w-full pl-10 pr-4 py-3 bg-[#fff] border-2 border-[#e3c086] rounded-xl focus:border-[#5c4033] focus:ring-0 font-mono text-lg font-bold text-center outline-none transition-all text-[#5c4033]"/>
                     </div>
-                    <button onClick={joinRoom} disabled={remotePeerId.length < 6 || onlineStatus === 'connecting' || onlineStatus === 'connected'} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                    <button onClick={() => joinRoom(remotePeerId)} disabled={remotePeerId.length < 6 || onlineStatus === 'connecting' || onlineStatus === 'connected'} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
                         {onlineStatus === 'connecting' ? '连接中...' : '加入房间'}
                     </button>
                 </div>
@@ -1350,6 +1961,13 @@ const App: React.FC = () => {
                 </div>
                 <h2 className="text-3xl font-black text-[#5c4033] mb-2">{winner === 'black' ? '黑方获胜!' : '白方获胜!'}</h2>
                 <p className="text-[#8c6b38] font-bold mb-6 bg-[#e3c086]/30 px-3 py-1 rounded-full text-sm">{winReason}</p>
+                {eloDiffText && (
+                    <div className={`mb-4 text-lg font-black ${
+                        eloDiffStyle === 'gold' ? 'text-yellow-500 animate-bounce' :
+                        eloDiffStyle === 'negative' ? 'text-red-500' :
+                        'text-[#2e7d32]'
+                    } transition-all duration-300`}>积分 {eloDiffText}</div>
+                )}
                 {finalScore && (
                      <div className="flex gap-8 mb-6 text-sm font-bold text-[#5c4033]">
                         <div className="flex flex-col items-center">
@@ -1422,6 +2040,53 @@ const App: React.FC = () => {
                 </button>
             </div>
         </div>
+      )}
+
+      {/* LOGIN MODAL */}
+      {showLoginModal && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in">
+              <div className="bg-[#fcf6ea] rounded-3xl p-6 w-full max-w-sm shadow-2xl border-[6px] border-[#5c4033] relative">
+                  <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-[#8c6b38]"><X size={20}/></button>
+                  <h2 className="text-2xl font-black text-[#5c4033] mb-6 text-center">
+                      {loginMode === 'signin' ? '登录账号' : '注册新账号'}
+                  </h2>
+                  
+                  <div className="space-y-4">
+                      <input 
+                          type="email" placeholder="邮箱" 
+                          value={authEmail} onChange={e => setAuthEmail(e.target.value)}
+                          className="w-full p-3 bg-white border-2 border-[#e3c086] rounded-xl font-bold text-[#5c4033] outline-none focus:border-[#5c4033]"
+                      />
+                      <input 
+                          type="password" placeholder="密码" 
+                          value={authPassword} onChange={e => setAuthPassword(e.target.value)}
+                          className="w-full p-3 bg-white border-2 border-[#e3c086] rounded-xl font-bold text-[#5c4033] outline-none focus:border-[#5c4033]"
+                      />
+                      
+                      {loginMode === 'signup' && (
+                           <input 
+                              type="text" placeholder="昵称 (例如: 弈星)" 
+                              value={authNickname} onChange={e => setAuthNickname(e.target.value)}
+                              className="w-full p-3 bg-white border-2 border-[#e3c086] rounded-xl font-bold text-[#5c4033] outline-none focus:border-[#5c4033]"
+                          />
+                      )}
+
+                      <button onClick={handleAuth} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold">
+                          {loginMode === 'signin' ? '登录' : '注册并登录'}
+                      </button>
+                      
+                      <div className="flex justify-center gap-2 text-xs font-bold text-[#8c6b38] mt-4">
+                          <span>{loginMode === 'signin' ? '还没有账号?' : '已有账号?'}</span>
+                          <button 
+                              onClick={() => setLoginMode(loginMode === 'signin' ? 'signup' : 'signin')}
+                              className="text-[#5c4033] underline"
+                          >
+                              {loginMode === 'signin' ? '去注册' : '去登录'}
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
       )}
     </div>
   );
