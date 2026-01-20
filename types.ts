@@ -1,9 +1,12 @@
+
 export type Player = 'black' | 'white';
 
 export interface Point {
   x: number;
   y: number;
 }
+
+export type Skin = 'default' | 'bear' | 'cat' | 'dog' | 'bird';
 
 export interface Stone {
   color: Player;

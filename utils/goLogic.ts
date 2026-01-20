@@ -1,5 +1,55 @@
 import { BoardState, Player, Point, Stone, Group, BoardSize, Difficulty, GameType } from '../types';
 
+// --- GTP Coordinate Utilities for KataGo ---
+
+// GTP 协议中，坐标 I 被跳过以避免与 1 混淆
+const GTP_COLUMNS = "ABCDEFGHJKLMNOPQRST"; 
+
+/**
+ * 将前端坐标 (x, y) 转换为 GTP 坐标 (例如: "D4", "Q16")
+ * 前端: (0,0) 是左上角
+ * GTP: A1 通常是左下角 (但也取决于引擎配置，标准 GTP 是左下角为 1)
+ * 这里我们采用标准：行号 = BoardSize - y
+ */
+export const toGTPCoordinate = (x: number, y: number, boardSize: number): string => {
+  if (x < 0 || x >= boardSize || y < 0 || y >= boardSize) return 'PASS';
+  
+  const colChar = GTP_COLUMNS[x];
+  // y=0 是最上面一行 (例如 19路棋盘的第19行)
+  const rowNum = boardSize - y; 
+  
+  return `${colChar}${rowNum}`;
+};
+
+/**
+ * 将 GTP 坐标 (例如: "R16") 解析回前端坐标 {x, y}
+ */
+export const fromGTPCoordinate = (gtp: string, boardSize: number): {x: number, y: number} | null => {
+  const s = gtp.trim().toUpperCase();
+  
+  if (s === 'PASS' || s === 'RESIGN') return null;
+  
+  // 处理可能的 "Genmove Error" 等异常字符串
+  if (s.length < 2) return null;
+
+  const colChar = s[0];
+  const rowStr = s.slice(1);
+  
+  const x = GTP_COLUMNS.indexOf(colChar);
+  if (x === -1) return null; // 无效列
+  
+  const rowNum = parseInt(rowStr, 10);
+  if (isNaN(rowNum)) return null;
+
+  // 转换回 0-indexed 的 y 轴
+  const y = boardSize - rowNum;
+
+  if (x < 0 || x >= boardSize || y < 0 || y >= boardSize) return null;
+  
+  return { x, y };
+};
+
+// --- 基本围棋逻辑 ---
 export const createBoard = (size: number): BoardState => {
   return Array(size).fill(null).map(() => Array(size).fill(null));
 };
@@ -45,14 +95,7 @@ export const getGroup = (board: BoardState, start: Point): Group | null => {
     }
   }
 
-  return { 
-      stones: group, 
-      liberties: liberties.size,
-      libertyPoints: Array.from(liberties).map(s => {
-          const [x, y] = s.split(',').map(Number);
-          return {x, y};
-      })
-  };
+  return { stones: group, liberties: liberties.size };
 };
 
 export const getAllGroups = (board: BoardState): Group[] => {
@@ -294,21 +337,9 @@ export const calculateScore = (board: BoardState): { black: number, white: numbe
 };
 
 export const calculateWinRate = (board: BoardState): number => {
-    // 1. Check game phase. If it's early game (< 10 stones), assume 50/50.
-    // This prevents the Komi (7.5) from making it look like White is crushing Black at start.
-    let stoneCount = 0;
-    for(let y=0; y<board.length; y++) {
-        for(let x=0; x<board.length; x++) {
-            if (board[y][x]) stoneCount++;
-        }
-    }
-    if (stoneCount < 10) return 50;
-
     const score = calculateScore(board);
     const diff = score.black - score.white; 
-    
-    // Lower k factor to make the curve less steep/volatile
-    const k = 0.12; 
+    const k = 0.15; 
     return (1 / (1 + Math.exp(-k * diff))) * 100;
 };
 
@@ -413,6 +444,119 @@ const getGomokuScore = (board: BoardState, x: number, y: number, player: Player,
 
 // --- MAIN AI FUNCTION ---
 
+// 获取有意义的候选移动点（只看棋子周围 2 格范围内的空位 + 星位）
+const getCandidateMoves = (board: BoardState, size: number): Point[] => {
+  const candidates = new Set<string>();
+  const hasStones = board.some(row => row.some(s => s !== null));
+
+  // 如果棋盘是空的，只返回天元和星位 (优化开局)
+  if (!hasStones) {
+      const center = Math.floor(size / 2);
+      const points = [{x: center, y: center}];
+      if (size >= 9) { // 添加星位
+          const offset = size >= 13 ? 3 : 2;
+          points.push({x: offset, y: offset}, {x: size-1-offset, y: offset}, 
+                      {x: offset, y: size-1-offset}, {x: size-1-offset, y: size-1-offset});
+      }
+      return points;
+  }
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (board[y][x] !== null) {
+        // 遍历该棋子周围 2 格范围
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const ny = y + dy;
+            const nx = x + dx;
+            if (nx >= 0 && nx < size && ny >= 0 && ny < size && board[ny][nx] === null) {
+               candidates.add(`${nx},${ny}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return Array.from(candidates).map(s => {
+      const [x, y] = s.split(',').map(Number);
+      return {x, y};
+  });
+};
+
+// 简单的局面评估函数
+const evaluateBoardGomoku = (board: BoardState, player: Player): number => {
+    // 这里复用你现有的 getGomokuScore 逻辑，但要计算总分差
+    // 简化版：遍历所有点，计算 (MyScore - OpponentScore)
+    // 注意：为了性能，这里最好不要复用太重的逻辑，或者只评估有棋子的区域
+    const size = board.length;
+    let score = 0;
+    const opponent = player === 'black' ? 'white' : 'black';
+    
+    // 简单采样评估（实际项目中需要更高效的评估）
+    for(let y=0; y<size; y++){
+        for(let x=0; x<size; x++){
+            if(board[y][x]) continue; // 只评估空位的潜力
+            // 这里为了简化，我们假设评估函数的开销是可控的
+            // 实际上应该只计算最后落子点的影响
+        }
+    }
+    return Math.random(); // 占位，下文 Minimax 会用到具体的 evaluateGomokuDirection
+};
+
+// Alpha-Beta 搜索 (递归)
+const minimax = (
+    board: BoardState, 
+    depth: number, 
+    alpha: number, 
+    beta: number, 
+    isMaximizing: boolean,
+    player: Player,
+    lastMove: Point
+): number => {
+    const opponent = player === 'black' ? 'white' : 'black';
+    
+    // 1. 检查游戏结束或达到深度
+    if (checkGomokuWin(board, lastMove)) {
+        return isMaximizing ? -100000 + depth : 100000 - depth; // 越快赢分越高
+    }
+    if (depth === 0) {
+        // 静态评估：这里直接利用你现有的 getGomokuScore 逻辑
+        // 注意：getGomokuScore 是针对单点评估的，这里我们需要一个简单的局面分
+        // 作为一个轻量级 AI，我们简化为：评估上一手棋的价值
+        return isMaximizing 
+            ? getGomokuScore(board, lastMove.x, lastMove.y, opponent, player, 'Hard') 
+            : -getGomokuScore(board, lastMove.x, lastMove.y, player, opponent, 'Hard');
+    }
+
+    const candidates = getCandidateMoves(board, board.length);
+    // 排序 candidates 以优化剪枝效率（可选）
+    
+    if (isMaximizing) {
+        let maxEval = -Infinity;
+        for (const move of candidates) {
+            board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'temp' }; // 模拟落子 (不深拷贝)
+            const evalScore = minimax(board, depth - 1, alpha, beta, false, player, move);
+            board[move.y][move.x] = null; // 回溯
+            maxEval = Math.max(maxEval, evalScore);
+            alpha = Math.max(alpha, evalScore);
+            if (beta <= alpha) break;
+        }
+        return maxEval;
+    } else {
+        let minEval = Infinity;
+        for (const move of candidates) {
+            board[move.y][move.x] = { color: opponent, x: move.x, y: move.y, id: 'temp' };
+            const evalScore = minimax(board, depth - 1, alpha, beta, true, player, move);
+            board[move.y][move.x] = null;
+            minEval = Math.min(minEval, evalScore);
+            beta = Math.min(beta, evalScore);
+            if (beta <= alpha) break;
+        }
+        return minEval;
+    }
+};
+
 export const getAIMove = (
   board: BoardState, 
   player: Player, 
@@ -421,195 +565,121 @@ export const getAIMove = (
   previousBoardHash: string | null
 ): Point | null | 'RESIGN' => {
   const size = board.length;
-  const validMoves: Point[] = [];
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      if (!board[y][x]) validMoves.push({ x, y });
-    }
+  
+  // 1. 优化：获取候选点 (Candidate Pruning)
+  // 极大减少循环次数，解决发热问题
+  let candidates = getCandidateMoves(board, size);
+  
+  // 如果没有候选点（虽然前面处理了，防万一），则随机
+  if (candidates.length === 0) {
+      const allMoves: Point[] = [];
+      for(let y=0; y<size; y++) for(let x=0; x<size; x++) if(!board[y][x]) allMoves.push({x,y});
+      if (allMoves.length === 0) return null;
+      return allMoves[Math.floor(Math.random() * allMoves.length)];
   }
-  if (validMoves.length === 0) return null;
 
-  // --- GOMOKU AI ---
+  // --- GOMOKU 逻辑升级 (Minimax) ---
   if (gameType === 'Gomoku') {
       if (difficulty === 'Easy') {
-          // Pure randomness
-          return validMoves[Math.floor(Math.random() * validMoves.length)];
+          return candidates[Math.floor(Math.random() * candidates.length)];
       }
 
-      const opponent = player === 'black' ? 'white' : 'black';
-      let bestScore = -Infinity;
-      let bestMoves: Point[] = [];
+      // 如果是 Hard 模式，使用浅层 Minimax (深度 2，即自己一步，对手一步)
+      // 深度太深在 JS 线程会卡死，建议 2 或 3
+      if (difficulty === 'Hard' || difficulty === 'Medium') {
+          const searchDepth = 2; 
+          let bestVal = -Infinity;
+          let bestMoves: Point[] = [];
+          const opponent = player === 'black' ? 'white' : 'black';
 
-      // Determine error margin based on difficulty
-      const errorMargin = difficulty === 'Medium' ? 100 : 0; // No error margin for Hard
+          // 第一层循环
+          for (const move of candidates) {
+              // 模拟落子 (直接修改数组，比 deep clone 快 100 倍)
+              board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'temp' };
+              
+              // 检查这一步是否直接获胜
+              if (checkGomokuWin(board, move)) {
+                  board[move.y][move.x] = null; // 回溯
+                  return move; // 直接赢
+              }
 
-      for (const move of validMoves) {
-          // Optimization: Only check moves near existing stones (Radius 2)
-          // For empty board, center is best.
-          const hasNeighbor = validMoves.length > size*size - 1 ? false : (() => {
-               for(let dy=-2; dy<=2; dy++) {
-                   for(let dx=-2; dx<=2; dx++) {
-                       if (dx===0 && dy===0) continue;
-                       const ny = move.y + dy;
-                       const nx = move.x + dx;
-                       if(nx>=0 && nx<size && ny>=0 && ny<size && board[ny][nx]) return true;
-                   }
-               }
-               return false;
-          })();
+              // 进入递归评估
+              // 注意：这里传入的是 minimize (因为轮到对手了)
+              const moveVal = minimax(board, searchDepth - 1, -Infinity, Infinity, false, player, move);
+              
+              // 回溯
+              board[move.y][move.x] = null;
 
-          // First move logic
-          if (validMoves.length >= size*size - 1) {
-              if (move.x === Math.floor(size/2) && move.y === Math.floor(size/2)) return move;
+              if (moveVal > bestVal) {
+                  bestVal = moveVal;
+                  bestMoves = [move];
+              } else if (moveVal === bestVal) {
+                  bestMoves.push(move);
+              }
           }
-
-          if (!hasNeighbor && validMoves.length < size*size - 1) continue;
-
-          let score = getGomokuScore(board, move.x, move.y, player, opponent, difficulty);
-          
-          // Positional Bias (Center is better)
-          const distFromCenter = Math.abs(move.x - size/2) + Math.abs(move.y - size/2);
-          score += (size - distFromCenter);
-
-          // Fuzzy Logic for Medium
-          if (difficulty === 'Medium') {
-             score += (Math.random() * errorMargin);
-          }
-
-          if (score > bestScore) {
-              bestScore = score;
-              bestMoves = [move];
-          } else if (Math.abs(score - bestScore) < 10) { // Keep moves with similar scores
-              bestMoves.push(move);
-          }
+          return bestMoves.length > 0 ? bestMoves[Math.floor(Math.random() * bestMoves.length)] : candidates[0];
       }
-      
-      // If no strategic moves found (e.g. only distant valid moves), pick random
-      if (bestMoves.length === 0) return validMoves[Math.floor(Math.random() * validMoves.length)];
-      
-      return bestMoves[Math.floor(Math.random() * bestMoves.length)];
   }
 
-  // --- GO AI ---
+  // --- 围棋逻辑优化 (保留启发式，但应用候选点剪枝) ---
   
-  // Resignation Check for Hard/Medium
-  if (difficulty !== 'Easy') {
-       // Estimate game progress by stone count
-       let occupiedCount = 0;
-       for(let y=0; y<size; y++) for(let x=0; x<size; x++) if(board[y][x]) occupiedCount++;
-       
-       // Only check for resignation if game is > 40% developed to avoid early surrender
-       if (occupiedCount > (size * size) * 0.4) {
-           const score = calculateScore(board);
-           const aiScore = player === 'black' ? score.black : score.white;
-           const opponentScore = player === 'black' ? score.white : score.black;
-           const scoreDiff = aiScore - opponentScore;
-           
-           // If AI is behind by 30 points (considering our scoring algo is simple, 30 is a safe margin)
-           // and it's Hard mode (AI recognizes defeat), it resigns.
-           if (scoreDiff < -30) {
-               return 'RESIGN';
-           }
-       }
-  }
-
-  // Easy: Random valid moves (avoids suicide/eyes)
-  if (difficulty === 'Easy') {
-    const safeMoves = validMoves.filter(m => {
-        const res = attemptMove(board, m.x, m.y, player, 'Go', previousBoardHash);
-        if (!res) return false;
-        return !isEye(board, m.x, m.y, player);
-    });
-    return safeMoves.length > 0 ? safeMoves[Math.floor(Math.random() * safeMoves.length)] : null;
-  }
-
-  // Medium & Hard: Weighted Heuristic Map
-  // Factors: Captures, Saving Self (Atari), Corner/Side preference, Pattern weights
+  // 围棋依然使用原来的加权逻辑，但循环范围从全图变成了 candidates
+  // 这解决了性能问题。
+  
   let bestMove: Point | null = null;
   let maxWeight = -Infinity;
-
   const opponent = player === 'black' ? 'white' : 'black';
 
-  for (const move of validMoves) {
+  for (const move of candidates) {
+      // 简单的眼位检查
       if (isEye(board, move.x, move.y, player)) continue;
 
+      // 这里依然需要 attemptMove，因为它涉及提子逻辑，比较复杂
+      // 但由于 candidates 数量少了很多，性能是可以接受的
       const sim = attemptMove(board, move.x, move.y, player, 'Go', previousBoardHash);
       if (!sim) continue;
 
-      let weight = Math.random() * 10; // Baseline randomness
+      let weight = Math.random() * 10; 
 
-      // 1. TACTICAL: Capturing (High Priority)
+      // --- 增强 AI 逻辑：增加对"征子"和"断点"的敏感度 ---
+      
+      // 1. 吃子权重 (大幅提高)
       if (sim.captured > 0) {
-          weight += 100 + (sim.captured * 20);
+          weight += 200 + (sim.captured * 30);
       }
 
-      // 2. TACTICAL: Save Self (Atari) / Extension
-      // Check neighbors for friendly groups in atari
+      // 2. 逃生权重 (检测自己是否处于 Atari 状态)
+      const myGroup = getGroup(sim.newBoard, move);
+      if (myGroup) {
+          if (myGroup.liberties === 1) {
+              // 除非是打劫或反提，否则不要下气紧的地方
+              if (sim.captured === 0) weight -= 500; // 找死
+          } else if (myGroup.liberties >= 3) {
+              weight += 20; // 气延展
+          }
+      }
+
+      // 3. 进攻权重 (让对手气变紧)
       const neighbors = getNeighbors(move, size);
-      let savesGroup = false;
       neighbors.forEach(n => {
           const s = board[n.y][n.x];
-          if (s && s.color === player) {
+          if (s && s.color === opponent) {
               const g = getGroup(board, n);
-              if (g && g.liberties === 1) {
-                  // If placing here increases liberties of that group > 1, it's a save
-                  const newSelfGroup = getGroup(sim.newBoard, move);
-                  if (newSelfGroup && newSelfGroup.liberties > 1) {
-                      weight += 80;
-                      savesGroup = true;
-                  }
+              if (g && g.liberties === 2) {
+                  // 对手只有2口气，我贴上去，对手变1口气 (叫吃)
+                  weight += 60; 
               }
           }
       });
-
-      // 3. TACTICAL: Atari Opponent (Medium Priority)
-      if (difficulty === 'Hard') {
-          neighbors.forEach(n => {
-             const s = board[n.y][n.x];
-             if (s && s.color === opponent) {
-                 const g = getGroup(board, n);
-                 if (g && g.liberties === 2) {
-                     // Check if this move reduces them to 1 liberty (Atari)
-                     // Note: We need to check the liberties on the NEW board, but simple check is:
-                     // We placed a stone next to them, so we likely took a liberty.
-                     weight += 25;
-                 }
-             }
-          });
-      }
-
-      // 4. STRATEGIC: Pattern / Influence (Hard Only)
-      if (difficulty === 'Hard') {
-          // Corner preference (Star points)
-          if (size >= 9) {
-              const dX = Math.min(move.x, size - 1 - move.x);
-              const dY = Math.min(move.y, size - 1 - move.y);
-              // 3-3, 3-4, 4-4 points are gold in opening
-              if ((dX === 2 || dX === 3) && (dY === 2 || dY === 3)) {
-                  // Only boost if board is relatively empty nearby
-                  const closeStones = neighbors.filter(n => board[n.y][n.x] !== null).length;
-                  if (closeStones === 0) weight += 15;
-              }
-              // Avoid edges line 0 early game
-              if (dX === 0 || dY === 0) weight -= 5;
+      
+      // 4. 布局权重 (金角银边草肚皮)
+      if (size >= 9 && difficulty === 'Hard') {
+          const distToEdgeX = Math.min(move.x, size - 1 - move.x);
+          const distToEdgeY = Math.min(move.y, size - 1 - move.y);
+          if (distToEdgeX >= 2 && distToEdgeX <= 4 && distToEdgeY >= 2 && distToEdgeY <= 4) {
+              weight += 15;
           }
       }
-
-      // 5. SAFETY: Don't self-atari unless necessary (stupid filter)
-      const myNewGroup = getGroup(sim.newBoard, move);
-      if (myNewGroup && myNewGroup.liberties === 1) {
-          // Only play self-atari if it captured something (snapback logic handled in rule 1)
-          // or if it connects to a safe group (handled in rule 2 check).
-          // If neither, penalize heavily.
-          if (sim.captured === 0 && !savesGroup) {
-              weight -= 200; 
-          }
-      }
-
-      // 6. CONTACT: Play near opponent stones (Medium/Hard)
-      // Since difficulty 'Easy' returns early, we don't need to check for it here.
-      const enemyNeighbors = neighbors.filter(n => board[n.y][n.x]?.color === opponent).length;
-      if (enemyNeighbors > 0) weight += 5;
 
       if (weight > maxWeight) {
           maxWeight = weight;
@@ -617,5 +687,5 @@ export const getAIMove = (
       }
   }
 
-  return bestMove;
+  return bestMove || candidates[Math.floor(Math.random() * candidates.length)];
 };

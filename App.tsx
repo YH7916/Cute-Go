@@ -4,6 +4,9 @@ import { BoardState, Player, GameMode, GameType, BoardSize, Difficulty } from '.
 import { createBoard, attemptMove, getAIMove, checkGomokuWin, calculateScore, calculateWinRate, serializeGame, deserializeGame } from './utils/goLogic';
 import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Globe, Copy, Check, Wind, Volume2, VolumeX, BarChart3, Skull, Undo2, AlertCircle, X, Eye, FileUp, Hash, Eraser, PenTool, LayoutGrid, Zap, Smartphone, Info, Heart, Download, RefreshCw, ExternalLink, QrCode } from 'lucide-react';
 
+// [新增] 引入 AI Hook
+import { useKataGo, sliderToVisits, visitsToSlider, ExtendedDifficulty } from './hooks/useKataGo'; 
+
 // --- 1. 引入 Supabase ---
 import { createClient } from '@supabase/supabase-js';
 
@@ -55,28 +58,62 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-const App: React.FC = () => {
-  // --- Global App State ---
-  const [boardSize, setBoardSize] = useState<BoardSize>(9);
-  const [gameType, setGameType] = useState<GameType>('Go');
-  const [gameMode, setGameMode] = useState<GameMode>('PvP');
-  const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
-  
-  // New: Player Color Preference (vs AI)
-  const [userColor, setUserColor] = useState<Player>('black');
-  
-  // Visual/Audio Settings
-  const [showQi, setShowQi] = useState<boolean>(false);
-  const [showWinRate, setShowWinRate] = useState<boolean>(true);
-  const [showCoordinates, setShowCoordinates] = useState<boolean>(false);
-  const [musicVolume, setMusicVolume] = useState<number>(0.3);
-  const [hapticEnabled, setHapticEnabled] = useState<boolean>(true); // New: Haptic
+// 在 App 组件外部定义扩展类型
+// ExtendedDifficulty type imported from useKataGo
 
-  // Settings Modal Local State
+const App: React.FC = () => {
+  // --- 1. 定义一个读取本地存储的辅助函数 ---
+  const loadState = <T,>(key: string, fallback: T): T => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved !== null ? JSON.parse(saved) : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  };
+
+  // --- 2. Global App State (使用 loadState 初始化) ---
+  const [boardSize, setBoardSize] = useState<BoardSize>(() => loadState('boardSize', 9));
+  const [gameType, setGameType] = useState<GameType>(() => loadState('gameType', 'Go'));
+  const [gameMode, setGameMode] = useState<GameMode>(() => loadState('gameMode', 'PvP'));
+  const [difficulty, setDifficulty] = useState<ExtendedDifficulty>(() => loadState('difficulty', 'Medium'));
+  
+  // [新增] 思考量状态 (默认 5)
+  const [maxVisits, setMaxVisits] = useState<number>(() => loadState('maxVisits', 5));
+
+  // New: Player Color Preference (vs AI)
+  const [userColor, setUserColor] = useState<Player>(() => loadState('userColor', 'black'));
+  
+  // Visual/Audio Settings (同样持久化)
+  const [showQi, setShowQi] = useState<boolean>(() => loadState('showQi', false));
+  const [showWinRate, setShowWinRate] = useState<boolean>(() => loadState('showWinRate', true));
+  const [showCoordinates, setShowCoordinates] = useState<boolean>(() => loadState('showCoordinates', false));
+  const [musicVolume, setMusicVolume] = useState<number>(() => loadState('musicVolume', 0.3));
+  const [hapticEnabled, setHapticEnabled] = useState<boolean>(() => loadState('hapticEnabled', true));
+
+  // --- 3. 监听状态变化并自动保存 ---
+  useEffect(() => {
+    localStorage.setItem('boardSize', JSON.stringify(boardSize));
+    localStorage.setItem('gameType', JSON.stringify(gameType));
+    localStorage.setItem('gameMode', JSON.stringify(gameMode));
+    localStorage.setItem('difficulty', JSON.stringify(difficulty));
+    localStorage.setItem('maxVisits', JSON.stringify(maxVisits));
+    localStorage.setItem('userColor', JSON.stringify(userColor));
+    
+    localStorage.setItem('showQi', JSON.stringify(showQi));
+    localStorage.setItem('showWinRate', JSON.stringify(showWinRate));
+    localStorage.setItem('showCoordinates', JSON.stringify(showCoordinates));
+    localStorage.setItem('musicVolume', JSON.stringify(musicVolume));
+    localStorage.setItem('hapticEnabled', JSON.stringify(hapticEnabled));
+  }, [boardSize, gameType, gameMode, difficulty, maxVisits, userColor, showQi, showWinRate, showCoordinates, musicVolume, hapticEnabled]);
+
+  // Settings Modal Local State (这些不需要持久化，因为每次打开菜单都会从上面的主状态同步)
   const [tempBoardSize, setTempBoardSize] = useState<BoardSize>(9);
   const [tempGameType, setTempGameType] = useState<GameType>('Go');
   const [tempGameMode, setTempGameMode] = useState<GameMode>('PvP');
-  const [tempDifficulty, setTempDifficulty] = useState<Difficulty>('Medium');
+  const [tempDifficulty, setTempDifficulty] = useState<ExtendedDifficulty>('Medium');
+  // [新增] 临时思考量状态
+  const [tempMaxVisits, setTempMaxVisits] = useState<number>(1000);
   const [tempUserColor, setTempUserColor] = useState<Player>('black'); // Temp state for settings
 
   // Game State
@@ -117,6 +154,54 @@ const App: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [showPassModal, setShowPassModal] = useState(false); 
   const [isThinking, setIsThinking] = useState(false); 
+
+  // [新增] --- 初始化 PC 端 AI 引擎 ---
+  const aiEngine = useKataGo({
+    boardSize,
+    // AI 落子时的回调（复用现有的 executeMove，视为非远程操作以记录历史）
+    onAiMove: (x, y) => executeMove(x, y, false), 
+    // AI 停着时的回调
+    onAiPass: () => handlePass(false) 
+  });
+  
+  // 解构出我们需要用到的状态
+  // isAvailable: 判断当前是否在 PC 端 (有 electronAPI)
+  const { isAvailable: isPcAiAvailable, aiWinRate: pcAiWinRate, isThinking: isPcAiThinking, isInitializing, setIsInitializing } = aiEngine;
+
+  // 记录是否首次运行 (用于显示不同的加载提示)
+  const [isFirstRun] = useState(() => !localStorage.getItem('has_run_ai_before'));
+  
+  // [修改] 统一的思考状态：本地 JS 思考中 或 PC KataGo 思考中
+  const showThinkingStatus = isThinking || isPcAiThinking;
+
+  // --- [新增] 辅助函数：处理非线性滑块逻辑 ---
+  // sliderToVisits 和 visitsToSlider 已移至 useKataGo hooks 中引用
+
+  const handleDifficultySelect = (diff: ExtendedDifficulty) => {
+      setTempDifficulty(diff);
+      switch (diff) {
+          case 'Easy': setTempMaxVisits(1); break;
+          case 'Medium': setTempMaxVisits(10); break;
+          case 'Hard': setTempMaxVisits(100); break;
+      }
+  };
+
+  const handleCustomChange = (val: number) => {
+      setTempMaxVisits(val);
+      if (val !== 1 && val !== 10 && val !== 100) {
+          setTempDifficulty('Custom');
+      }
+  };
+
+  const getCalculatedVisits = (diff: ExtendedDifficulty, customVal: number) => {
+      switch (diff) {
+          case 'Easy': return 1;    
+          case 'Medium': return 10; 
+          case 'Hard': return 100;  
+          case 'Custom': return customVal; 
+          default: return 10;
+      }
+  };
 
   // Online State
   const [showOnlineMenu, setShowOnlineMenu] = useState(false);
@@ -256,6 +341,20 @@ const App: React.FC = () => {
       setAppMode('playing');
       
       cleanupOnline();
+
+      // [新增] PC 端重置 AI
+      if (isPcAiAvailable && tempGameType === 'Go') {
+          // 重置 KataGo，默认贴目 7.5
+          aiEngine.resetAI(tempBoardSize, 7.5);
+          
+          // 特殊情况：如果是人机对战，且玩家选白棋（AI执黑），需要让 AI 先行
+          if (tempGameMode === 'PvAI' && tempUserColor === 'white') {
+              setTimeout(() => {
+                   // 1000 是 maxVisits，这里的 1000 是默认上限，也可以传 difficulty
+                   aiEngine.requestAiMove('black', tempDifficulty, 1000); 
+              }, 500);
+          }
+      }
   };
 
   // Check Version Logic - Using Supabase
@@ -312,34 +411,50 @@ const App: React.FC = () => {
   };
 
   // --- AI Turn Trigger Update ---
-  // If PvAI:
-  // - If User is Black: AI plays when current is White.
-  // - If User is White: AI plays when current is Black.
   useEffect(() => {
+    // 基本检查保持不变
     if (appMode !== 'playing' || gameMode !== 'PvAI' || gameOver || showPassModal) return;
 
     const aiColor = userColor === 'black' ? 'white' : 'black';
     
     if (currentPlayer === aiColor) {
-      setIsThinking(true);
-      const timer = setTimeout(() => {
-        let prevHash = null; if (history.length > 0) prevHash = getBoardHash(history[history.length-1].board);
-        const move = getAIMove(board, aiColor, gameType, difficulty, prevHash);
-        
-        if (move === 'RESIGN') {
-             setIsThinking(false);
-             endGame(userColor, 'AI 认为差距过大，投子认输');
-        } else if (move) {
-             executeMove(move.x, move.y, false);
-             setIsThinking(false);
-        } else {
-             handlePass();
-             setIsThinking(false);
+      // [新增] 分支判断
+      if (isPcAiAvailable && gameType === 'Go') {
+          // --- 分支 A: PC 端 (Electron + KataGo) ---
+          // 如果 AI 目前没有在思考，则发送请求
+          if (!isPcAiThinking) {
+              // 这里传入 difficulty，hooks 内部会决定 visits
+              // [修改] 传入 maxVisits
+              aiEngine.requestAiMove(aiColor, difficulty, maxVisits); 
+          }
+      } else {
+          // --- 分支 B: 安卓/Web 端 (纯 JS 算法) ---
+          // 保持你原有的逻辑不变
+          setIsThinking(true);
+          const timer = setTimeout(() => {
+            let prevHash = null; if (history.length > 0) prevHash = getBoardHash(history[history.length-1].board);
+            const move = getAIMove(board, aiColor, gameType, difficulty, prevHash);
+            
+            if (move === 'RESIGN') {
+                 setIsThinking(false);
+                 endGame(userColor, 'AI 认为差距过大，投子认输');
+            } else if (move) {
+                 executeMove(move.x, move.y, false);
+                 setIsThinking(false);
+            } else {
+                 handlePass();
+                 setIsThinking(false);
+            }
+          }, 700);
+          return () => clearTimeout(timer);
+      }
+    } else {
+        // 轮到玩家落子时，确保 PC AI 停止思考状态（安全阀）
+        if (isPcAiAvailable && isPcAiThinking) {
+            aiEngine.stopThinking();
         }
-      }, 700);
-      return () => clearTimeout(timer);
     }
-  }, [currentPlayer, gameMode, board, gameOver, gameType, difficulty, showPassModal, appMode, userColor, history]);
+  }, [currentPlayer, gameMode, board, gameOver, gameType, difficulty, showPassModal, appMode, userColor, history, isPcAiAvailable, isPcAiThinking, aiEngine]);
 
 
   // --- Helper: Board Stringify for Ko ---
@@ -474,6 +589,11 @@ const App: React.FC = () => {
     setBoard(createBoard(sizeToUse)); 
     setCurrentPlayer('black'); setBlackCaptures(0); setWhiteCaptures(0); setLastMove(null); setGameOver(false); setWinner(null); setWinReason(''); setConsecutivePasses(0); setPassNotificationDismissed(false); setFinalScore(null); setHistory([]); setShowMenu(false); setShowPassModal(false); setIsThinking(false); setAppMode('playing');
     
+    // [新增] PC 端简单的重置 (保持当前规则)
+    if (isPcAiAvailable && gameType === 'Go') {
+        aiEngine.resetAI(sizeToUse, 7.5);
+    }
+    
     // Always send RESTART if connected, so opponent resets too
     if (onlineStatusRef.current === 'connected' && dataChannelRef.current?.readyState === 'open') {
         dataChannelRef.current.send(JSON.stringify({ type: 'RESTART' }));
@@ -544,8 +664,14 @@ const App: React.FC = () => {
     if (gameMode === 'PvAI' && currentPlayer === aiColor) return;
 
     if (onlineStatus === 'connected') { if (currentPlayer !== myColor) return; sendData({ type: 'MOVE', x, y }); }
+    
+    // [新增] 如果是 PC 端且是围棋模式，同步人类的一手棋给 KataGo
+    if (isPcAiAvailable && gameType === 'Go') {
+        aiEngine.syncHumanMove(currentPlayer, x, y);
+    }
+
     executeMove(x, y, false);
-  }, [gameOver, gameMode, currentPlayer, onlineStatus, myColor, isThinking, appMode, setupTool, board, userColor]);
+  }, [gameOver, gameMode, currentPlayer, onlineStatus, myColor, isThinking, appMode, setupTool, board, userColor, isPcAiAvailable, aiEngine, gameType]);
 
   const handlePass = useCallback((isRemote: boolean = false) => {
     if (gameOver) return;
@@ -577,7 +703,9 @@ const App: React.FC = () => {
   const currentDisplayLastMove = appMode === 'review' && history[reviewIndex] ? history[reviewIndex].lastMove : lastMove;
   
   // Win Rate Logic with Color Flip
-  const rawWinRate = showWinRate && !gameOver && appMode === 'playing' && gameType === 'Go' ? calculateWinRate(board) : 50;
+  const rawWinRate = showWinRate && !gameOver && appMode === 'playing' && gameType === 'Go' 
+      ? (isPcAiAvailable && pcAiWinRate !== 50 ? pcAiWinRate : calculateWinRate(board)) 
+      : 50;
   // If user is White, show White's win rate (which is 100 - Black's win rate)
   const displayWinRate = userColor === 'white' ? (100 - rawWinRate) : rawWinRate;
   
@@ -616,9 +744,9 @@ const App: React.FC = () => {
              </div>
           </div>
           
-          {isThinking && (
+          {showThinkingStatus && (
               <div className="absolute top-4 left-4 bg-white/80 px-4 py-2 rounded-full text-xs font-bold text-[#5c4033] animate-pulse border-2 border-[#e3c086] shadow-sm z-20">
-                  AI 正在思考...
+                  {isPcAiAvailable ? 'KataGo 正在计算...' : 'AI 正在思考...'}
               </div>
           )}
           
@@ -822,14 +950,50 @@ const App: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Difficulty */}
+                        {/* Difficulty */}
                     {tempGameMode === 'PvAI' && (
-                        <div className="grid grid-cols-3 gap-2 animate-in fade-in slide-in-from-top-2">
-                            {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map((level) => (
-                                <button key={level} onClick={() => setTempDifficulty(level)} className={`btn-retro py-2 rounded-xl font-bold text-sm transition-all ${tempDifficulty === level ? 'bg-[#8c6b38] text-[#fcf6ea] border-[#5c4033]' : 'bg-[#fff] text-[#8c6b38] border-[#e3c086]'}`}>
-                                    {level === 'Easy' ? '简单' : level === 'Medium' ? '中等' : '困难'}
-                                </button>
-                            ))}
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                             {/* 原有的 Difficulty 按钮 */}
+                            <div className="grid grid-cols-3 gap-2">
+                                {(['Easy', 'Medium', 'Hard'] as const).map((level) => (
+                                    <button 
+                                        key={level} 
+                                        onClick={() => handleDifficultySelect(level)} 
+                                        className={`btn-retro py-2 rounded-xl font-bold text-sm transition-all ${tempDifficulty === level ? 'bg-[#8c6b38] text-[#fcf6ea] border-[#5c4033]' : 'bg-[#fff] text-[#8c6b38] border-[#e3c086]'}`}
+                                    >
+                                        {level === 'Easy' ? '简单' : level === 'Medium' ? '中等' : '困难'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* [新增] 思考量滑块 (仅对 PC 围棋模式有效) */}
+                            {isPcAiAvailable && tempGameType === 'Go' && (
+                                <div className="bg-[#fff]/50 p-2 rounded-xl border border-[#e3c086] flex flex-col gap-2">
+                                    <div className="flex justify-between items-center px-1">
+                                        <span className="text-xs font-bold text-[#5c4033] flex items-center gap-1">
+                                            <Cpu size={14} className="text-[#8c6b38]"/> 思考量
+                                        </span>
+                                        <span className="text-[10px] font-black text-[#fcf6ea] bg-[#8c6b38] px-1.5 py-0.5 rounded shadow-sm">
+                                            {tempDifficulty === 'Custom' ? `${tempMaxVisits} Visits` : `${getCalculatedVisits(tempDifficulty, tempMaxVisits)} Visits`}
+                                        </span>
+                                    </div>
+                                    <div className="relative h-6 flex items-center px-1">
+                                        <input 
+                                            type="range" min="0" max="100" step="1"
+                                            value={visitsToSlider(tempMaxVisits)} 
+                                            onChange={(e) => handleCustomChange(sliderToVisits(parseInt(e.target.value)))}
+                                            className="cute-range w-full"
+                                            style={{ 
+                                                background: getSliderBackground(visitsToSlider(tempMaxVisits), 0, 100),
+                                                touchAction: 'none'
+                                            }}
+                                        />
+                                    </div>
+                                    {tempDifficulty === 'Custom' && (
+                                        <p className="text-[9px] text-[#8c6b38] text-center font-bold opacity-75">自定义模式</p>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1037,7 +1201,7 @@ const App: React.FC = () => {
                          <button onClick={() => copySocial('1245921330', 'B站')} className="flex flex-col items-center gap-2 group">
                              <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#23ade5] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
                                  {/* 请确保 public 文件夹中有 bili.png */}
-                                 <img src="/bili.jpg" alt="Bili" className="w-full h-full object-cover" />
+                                 <img src="./bili.jpg" alt="Bili" className="w-full h-full object-cover" />
                              </div>
                              <span className="text-[10px] font-bold text-[#5c4033]">Bilibili</span>
                          </button>
@@ -1046,7 +1210,7 @@ const App: React.FC = () => {
                          <button onClick={() => copySocial('7848618811', '小红书')} className="flex flex-col items-center gap-2 group">
                              <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#ff2442] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
                                  {/* 请确保 public 文件夹中有 rednote.png */}
-                                 <img src="/rednote.jpg" alt="RedNote" className="w-full h-full object-cover" />
+                                 <img src="./rednote.jpg" alt="RedNote" className="w-full h-full object-cover" />
                              </div>
                              <span className="text-[10px] font-bold text-[#5c4033]">小红书</span>
                          </button>
@@ -1055,7 +1219,7 @@ const App: React.FC = () => {
                          <button onClick={() => copySocial('47891107161', '抖音')} className="flex flex-col items-center gap-2 group">
                              <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#1c1c1c] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
                                   {/* 请确保 public 文件夹中有 douyin.png */}
-                                  <img src="/douyin.jpg" alt="Douyin" className="w-full h-full object-cover" />
+                                  <img src="./douyin.jpg" alt="Douyin" className="w-full h-full object-cover" />
                              </div>
                              <span className="text-[10px] font-bold text-[#5c4033]">抖音</span>
                          </button>
@@ -1090,8 +1254,8 @@ const App: React.FC = () => {
                              {/* 请确保 public 文件夹中有 wechat_pay.png 和 alipay_pay.png */}
                              <img 
                                 src={donationMethod === 'wechat' 
-                                    ? '/wechat_pay.jpg' 
-                                    : '/alipay_pay.jpg'
+                                    ? './wechat_pay.jpg' 
+                                    : './alipay_pay.jpg'
                                 } 
                                 alt={donationMethod === 'wechat' ? "WeChat QR" : "Alipay QR"}
                                 className="w-full h-full object-contain p-2" 
@@ -1207,6 +1371,55 @@ const App: React.FC = () => {
                         <Eye size={18} /> 复盘
                     </button>
                 </div>
+            </div>
+        </div>
+      )}
+
+      {/* [新增] AI 初始化弹窗 (复刻 App copy.tsx 样式) */}
+      {isInitializing && isPcAiAvailable && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-500">
+            <div className="bg-[#fcf6ea] rounded-3xl p-8 w-full max-w-sm shadow-2xl border-[6px] border-[#8c6b38] flex flex-col items-center text-center relative">
+                
+                {/* 加载图标 */}
+                <div className="mb-6 relative">
+                    <div className="w-16 h-16 border-4 border-[#e3c086] border-t-[#5c4033] rounded-full animate-spin"></div>
+                    <Cpu size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#5c4033]" />
+                </div>
+
+                <h2 className="text-2xl font-black text-[#5c4033] mb-3">
+                    {isFirstRun ? "正在进行首次初始化" : "AI 引擎启动中..."}
+                </h2>
+
+                <div className="bg-[#e3c086]/20 p-4 rounded-xl border border-[#e3c086] mb-6">
+                    {isFirstRun ? (
+                        // 首次运行显示的文案
+                        <>
+                            <p className="text-sm font-bold text-[#8c6b38] leading-relaxed text-left">
+                                <AlertCircle size={16} className="inline mr-1 mb-1"/>
+                                系统正在配置神经网络模型。
+                            </p>
+                            <p className="text-xs font-bold text-[#5c4033]/80 mt-2 text-left">
+                                首次运行可能需要 <span className="text-red-600 font-black">1-3 分钟</span> 进行硬件调优，请务必耐心等待，不要关闭程序。
+                            </p>
+                        </>
+                    ) : (
+                        // 后续运行显示的文案
+                        <p className="text-sm font-bold text-[#8c6b38] leading-relaxed">
+                             <Zap size={16} className="inline mr-1 mb-1"/>
+                             正在加载模型权重，通常需要 5-10 秒。
+                        </p>
+                    )}
+                </div>
+
+                <button
+                    onClick={() => {
+                        setIsInitializing(false);
+                        localStorage.setItem('has_run_ai_before', 'true');
+                    }}
+                    className="btn-retro btn-brown w-full py-3 rounded-xl font-bold text-sm opacity-80 hover:opacity-100"
+                >
+                    {isFirstRun ? "我知道了 (后台继续加载)" : "进入游戏"}
+                </button>
             </div>
         </div>
       )}
