@@ -6,8 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+
+    "//--- 下面是新增的一键自动化脚本 ---": "",
+    "version:sync": "node update-version.js",
+    "icon:gen": "capacitor-assets generate --android",
+    
+    "//--- 终极懒人命令：版本同步 + 编译React + 生成图标 + 同步到安卓 ---": "",
+    "make-android": "npm run version:sync && npm run build && npm run icon:gen && npx cap sync android"
   },
+  
   "dependencies": {
     "@capacitor/android": "^8.0.1",
     "@supabase/supabase-js": "^2.90.1",

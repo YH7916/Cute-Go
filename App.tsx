@@ -126,6 +126,7 @@ const App: React.FC = () => {
     const [opponentProfile, setOpponentProfile] = useState<{ id: string; elo: number } | null>(null);
 
     const matchTimerRef = useRef<number | null>(null);
+    const heartbeatRef = useRef<number | null>(null);
 
   // --- 2. Global App State (使用 loadState 初始化) ---
   const [boardSize, setBoardSize] = useState<BoardSize>(() => loadState('boardSize', 9));
@@ -632,7 +633,7 @@ const App: React.FC = () => {
       pcRef.current = pc;
       pc.oniceconnectionstatechange = () => {
           if (pc.iceConnectionState === 'connected') {
-              setOnlineStatus('connected');
+              // setOnlineStatus('connected'); // Wait for DataChannel to open
               if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
           } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
               setOnlineStatus('disconnected');
@@ -718,6 +719,13 @@ const App: React.FC = () => {
       setOpponentProfile(null);
   };
 
+  const stopHeartbeat = () => {
+      if (heartbeatRef.current) {
+          clearInterval(heartbeatRef.current);
+          heartbeatRef.current = null;
+      }
+  };
+
   useEffect(() => { return () => cleanupOnline(); }, []);
 
   const cancelMatchmaking = async () => {
@@ -725,6 +733,7 @@ const App: React.FC = () => {
           clearInterval(matchTimerRef.current);
           matchTimerRef.current = null;
       }
+      stopHeartbeat();
       setIsMatching(false);
       setMatchTime(0);
       if (peerId) {
@@ -769,6 +778,7 @@ const App: React.FC = () => {
 
       const findOpponent = async (attempt: number): Promise<any> => {
           const range = attempt === 1 ? 100 : (attempt === 2 ? 300 : 9999);
+          const activeSince = new Date(Date.now() - 15000).toISOString();
 
           const { data: opponents } = await supabase
               .from('matchmaking_queue')
@@ -776,6 +786,7 @@ const App: React.FC = () => {
               .eq('game_type', gameType)
               .eq('board_size', sizeToMatch)
               .neq('user_id', session.user.id)
+              .gte('last_seen', activeSince)
               .gte('elo_rating', myElo - range)
               .lte('elo_rating', myElo + range)
               .limit(1);
@@ -796,6 +807,7 @@ const App: React.FC = () => {
               if (!error) {
                   setOpponentProfile({ id: opponent.user_id, elo: opponent.elo_rating });
                   if (matchTimerRef.current) clearInterval(matchTimerRef.current);
+                  stopHeartbeat();
                   setIsMatching(false);
 
                   setRemotePeerId(opponent.peer_id);
@@ -816,6 +828,7 @@ const App: React.FC = () => {
                if (payload.type === 'offer' && payload.sdp) {
                    supabase.from('matchmaking_queue').delete().eq('peer_id', myTempPeerId).then();
                    if (matchTimerRef.current) clearInterval(matchTimerRef.current);
+                  stopHeartbeat();
                    setIsMatching(false);
                    setOnlineStatus('connecting');
                    let hostPc = pc;
@@ -833,8 +846,15 @@ const App: React.FC = () => {
                        game_type: gameType,
                        board_size: sizeToMatch,
                        elo_rating: myElo,
-                       user_id: session.user.id
+                       user_id: session.user.id,
+                       last_seen: new Date().toISOString()
                    });
+                   stopHeartbeat();
+                   heartbeatRef.current = window.setInterval(async () => {
+                       await supabase.from('matchmaking_queue')
+                           .update({ last_seen: new Date().toISOString() })
+                           .eq('peer_id', myTempPeerId);
+                   }, 5000);
                    setOnlineStatus('disconnected');
                }
           });
@@ -847,6 +867,7 @@ const App: React.FC = () => {
 
   const createRoom = async () => {
       isManualDisconnect.current = false;
+      stopHeartbeat();
       cleanupOnline();
       const id = Math.floor(100000 + Math.random() * 900000).toString();
       setPeerId(id);
@@ -870,6 +891,7 @@ const App: React.FC = () => {
       const targetId = roomId || remotePeerId;
       if (!targetId) return;
       isManualDisconnect.current = false;
+      stopHeartbeat();
       cleanupOnline();
       setOnlineStatus('connecting');
       
@@ -906,12 +928,14 @@ const App: React.FC = () => {
       if (!showOnlineMenu) return;
       const updateCounts = async () => {
           const sizes: BoardSize[] = [9, 13, 19];
+          const activeSince = new Date(Date.now() - 15000).toISOString();
           const results = await Promise.all(
               sizes.map(size =>
                   supabase.from('matchmaking_queue')
                       .select('*', { count: 'exact', head: true })
                       .eq('game_type', gameType)
                       .eq('board_size', size)
+                      .gte('last_seen', activeSince)
               )
           );
           setQueueCounts(prev => {
@@ -1017,7 +1041,7 @@ const App: React.FC = () => {
     
     // PvAI check: if it's AI's turn, block user
     const aiColor = userColor === 'black' ? 'white' : 'black';
-    if (gameMode === 'PvAI' && currentPlayer === aiColor) return;
+    if (onlineStatus !== 'connected' && gameMode === 'PvAI' && currentPlayer === aiColor) return;
 
     if (onlineStatus === 'connected') { if (currentPlayer !== myColor) return; sendData({ type: 'MOVE', x, y }); }
     
@@ -1754,7 +1778,7 @@ const App: React.FC = () => {
                         className="btn-retro bg-[#81c784] border-[#388e3c] text-white py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg animate-in fade-in slide-in-from-top-2"
                      >
                         <Download size={18} /> 
-                        {updateMsg.includes('发现新版本') ? '下载更新' : '访问官网 / 下载'}
+                        {updateMsg.includes('发现新版本') ? '下载更新(密码：cute）' : '访问官网 / 下载'}
                     </a>
                  )}
 
