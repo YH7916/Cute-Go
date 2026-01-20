@@ -345,8 +345,11 @@ const App: React.FC = () => {
   const gameTypeRef = useRef(gameType);
   const myColorRef = useRef(myColor);
   const onlineStatusRef = useRef(onlineStatus);
+  // [新增] 添加 boardSizeRef，确保 WebRTC 回调能拿到最新的棋盘大小
+  const boardSizeRef = useRef(boardSize);
 
   useEffect(() => { boardRef.current = board; }, [board]);
+  useEffect(() => { boardSizeRef.current = boardSize; }, [boardSize]);
   useEffect(() => { currentPlayerRef.current = currentPlayer; }, [currentPlayer]);
   useEffect(() => { gameTypeRef.current = gameType; }, [gameType]);
   useEffect(() => { myColorRef.current = myColor; }, [myColor]);
@@ -654,13 +657,16 @@ const App: React.FC = () => {
           setOnlineStatus('connected'); setIsMatching(false); setShowOnlineMenu(false); setShowMenu(false); setGameMode('PvP');
 
           if (isHost) {
-              // Host (白棋) 发送 Sync（使用房主的棋盘大小）
+              // Host (白棋)
               setMyColor('white');
-              resetGame(true);
+              // Host 重置游戏，并广播 RESTART (其实 SYNC 已经包含了初始化信息，这里 resetGame 主要是为了清空本地状态)
+              // 此时 boardSizeRef.current 已经是正确的匹配大小
+              resetGame(true, boardSizeRef.current, false); // false: 不用发RESTART，因为马上要发SYNC
 
               const syncPayload: any = {
                   type: 'SYNC',
-                  boardSize,
+                  // [关键修改] 使用 Ref 获取最新的棋盘大小，而不是闭包里的 boardSize
+                  boardSize: boardSizeRef.current, 
                   gameType: gameTypeRef.current,
                   startColor: 'black'
               };
@@ -679,6 +685,9 @@ const App: React.FC = () => {
           else if (msg.type === 'SYNC') { 
               setBoardSize(msg.boardSize); 
               setTempBoardSize(msg.boardSize);
+              // 也要同步 Ref
+              boardSizeRef.current = msg.boardSize;
+
               setGameType(msg.gameType); 
               setTempGameType(msg.gameType);
               setMyColor(msg.startColor);
@@ -692,7 +701,8 @@ const App: React.FC = () => {
                       }));
                   }
               }
-              resetGame(true, msg.boardSize);
+              // [关键修改] 初始化游戏，使用对方传来的 boardSize，并且传入 false 禁止回传 RESTART
+              resetGame(true, msg.boardSize, false);
               vibrate(20);
           }
           else if (msg.type === 'SYNC_REPLY') {
@@ -700,7 +710,8 @@ const App: React.FC = () => {
                   setOpponentProfile(msg.opponentInfo);
               }
           }
-          else if (msg.type === 'RESTART') resetGame(true);
+          // 收到普通重开信号时，也不需要再广播回去
+          else if (msg.type === 'RESTART') resetGame(true, undefined, false);
       };
       dc.onclose = () => { 
           setOnlineStatus('disconnected'); 
@@ -766,6 +777,8 @@ const App: React.FC = () => {
       setMatchBoardSize(sizeToMatch);
       setBoardSize(sizeToMatch);
       setTempBoardSize(sizeToMatch);
+      // [新增] 立即手动更新 Ref，确保后续 WebRTC 流程读到正确的值
+      boardSizeRef.current = sizeToMatch; 
       setIsMatching(true);
       setMatchTime(0);
 
@@ -952,9 +965,15 @@ const App: React.FC = () => {
       return () => clearInterval(timer);
   }, [showOnlineMenu, gameType]);
 
-  const resetGame = (keepOnline: boolean = false, explicitSize?: number) => {
+  const resetGame = (keepOnline: boolean = false, explicitSize?: number, shouldBroadcast: boolean = true) => {
     // 优先使用传入的 explicitSize，否则使用当前的 state
     const sizeToUse = explicitSize !== undefined ? explicitSize : boardSize;
+    
+    // 如果传入了显式大小，这里也需要同步更新 state 和 ref，防止后续逻辑错乱
+    if (explicitSize !== undefined) {
+        setBoardSize(sizeToUse);
+        boardSizeRef.current = sizeToUse; // 立即更新 Ref
+    }
     
     setBoard(createBoard(sizeToUse)); 
     setCurrentPlayer('black'); setBlackCaptures(0); setWhiteCaptures(0); setLastMove(null); setGameOver(false); setWinner(null); setWinReason(''); setConsecutivePasses(0); setPassNotificationDismissed(false); setFinalScore(null); setHistory([]); setShowMenu(false); setShowPassModal(false); setIsThinking(false); setAppMode('playing');
@@ -965,7 +984,7 @@ const App: React.FC = () => {
     }
     
     // Always send RESTART if connected, so opponent resets too
-    if (onlineStatusRef.current === 'connected' && dataChannelRef.current?.readyState === 'open') {
+    if (keepOnline && shouldBroadcast && onlineStatusRef.current === 'connected' && dataChannelRef.current?.readyState === 'open') {
         dataChannelRef.current.send(JSON.stringify({ type: 'RESTART' }));
     }
     
