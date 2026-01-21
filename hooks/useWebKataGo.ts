@@ -77,10 +77,18 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         });
     }, [boardSize, isThinking]);
 
+    const stopThinking = useCallback(() => {
+        setIsThinking(false);
+        if (workerRef.current) {
+            workerRef.current.postMessage({ type: 'stop' });
+        }
+    }, []);
+
     return {
         isWorkerReady,
         isThinking,
         aiWinRate,
-        requestWebAiMove
+        requestWebAiMove,
+        stopThinking
     };
 };

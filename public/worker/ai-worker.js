@@ -200,6 +200,7 @@ const MCTS_SIMULATIONS = 50;
 
 let model = null;
 let isBusy = false;
+let stopRequested = false;
 
 // === 3. 定式库 ===
 const OPENING_BOOK = {
@@ -411,6 +412,7 @@ function selectChild(node) {
 }
 
 async function runMCTS(initialBoard, history, myColor, size) {
+    stopRequested = false;
     // 1. 定式与开局逻辑
     if (history.length < 4 && OPENING_BOOK[size]) {
         let bookMoves = [];
@@ -450,6 +452,9 @@ async function runMCTS(initialBoard, history, myColor, size) {
     const { scoreLead } = await expandNode(root, rootBoard, history, myColorVal);
 
     for(let i=0; i<MCTS_SIMULATIONS; i++) {
+        if (stopRequested) {
+            return null;
+        }
         let node = root;
         let simBoard = rootBoard.clone();
         let currColor = myColorVal;
@@ -508,6 +513,8 @@ async function runMCTS(initialBoard, history, myColor, size) {
         }
     }
 
+    if (stopRequested) return null;
+    
     const winRate = (1 / (1 + Math.exp(-0.3 * scoreLead))) * 100;
     return {
         move: finalMove,
@@ -519,14 +526,24 @@ async function runMCTS(initialBoard, history, myColor, size) {
 onmessage = async function(e) {
     const { type, data } = e.data;
     if (type === 'init') { await loadModel(); return; }
+    if (type === 'stop') {
+        stopRequested = true;
+        isBusy = false;
+        return;
+    }
     
     if (type === 'compute') {
         if (!model) await loadModel();
         if (isBusy) return;
         isBusy = true;
+        stopRequested = false;
         try {
             const { board, history, color, size } = data;
             const result = await runMCTS(board, history, color, size);
+            if (!result) {
+                isBusy = false;
+                return;
+            }
             
             if (result.winRate < 5.0 && history.length > 30) {
                 postMessage({ type: 'ai-resign', data: { winRate: result.winRate } });

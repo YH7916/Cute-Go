@@ -305,7 +305,8 @@ const App: React.FC = () => {
           isWorkerReady, 
           isThinking: isWebThinking, 
           aiWinRate: webWinRate, 
-          requestWebAiMove 
+          requestWebAiMove,
+          stopThinking: stopWebThinking 
       } = webAiEngine;
 
   // 记录是否首次运行 (用于显示不同的加载提示)
@@ -499,6 +500,12 @@ const App: React.FC = () => {
 
   const applySettingsAndRestart = () => {
       vibrate(20);
+      stopWebThinking();
+      aiTurnLock.current = false;
+      if (aiTimerRef.current) {
+          clearTimeout(aiTimerRef.current);
+          aiTimerRef.current = null;
+      }
       setBoardSize(tempBoardSize);
       setGameType(tempGameType);
       setDifficulty(tempDifficulty);
