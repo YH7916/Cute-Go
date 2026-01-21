@@ -196,7 +196,7 @@ class MicroBoard {
 // === 2. AI 配置 ===
 const MODEL_SIZE = 19; 
 const INPUT_CHANNELS = 22; 
-const MCTS_SIMULATIONS = 800; 
+const MCTS_SIMULATIONS = 50; 
 
 let model = null;
 let isBusy = false;

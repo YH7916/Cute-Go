@@ -1,6 +1,6 @@
 import { BoardState, Player, Point, Stone, Group, BoardSize, Difficulty, GameType } from '../types';
 
-// --- 基础工具函数 (保持不变) ---
+// --- 基础工具函数 ---
 export const createBoard = (size: number): BoardState => {
   return Array(size).fill(null).map(() => Array(size).fill(null));
 };
@@ -14,6 +14,7 @@ export const getNeighbors = (point: Point, size: number): Point[] => {
   return neighbors;
 };
 
+// [优化 1] 使用数字索引代替字符串 Key，大幅提升高频调用的性能
 export const getGroup = (board: BoardState, start: Point): Group | null => {
   const size = board.length;
   const stone = board[start.y][start.x];
@@ -21,11 +22,13 @@ export const getGroup = (board: BoardState, start: Point): Group | null => {
 
   const color = stone.color;
   const group: Stone[] = [];
-  const visited = new Set<string>();
+  // Optimization: use number set (y * size + x) instead of string set
+  const visited = new Set<number>();
   const queue: Point[] = [start];
-  const liberties = new Set<string>();
+  const liberties = new Set<number>();
 
-  visited.add(`${start.x},${start.y}`);
+  // Init
+  visited.add(start.y * size + start.x);
 
   while (queue.length > 0) {
     const current = queue.shift()!;
@@ -34,13 +37,13 @@ export const getGroup = (board: BoardState, start: Point): Group | null => {
 
     const neighbors = getNeighbors(current, size);
     for (const n of neighbors) {
-      const neighborKey = `${n.x},${n.y}`;
+      const idx = n.y * size + n.x;
       const neighborStone = board[n.y][n.x];
 
       if (!neighborStone) {
-        liberties.add(neighborKey);
-      } else if (neighborStone.color === color && !visited.has(neighborKey)) {
-        visited.add(neighborKey);
+        liberties.add(idx);
+      } else if (neighborStone.color === color && !visited.has(idx)) {
+        visited.add(idx);
         queue.push(n);
       }
     }
@@ -49,25 +52,26 @@ export const getGroup = (board: BoardState, start: Point): Group | null => {
   return { 
       stones: group, 
       liberties: liberties.size,
-      libertyPoints: Array.from(liberties).map(s => {
-          const [x, y] = s.split(',').map(Number);
-          return {x, y};
-      })
+      // 保持接口兼容，还原回 Point 数组
+      libertyPoints: Array.from(liberties).map(idx => ({
+          x: idx % size,
+          y: Math.floor(idx / size)
+      }))
   };
 };
 
 export const getAllGroups = (board: BoardState): Group[] => {
   const size = board.length;
-  const visited = new Set<string>();
+  const visited = new Set<number>(); // Optimization
   const groups: Group[] = [];
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const key = `${x},${y}`;
-      if (board[y][x] && !visited.has(key)) {
+      const idx = y * size + x;
+      if (board[y][x] && !visited.has(idx)) {
         const group = getGroup(board, { x, y });
         if (group) {
-          group.stones.forEach(s => visited.add(`${s.x},${s.y}`));
+          group.stones.forEach(s => visited.add(s.y * size + s.x));
           groups.push(group);
         }
       }
@@ -77,6 +81,7 @@ export const getAllGroups = (board: BoardState): Group[] => {
 };
 
 const hashBoard = (board: BoardState): string => {
+    // 字符串拼接对于 React Hook 依赖检查是必须的，保持不变
     let str = '';
     for(let y=0; y<board.length; y++) {
         for(let x=0; x<board.length; x++) {
@@ -123,17 +128,16 @@ export const deserializeGame = (key: string): {
     } catch (e) { return null; }
 };
 
-// --- 核心落子逻辑 (保持不变) ---
+// --- 核心落子逻辑 ---
 export const attemptMove = (
   board: BoardState, x: number, y: number, player: Player, gameType: 'Go' | 'Gomoku' = 'Go', previousBoardStateHash: string | null = null
 ): { newBoard: BoardState; captured: number } | null => {
   if (board[y][x] !== null) return null;
   const size = board.length;
+  
   // 浅拷贝 + 行拷贝优化
-  const nextBoard = [...board];
-  nextBoard[y] = [...board[y]]; 
-  // 注意：为了处理提子，我们需要更深的拷贝，或者只拷贝受影响的行。
-  // 为安全起见，还是做全量 map 拷贝，但在 getAIMove 中我们会尽量少调用它。
+  // 注意：AI 模拟时这里是性能热点，但为了保证逻辑正确性（提子、劫争），
+  // 完全的不可变数据结构是必要的。
   const safeBoard = board.map(row => row.map(s => s ? { ...s } : null));
 
   safeBoard[y][x] = { color: player, id: `${player}-${Date.now()}-${x}-${y}`, x, y };
@@ -158,11 +162,12 @@ export const attemptMove = (
   });
 
   const myGroup = getGroup(safeBoard, { x, y });
-  if (myGroup && myGroup.liberties === 0) return null; 
+  // 自杀禁手检查：如果在这个位置落子后没气，且没有提掉对方的子，则为非法
+  if (myGroup && myGroup.liberties === 0 && capturedCount === 0) return null; 
 
   if (previousBoardStateHash) {
       const currentHash = hashBoard(safeBoard);
-      if (currentHash === previousBoardStateHash) return null;
+      if (currentHash === previousBoardStateHash) return null; // 简单的劫争检查
   }
 
   return { newBoard: safeBoard, captured: capturedCount };
@@ -192,35 +197,40 @@ export const checkGomokuWin = (board: BoardState, lastMove: {x: number, y: numbe
   return false;
 };
 
+// [优化 2] 使用数字 Set 优化算分
 export const calculateScore = (board: BoardState): { black: number, white: number } => {
   const size = board.length;
   let blackScore = 0, whiteScore = 0;
-  const visited = new Set<string>();
+  const visited = new Set<number>();
+  
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const key = `${x},${y}`;
-      if (visited.has(key)) continue;
+      const idx = y * size + x;
+      if (visited.has(idx)) continue;
+      
       const stone = board[y][x];
       if (stone) {
         if (stone.color === 'black') blackScore++; else whiteScore++;
-        visited.add(key);
+        visited.add(idx);
       } else {
         const region: Point[] = [];
         const regionQueue: Point[] = [{x, y}];
-        visited.add(key);
+        visited.add(idx);
         let touchesBlack = false, touchesWhite = false;
+        
         while(regionQueue.length > 0) {
            const p = regionQueue.shift()!;
            region.push(p);
            const neighbors = getNeighbors(p, size);
            for(const n of neighbors) {
-              const nKey = `${n.x},${n.y}`;
+              const nIdx = n.y * size + n.x;
               const nStone = board[n.y][n.x];
+              
               if(nStone) {
                  if(nStone.color === 'black') touchesBlack = true;
                  if(nStone.color === 'white') touchesWhite = true;
-              } else if (!visited.has(nKey)) {
-                 visited.add(nKey);
+              } else if (!visited.has(nIdx)) {
+                 visited.add(nIdx);
                  regionQueue.push(n);
               }
            }
@@ -230,7 +240,7 @@ export const calculateScore = (board: BoardState): { black: number, white: numbe
       }
     }
   }
-  whiteScore += 7.5;
+  whiteScore += 7.5; // Komi
   return { black: blackScore, white: whiteScore };
 };
 
@@ -246,9 +256,47 @@ export const calculateWinRate = (board: BoardState): number => {
 
 // --- 增强版 AI 系统 ---
 
-// 1. 候选点生成器 (Candidate Generator)
+// [优化 3] 增加“真眼”识别，防止 AI 填自己的眼
+const isSimpleEye = (board: BoardState, x: number, y: number, color: Player): boolean => {
+    const size = board.length;
+    // 1. 检查四周十字方向，如果不是自己的子或边缘，则不是眼
+    const neighbors = getNeighbors({x, y}, size);
+    for (const n of neighbors) {
+        const s = board[n.y][n.x];
+        if (!s || s.color !== color) return false;
+    }
+    
+    // 2. 检查对角线，防止假眼
+    // 规则：对于非边缘的眼，4个对角点至少要有3个是自己的子；边缘则适当放宽
+    let corners = 0;
+    let myCorners = 0;
+    const diags = [[-1,-1], [-1,1], [1,-1], [1,1]];
+    
+    for (const [dx, dy] of diags) {
+        const nx = x+dx, ny = y+dy;
+        if (nx < 0 || nx >= size || ny < 0 || ny >= size) {
+             // 棋盘外算作“保护”，计入 myCorners
+             corners++;
+             myCorners++;
+        } else {
+             corners++;
+             const s = board[ny][nx];
+             if (s && s.color === color) myCorners++;
+        }
+    }
+    
+    // 简单判定：如果有2个以上对角线不是自己的，可能是假眼，但为了安全，
+    // 我们只保护非常确定的真眼（防止AI自杀），所以严格一点：
+    // 如果是我方控制的角落少于3个，就不视为绝对安全的真眼（允许填）
+    // 反之，如果是真眼，绝对不填。
+    if (myCorners < 3) return false; 
+    
+    return true;
+};
+
+// 1. 候选点生成器
 const getCandidateMoves = (board: BoardState, size: number, range: number = 2): Point[] => {
-  const candidates = new Set<string>();
+  const candidates = new Set<number>(); // Optimization
   const hasStones = board.some(row => row.some(s => s !== null));
 
   if (!hasStones) {
@@ -269,7 +317,7 @@ const getCandidateMoves = (board: BoardState, size: number, range: number = 2): 
             const ny = y + dy;
             const nx = x + dx;
             if (nx >= 0 && nx < size && ny >= 0 && ny < size && board[ny][nx] === null) {
-               candidates.add(`${nx},${ny}`);
+               candidates.add(ny * size + nx);
             }
           }
         }
@@ -282,10 +330,10 @@ const getCandidateMoves = (board: BoardState, size: number, range: number = 2): 
       for(let y=0; y<size; y++) for(let x=0; x<size; x++) if(!board[y][x]) all.push({x,y});
       return all;
   }
-  return Array.from(candidates).map(s => { const [x, y] = s.split(',').map(Number); return {x, y}; });
+  return Array.from(candidates).map(idx => ({x: idx % size, y: Math.floor(idx / size)}));
 };
 
-// --- 新增：简单的棋形评估 ---
+// 2. 棋形评估
 const evaluateShape = (board: BoardState, x: number, y: number, player: Player): number => {
   const size = board.length;
   let score = 0;
@@ -317,22 +365,22 @@ const evaluateShape = (board: BoardState, x: number, y: number, player: Player):
   return score;
 };
 
-// --- 新增：简单的影响力/位置评分 ---
+// 3. 影响力/位置评分
 const evaluatePositionStrength = (x: number, y: number, size: number): number => {
   if (size >= 13) {
     const dX = Math.min(x, size - 1 - x);
     const dY = Math.min(y, size - 1 - y);
-    if ((dX === 2 || dX === 3) && (dY === 2 || dY === 3)) return 25;
+    if ((dX === 2 || dX === 3) && (dY === 2 || dY === 3)) return 25; // 金角银边
     if (dX === 2 && dY === 4) return 20;
-    if (dX === 0 || dY === 0) return -20;
-    if (dX === 1 || dY === 1) return -5;
+    if (dX === 0 || dY === 0) return -20; // 除非必要，少下断头路
+    if (dX === 1 || dY === 1) return -5;  // 爬二路通常不好
   }
   const center = Math.floor(size / 2);
   const distToCenter = Math.abs(x - center) + Math.abs(y - center);
   return Math.max(0, 10 - distToCenter);
 };
 
-// 3. 五子棋评估核心 (Heuristics)
+// 4. 五子棋评估核心 (Heuristics) - 保持不变
 const evaluateGomokuDirection = (board: BoardState, x: number, y: number, dx: number, dy: number, player: Player): number => {
   let count = 0;
   let blockedStart = false; let blockedEnd = false;
@@ -352,14 +400,13 @@ const evaluateGomokuDirection = (board: BoardState, x: number, y: number, dx: nu
   }
 
   const total = count + 1;
-  // 评分权重优化：区分“活四”和“冲四”
   if (total >= 5) return 1000000;
   if (total === 4) {
-      if (!blockedStart && !blockedEnd) return 50000; // 活四 (必胜)
-      if (!blockedStart || !blockedEnd) return 5000;  // 冲四 (需要防守)
+      if (!blockedStart && !blockedEnd) return 50000; // 活四
+      if (!blockedStart || !blockedEnd) return 5000;  // 冲四
   }
   if (total === 3) {
-      if (!blockedStart && !blockedEnd) return 5000;  // 活三 (威胁大)
+      if (!blockedStart && !blockedEnd) return 5000;  // 活三
       if (!blockedStart || !blockedEnd) return 500;   // 眠三
   }
   if (total === 2) {
@@ -380,27 +427,18 @@ const getGomokuScore = (board: BoardState, x: number, y: number, player: Player,
     }
     
     if (strict) {
-        // 困难模式：大幅提高进攻和防守的关键权重
-        if (attackScore >= 50000) return 9999999; // 自己能活四 -> 赢了
-        if (defenseScore >= 50000) return 8000000; // 对方能活四 -> 必堵
-        if (attackScore >= 5000) return 40000; // 自己能冲四/活三
-        if (defenseScore >= 5000) return 30000; // 对方能冲四/活三
+        if (attackScore >= 50000) return 9999999; 
+        if (defenseScore >= 50000) return 8000000;
+        if (attackScore >= 5000) return 40000; 
+        if (defenseScore >= 5000) return 30000;
     }
-    return attackScore + defenseScore; // 基础模式：攻守兼备
+    return attackScore + defenseScore;
 };
 
-// 4. 五子棋 Minimax (带 Alpha-Beta 剪枝 + 启发式排序)
-// 优化：增加了 moveOrdering (排序)，使得剪枝效率更高，允许更深层搜索
+// 5. 五子棋 Minimax - 保持不变
 const minimaxGomoku = (
-    board: BoardState, 
-    depth: number, 
-    alpha: number, 
-    beta: number, 
-    isMaximizing: boolean,
-    player: Player,
-    lastMove: Point | null
+    board: BoardState, depth: number, alpha: number, beta: number, isMaximizing: boolean, player: Player, lastMove: Point | null
 ): number => {
-    // 终局判断
     if (lastMove && checkGomokuWin(board, lastMove)) {
         return isMaximizing ? -10000000 + depth : 10000000 - depth; 
     }
@@ -410,18 +448,12 @@ const minimaxGomoku = (
     let candidates = getCandidateMoves(board, size);
     const opponent = player === 'black' ? 'white' : 'black';
 
-    // --- 启发式排序 (Beam Search 核心) ---
-    // 为了搜得更深，我们只搜前 N 个最好的点，而不是所有点
-    // 这能让深度从 2 提升到 4~6
     const scoredCandidates = candidates.map(move => {
         const score = getGomokuScore(board, move.x, move.y, isMaximizing ? player : opponent, isMaximizing ? opponent : player, true);
         return { move, score };
     });
 
-    // 排序：高分在前
     scoredCandidates.sort((a, b) => b.score - a.score);
-
-    // 剪枝宽度：每层只看前 8 个点 (大幅优化性能)
     const topCandidates = scoredCandidates.slice(0, 8).map(sc => sc.move);
 
     if (isMaximizing) {
@@ -429,15 +461,9 @@ const minimaxGomoku = (
         for (const move of topCandidates) {
             board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'sim' };
             const score = getGomokuScore(board, move.x, move.y, player, opponent, true);
-            
-            // 立即获胜剪枝
-            if (score >= 9000000) {
-                 board[move.y][move.x] = null;
-                 return score;
-            }
+            if (score >= 9000000) { board[move.y][move.x] = null; return score; }
 
             const val = minimaxGomoku(board, depth - 1, alpha, beta, false, player, move);
-            // 结合当前评分和未来评分
             const totalVal = score + val * 0.8; 
 
             board[move.y][move.x] = null;
@@ -451,11 +477,7 @@ const minimaxGomoku = (
         for (const move of topCandidates) {
             board[move.y][move.x] = { color: opponent, x: move.x, y: move.y, id: 'sim' };
             const score = getGomokuScore(board, move.x, move.y, opponent, player, true);
-            
-            if (score >= 9000000) {
-                board[move.y][move.x] = null;
-                return -score;
-            }
+            if (score >= 9000000) { board[move.y][move.x] = null; return -score; }
 
             const val = minimaxGomoku(board, depth - 1, alpha, beta, true, player, move);
             const totalVal = -score + val * 0.8;
@@ -481,7 +503,7 @@ export const getAIMove = (
   const size = board.length;
   const opponent = player === 'black' ? 'white' : 'black';
 
-  // === 五子棋 AI（保持原有逻辑）===
+  // === 五子棋 AI ===
   if (gameType === 'Gomoku') {
     const candidates = getCandidateMoves(board, size);
     if (candidates.length === 0) return null;
@@ -537,22 +559,26 @@ export const getAIMove = (
     }
   }
 
-  // === 围棋 AI ===
+  // === 围棋 AI (本地) ===
   let possibleMoves: { x: number; y: number; score: number }[] = [];
 
   for (let y = 0; y < size; y++) {
   for (let x = 0; x < size; x++) {
     if (board[y][x] !== null) continue;
 
+    // [优化] 如果确定是真眼，直接跳过，防止自杀式填眼
+    if (isSimpleEye(board, x, y, player)) continue;
+
     const sim = attemptMove(board, x, y, player, 'Go', previousBoardHash);
     if (!sim) continue;
 
     const myNewGroup = getGroup(sim.newBoard, { x, y });
+    // 如果下完这步棋，自己的气是 0 (自杀)，attemptMove 已经处理返回 null，但双重保险
     if (myNewGroup && myNewGroup.liberties === 0 && sim.captured === 0) continue;
 
     let score = 0;
 
-    // A. 吃子
+    // A. 吃子 (最高优先级)
     if (sim.captured > 0) {
       score += 1000 + sim.captured * 50;
     }
@@ -569,14 +595,18 @@ export const getAIMove = (
     });
 
     // C. 逃生/防守
+    // 如果原本只有1口气，现在变多了，加分
     if (myNewGroup && myNewGroup.liberties >= 3) score += 20;
+    // 如果下完只有2口气，有点危险，减分
     if (myNewGroup && myNewGroup.liberties === 2) score -= 10;
+    // 如果下完只有1口气，且没吃到子，非常危险（可能是愚型）
+    if (myNewGroup && myNewGroup.liberties === 1 && sim.captured === 0) score -= 50;
 
     // D. 棋形与位置
     score += evaluateShape(board, x, y, player);
     score += evaluatePositionStrength(x, y, size);
 
-    // E. 随机扰动
+    // E. 随机扰动 (避免 AI 每次走棋都一样)
     if (difficulty === 'Easy') {
       score += Math.random() * 200;
     } else if (difficulty === 'Medium') {
@@ -588,9 +618,10 @@ export const getAIMove = (
   }
 
   possibleMoves.sort((a, b) => b.score - a.score);
-  if (possibleMoves.length === 0) return null;
+  if (possibleMoves.length === 0) return null; // 无处可下，停着
 
   if (difficulty === 'Easy') {
+    // 简单模式：在前5好的点里随机选
     const topN = possibleMoves.slice(0, 5);
     return topN[Math.floor(Math.random() * topN.length)];
   }
