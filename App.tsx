@@ -620,70 +620,90 @@ const App: React.FC = () => {
       }
   }, [currentPlayer, userColor]);
 
-  // --- AI Turn Trigger Update ---
+  // --- AI Turn Trigger Update (修复版) ---
   useEffect(() => {
+    // 1. 基础条件检查
     if (appMode !== 'playing' || gameMode !== 'PvAI' || gameOver || showPassModal) return;
 
     const aiColor = userColor === 'black' ? 'white' : 'black';
     
+    // 只有轮到 AI 下棋时才执行
     if (currentPlayer === aiColor) {
-      // 检查锁
+      
+      // 检查锁，防止重复触发
       if (aiTurnLock.current) return;
 
-      // 场景 A: Electron / Web Worker
+      // 场景 A: PC端引擎 / Web Worker (无需修改，保持原样)
       const shouldUseHighLevelAI = gameType === 'Go' && (difficulty === 'Hard' || isElectronAvailable); 
 
-          if (shouldUseHighLevelAI) {
-            if (!showThinkingStatus) {
-                aiTurnLock.current = true; // 上锁
-              
-                // 延迟一丢丢，给 UI 喘息机会
-                setTimeout(() => {
-                    if (isElectronAvailable) {
-                        electronAiEngine.requestAiMove(aiColor, difficulty, maxVisits, getResignThreshold(difficulty));
-                    } else {
-                        // Web Worker Call
-                        webAiEngine.requestWebAiMove(board, aiColor, history);
-                    }
-                }, 100);
-            }
-        }
-        // 场景 B: 本地算法 [这里是核心修改点]
-        else {
-            if (!showThinkingStatus) {
-                aiTurnLock.current = true; // 上锁
-                setIsThinking(true);
-              
-                // [关键修改] 使用 ref 存储 timer，且不在 useEffect cleanup 中清除它
-                if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+      if (shouldUseHighLevelAI) {
+          if (!showThinkingStatus) {
+              aiTurnLock.current = true; // 上锁
+              // 延迟一丢丢，给 UI 喘息机会
+              setTimeout(() => {
+                  if (isElectronAvailable) {
+                      electronAiEngine.requestAiMove(aiColor, difficulty, maxVisits, getResignThreshold(difficulty));
+                  } else {
+                      // Web Worker Call
+                      webAiEngine.requestWebAiMove(boardRef.current, aiColor, history); // 建议这里也传 boardRef.current
+                  }
+              }, 100);
+          }
+      }
+      // 场景 B: 本地算法 [核心修复点]
+      else {
+          if (!showThinkingStatus) {
+              aiTurnLock.current = true; // 上锁
+              setIsThinking(true);
+            
+              // 清除旧定时器
+              if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
 
-                aiTimerRef.current = setTimeout(() => {
-                    let prevHash = null;
-                    if (history.length > 0) prevHash = getBoardHash(history[history.length - 1].board);
-                
-                    const move = getAIMove(board, aiColor, gameType, difficulty, prevHash);
-                
-                    if (move === 'RESIGN') {
-                        setIsThinking(false);
-                        endGame(userColor, 'AI 认为差距过大，投子认输');
-                    } else if (move) {
-                        executeMove(move.x, move.y, false);
-                        setIsThinking(false);
-                    } else {
-                        handlePass(false);
-                        setIsThinking(false);
-                    }
-                    // 执行完后清空引用
-                    aiTimerRef.current = null;
-                }, 700);
-              
-                // [注意] 这里删除了 return () => clearTimeout(...) 这一行
-            }
-        }
+              aiTimerRef.current = setTimeout(() => {
+                  try {
+                      // [修复 1] 使用 boardRef.current 确保获取最新棋盘状态，解决移动端闭包过期问题
+                      const currentRealBoard = boardRef.current;
+                      
+                      let prevHash = null;
+                      // [修复 2] 安全访问 history，防止移动端极端情况下数组越界
+                      if (history && history.length > 0) {
+                          prevHash = getBoardHash(history[history.length - 1].board);
+                      }
+                  
+                      // 计算 AI 落子
+                      const move = getAIMove(currentRealBoard, aiColor, gameType, difficulty, prevHash);
+                  
+                      if (move === 'RESIGN') {
+                          setIsThinking(false);
+                          endGame(userColor, 'AI 认为差距过大，投子认输');
+                      } else if (move) {
+                          // 执行落子
+                          executeMove(move.x, move.y, false);
+                          setIsThinking(false);
+                      } else {
+                          // 无处可下，停着
+                          handlePass(false);
+                          setIsThinking(false);
+                      }
+                  } catch (error) {
+                      console.error("AI Calculation Error:", error);
+                      // 出错兜底：取消思考状态，避免界面卡死
+                      setIsThinking(false);
+                      aiTurnLock.current = false; 
+                  } finally {
+                      // 执行完后清空引用
+                      aiTimerRef.current = null;
+                  }
+              }, 700);
+          }
+      }
     } 
-  }, [currentPlayer, gameMode, board, gameOver, gameType, difficulty, showPassModal, appMode, userColor, history, 
-      isElectronAvailable, showThinkingStatus, isWorkerReady]);
-
+  }, [
+      // 依赖项保持不变
+      currentPlayer, gameMode, board, gameOver, gameType, difficulty, 
+      showPassModal, appMode, userColor, history, isElectronAvailable, 
+      showThinkingStatus, isWorkerReady
+  ]);
 
   // --- Helper: Board Stringify for Ko ---
   const getBoardHash = (b: BoardState) => {
