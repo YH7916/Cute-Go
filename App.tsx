@@ -174,7 +174,7 @@ const App: React.FC = () => {
   }, [boardSize, gameType, gameMode, difficulty, maxVisits, userColor, showQi, showWinRate, showCoordinates, musicVolume, hapticEnabled]);
 
   // Settings Modal Local State (这些不需要持久化，因为每次打开菜单都会从上面的主状态同步)
-  const [tempBoardSize, setTempBoardSize] = useState<BoardSize>(9);
+    const [tempBoardSize, setTempBoardSize] = useState<BoardSize>(boardSize);
   const [tempGameType, setTempGameType] = useState<GameType>('Go');
   const [tempGameMode, setTempGameMode] = useState<GameMode>('PvP');
   const [tempDifficulty, setTempDifficulty] = useState<ExtendedDifficulty>('Medium');
