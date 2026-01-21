@@ -633,7 +633,7 @@ const App: React.FC = () => {
       // 场景 A: Electron / Web Worker
       const shouldUseHighLevelAI = gameType === 'Go' && (difficulty === 'Hard' || isElectronAvailable); 
 
-        if (shouldUseHighLevelAI && (isWorkerReady || isElectronAvailable)) {
+          if (shouldUseHighLevelAI) {
             if (!showThinkingStatus) {
                 aiTurnLock.current = true; // 上锁
               

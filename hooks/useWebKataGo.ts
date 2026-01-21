@@ -13,6 +13,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const [isThinking, setIsThinking] = useState(false);
     const [aiWinRate, setAiWinRate] = useState(50);
     const workerRef = useRef<Worker | null>(null);
+    const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[] } | null>(null);
 
     useEffect(() => {
         // 仅在非 Electron 环境下运行
@@ -26,6 +27,21 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 if (msg.type === 'init-complete') {
                     console.log('Web AI Ready');
                     setIsWorkerReady(true);
+
+                    // 如果在模型初始化期间已触发 AI 请求，则此处补发一次
+                    if (pendingRequestRef.current && workerRef.current) {
+                        const pending = pendingRequestRef.current;
+                        pendingRequestRef.current = null;
+                        workerRef.current.postMessage({
+                            type: 'compute',
+                            data: {
+                                board: pending.board,
+                                history: pending.history,
+                                color: pending.playerColor,
+                                size: boardSize
+                            }
+                        });
+                    }
                 } else if (msg.type === 'ai-response') {
                     setIsThinking(false);
                     const { move, winRate } = msg.data;
@@ -45,6 +61,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 } else if (msg.type === 'error') {
                     console.error('[WebAI Error]', msg.message);
                     setIsThinking(false);
+                    pendingRequestRef.current = null;
                 }
             };
 
@@ -65,6 +82,12 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         if (!workerRef.current || isThinking) return;
         
         setIsThinking(true);
+        if (!isWorkerReady) {
+            // 模型还未加载完成，先缓存请求，等 init-complete 后补发
+            pendingRequestRef.current = { board, playerColor, history };
+            return;
+        }
+
         // 发送完整数据到 Worker，让 Worker 负责繁重的计算
         workerRef.current.postMessage({
             type: 'compute',
@@ -75,10 +98,11 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 size: boardSize
             }
         });
-    }, [boardSize, isThinking]);
+    }, [boardSize, isThinking, isWorkerReady]);
 
     const stopThinking = useCallback(() => {
         setIsThinking(false);
+        pendingRequestRef.current = null;
         if (workerRef.current) {
             workerRef.current.postMessage({ type: 'stop' });
         }
