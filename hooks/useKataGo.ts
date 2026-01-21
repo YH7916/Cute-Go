@@ -6,7 +6,7 @@ import { Player, BoardSize, Difficulty } from '../types'; // 引用根目录的 
 interface ElectronAPI {
   initAI: () => void;
   sendCommand: (cmd: string) => void;
-  onResponse: (callback: (response: any) => void) => void;
+  onResponse: (callback: (response: any) => void) => (() => void) | undefined;
 }
 
 // 对应 App.tsx 中的 ExtendedDifficulty
@@ -49,11 +49,10 @@ interface UseKataGoProps {
   boardSize: BoardSize;
   onAiMove: (x: number, y: number) => void; // AI 落子回调
   onAiPass: () => void; // AI 停着回调
-  onAiResign?: () => void; // AI 认输回调 (可选)
 }
 
 // --- Hook 实现 ---
-export const useKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseKataGoProps) => {
+export const useKataGo = ({ boardSize, onAiMove, onAiPass }: UseKataGoProps) => {
   const [isThinking, setIsThinking] = useState(false);
   const [aiWinRate, setAiWinRate] = useState<number>(50);
   const [isInitializing, setIsInitializing] = useState(true); // 引擎加载状态
@@ -102,18 +101,12 @@ export const useKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseKata
 
         // 解析落子坐标 (只有在思考时才响应)
         // 增加 content 长度校验，防止误判
-        if (isThinkingRef.current && (content.match(/^[A-T][0-9]+$/) || content.toLowerCase() === 'pass' || content.toLowerCase() === 'resign')) {
-          const lower = content.toLowerCase();
-          if (lower === 'resign') {
-            if (onAiResign) onAiResign();
-            else onAiPass();
+        if (isThinkingRef.current && (content.match(/^[A-T][0-9]+$/) || content.toLowerCase() === 'pass')) {
+          const move = fromGTP(content, boardSizeRef.current);
+          if (move) {
+            onAiMove(move.x, move.y);
           } else {
-            const move = fromGTP(content, boardSizeRef.current);
-            if (move) {
-              onAiMove(move.x, move.y);
-            } else {
-              onAiPass();
-            }
+            onAiPass();
           }
           setIsThinking(false);
         }
@@ -159,8 +152,7 @@ export const useKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseKata
   const requestAiMove = useCallback((
     aiColor: Player, 
     difficulty: ExtendedDifficulty, 
-    maxVisits: number,
-    resignThreshold: number = 0.05
+    maxVisits: number
   ) => {
     if (!isElectron) return;
     if (isThinkingRef.current) return; // 防止重复请求
@@ -168,15 +160,13 @@ export const useKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseKata
     setIsThinking(true);
     
     // 计算 Visits
-    let visits = 10;
-    if (difficulty === 'Easy') visits = 1;
-    else if (difficulty === 'Medium') visits = 10;
-    else if (difficulty === 'Hard') visits = 100;
+    let visits = 100;
+    if (difficulty === 'Easy') visits = 10;
+    else if (difficulty === 'Medium') visits = 100;
+    else if (difficulty === 'Hard') visits = 1000;
     else if (difficulty === 'Custom') visits = maxVisits;
 
     sendCommand(`kata-set-param maxVisits ${visits}`);
-    // 胜率低于阈值才会认输 (0~1)
-    sendCommand(`kata-set-param resignThreshold ${resignThreshold}`);
     
     // 稍微延时发送 genmove 确保参数生效
     setTimeout(() => {
