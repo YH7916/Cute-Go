@@ -222,7 +222,8 @@ const App: React.FC = () => {
   }, []);
 
   // Game State
-  const [board, setBoard] = useState<BoardState>(createBoard(9));
+  const [board, setBoard] = useState<BoardState>(() => createBoard(loadState('boardSize', 9)));
+
   const [currentPlayer, setCurrentPlayer] = useState<Player>('black');
   const [blackCaptures, setBlackCaptures] = useState(0);
   const [whiteCaptures, setWhiteCaptures] = useState(0);
@@ -620,90 +621,106 @@ const App: React.FC = () => {
       }
   }, [currentPlayer, userColor]);
 
-  // --- AI Turn Trigger Update (修复版) ---
+  // --- AI Turn Trigger Update (防卡死版) ---
   useEffect(() => {
-    // 1. 基础条件检查
-    if (appMode !== 'playing' || gameMode !== 'PvAI' || gameOver || showPassModal) return;
+    // 基础拦截
+    if (appMode !== 'playing' || gameOver || showPassModal || gameMode !== 'PvAI') return;
 
     const aiColor = userColor === 'black' ? 'white' : 'black';
     
-    // 只有轮到 AI 下棋时才执行
     if (currentPlayer === aiColor) {
-      
-      // 检查锁，防止重复触发
       if (aiTurnLock.current) return;
 
-      // 场景 A: PC端引擎 / Web Worker (无需修改，保持原样)
       const shouldUseHighLevelAI = gameType === 'Go' && (difficulty === 'Hard' || isElectronAvailable); 
 
+      // 场景 A: Electron/Worker (保持原样)
       if (shouldUseHighLevelAI) {
-          if (!showThinkingStatus) {
-              aiTurnLock.current = true; // 上锁
-              // 延迟一丢丢，给 UI 喘息机会
+          if (!aiTurnLock.current) {
+              aiTurnLock.current = true; 
               setTimeout(() => {
                   if (isElectronAvailable) {
                       electronAiEngine.requestAiMove(aiColor, difficulty, maxVisits, getResignThreshold(difficulty));
                   } else {
-                      // Web Worker Call
-                      webAiEngine.requestWebAiMove(boardRef.current, aiColor, history); // 建议这里也传 boardRef.current
+                      webAiEngine.requestWebAiMove(boardRef.current, aiColor, history);
                   }
               }, 100);
           }
       }
-      // 场景 B: 本地算法 [核心修复点]
+      // 场景 B: 本地算法 (问题高发区)
       else {
-          if (!showThinkingStatus) {
-              aiTurnLock.current = true; // 上锁
-              setIsThinking(true);
+          if (!aiTurnLock.current) {
+              aiTurnLock.current = true;
+              setIsThinking(true); // 开启 UI 提示
             
-              // 清除旧定时器
               if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
 
               aiTimerRef.current = setTimeout(() => {
+                  // --- [修改重点]：进入定时器后，无论如何，先准备好数据 ---
                   try {
-                      // [修复 1] 使用 boardRef.current 确保获取最新棋盘状态，解决移动端闭包过期问题
                       const currentRealBoard = boardRef.current;
                       
+                      // 校验回合
+                      if (currentPlayerRef.current !== aiColor) {
+                          setIsThinking(false);
+                          aiTurnLock.current = false;
+                          return;
+                      }
+
                       let prevHash = null;
-                      // [修复 2] 安全访问 history，防止移动端极端情况下数组越界
                       if (history && history.length > 0) {
                           prevHash = getBoardHash(history[history.length - 1].board);
                       }
                   
-                      // 计算 AI 落子
+                      // 执行计算
                       const move = getAIMove(currentRealBoard, aiColor, gameType, difficulty, prevHash);
-                  
+                      
+                      // --- [修改重点]：计算完成后，立刻关闭 UI 思考状态！ ---
+                      // 把它放在 executeMove 之前。这样即使 executeMove 报错，UI 也不会卡住。
+                      setIsThinking(false);
+
                       if (move === 'RESIGN') {
-                          setIsThinking(false);
                           endGame(userColor, 'AI 认为差距过大，投子认输');
                       } else if (move) {
-                          // 执行落子
+                          // 现在执行落子，如果这里面报错，UI 已经恢复了，不会一直转圈
                           executeMove(move.x, move.y, false);
-                          setIsThinking(false);
                       } else {
-                          // 无处可下，停着
                           handlePass(false);
-                          setIsThinking(false);
                       }
-                  } catch (error) {
-                      console.error("AI Calculation Error:", error);
-                      // 出错兜底：取消思考状态，避免界面卡死
-                      setIsThinking(false);
-                      aiTurnLock.current = false; 
+
+                  } catch (error: any) {
+                      // --- [修改重点]：捕获所有错误并显示到屏幕上 ---
+                      console.error("AI Error:", error);
+                      setIsThinking(false); // 确保关闭
+                      
+                      // 在屏幕上方显示错误信息，方便手机端调试
+                      // 如果你不想让用户看到，可以把这一行注释掉，但现在为了找问题建议保留
+                      setToastMsg(`AI 出错: ${error?.message || '未知错误'}`);
+                      setTimeout(() => setToastMsg(null), 5000);
+                      
                   } finally {
-                      // 执行完后清空引用
+                      aiTurnLock.current = false; 
                       aiTimerRef.current = null;
                   }
-              }, 700);
+              }, 500); // 稍微缩短一点时间
           }
       }
-    } 
-  }, [
-      // 依赖项保持不变
-      currentPlayer, gameMode, board, gameOver, gameType, difficulty, 
-      showPassModal, appMode, userColor, history, isElectronAvailable, 
-      showThinkingStatus, isWorkerReady
-  ]);
+    } else {
+        // 如果轮到玩家，确保锁打开
+        if (currentPlayer === userColor) {
+             aiTurnLock.current = false;
+        }
+    }
+
+    // Cleanup
+    return () => {
+        if (gameMode !== 'PvAI') {
+            if (aiTimerRef.current) {
+                clearTimeout(aiTimerRef.current);
+                aiTurnLock.current = false;
+            }
+        }
+    };
+  }, [currentPlayer, gameMode, userColor, board, gameOver, gameType, difficulty, showPassModal, appMode, isElectronAvailable]);
 
   // --- Helper: Board Stringify for Ko ---
   const getBoardHash = (b: BoardState) => {
@@ -1117,44 +1134,63 @@ const App: React.FC = () => {
   };
 
   const executeMove = (x: number, y: number, isRemote: boolean) => {
-      // 1. 获取当前状态
+      // 1. 获取当前基础状态
       const currentBoard = boardRef.current; 
       const activePlayer = currentPlayerRef.current; 
       const currentType = gameTypeRef.current;
       
+      // 2. 计算 Move 结果
       let prevHash = null;
-      if (history.length > 0) prevHash = getBoardHash(history[history.length - 1].board);
-      
+      if (history && history.length > 0) prevHash = getBoardHash(history[history.length - 1].board);
       const result = attemptMove(currentBoard, x, y, activePlayer, currentType, prevHash);
       
       if (result) {
-          // [新增] 成就检测
-          if (!isRemote && session?.user?.id) {
-             checkMoveAchievements({
-               x, y, 
-               color: activePlayer, 
-               moveNumber: history.length + 1, 
-               boardSize 
-             });
-          }
-
-          // 2. 音效播放 (增加 try-catch 防止手机端报错中断逻辑)
+          // --- [安全区 1]：先尝试播放声音，失败不影响后续 ---
           try {
               if (result.captured > 0) {
                   playSfx('capture');
-                  vibrate([20, 30, 20]);
+                  // 这里的 vibrate 需要包裹，部分手机浏览器不支持数组参数会报错
+                  try { if(navigator.vibrate) navigator.vibrate([20, 30, 20]); } catch(e){}
               } else {
                   playSfx('move');
-                  vibrate(15);
+                  try { if(navigator.vibrate) navigator.vibrate(15); } catch(e){}
               }
           } catch (e) {
-              // 手机浏览器可能会因为没有用户交互而拒绝播放声音，忽略此错误，保证棋局继续
-              console.warn("Audio/Vibrate blocked:", e); 
+              console.warn("Audio/Vibrate Error (Ignored):", e); 
+          }
+
+          // --- [安全区 2]：成就系统 (最容易报错的地方，必须隔离) ---
+          if (!isRemote && session?.user?.id) {
+             try {
+                 checkMoveAchievements({
+                   x, y, 
+                   color: activePlayer, 
+                   moveNumber: history.length + 1, 
+                   boardSize 
+                 });
+             } catch (achError) {
+                 console.warn("Achievement Error (Ignored):", achError);
+             }
           }
           
-          if (!isRemote) setHistory(prev => [...prev, { board: currentBoard, currentPlayer: activePlayer, blackCaptures, whiteCaptures, lastMove, consecutivePasses }]);
+          // --- [核心区]：状态更新 (必须执行) ---
           
-          // 3. 更新状态
+          // 1. 更新历史
+          if (!isRemote) {
+              setHistory(prev => [...prev, { 
+                  board: currentBoard, 
+                  currentPlayer: activePlayer, 
+                  blackCaptures, 
+                  whiteCaptures, 
+                  lastMove, 
+                  consecutivePasses 
+              }]);
+          }
+          
+          // 2. 更新 Ref (最优先，防止 AI 读到旧数据)
+          boardRef.current = result.newBoard;
+          
+          // 3. 更新 React State
           setBoard(result.newBoard); 
           setLastMove({ x, y }); 
           setConsecutivePasses(0); 
@@ -1165,30 +1201,27 @@ const App: React.FC = () => {
               else setWhiteCaptures(prev => prev + result.captured); 
           }
 
-          // [关键修复] 立即手动更新 Ref，不要等待 useEffect
-          // 这能确保在手机端下一次快速计算时，Ref 绝对是最新的
-          boardRef.current = result.newBoard;
-
+          // 4. 胜利判定
           if (currentType === 'Gomoku' && checkGomokuWin(result.newBoard, {x, y})) { 
+              // 使用 setTimeout 把结束逻辑推到下一帧，防止阻塞当前渲染
               setTimeout(() => endGame(activePlayer, '五子连珠！'), 0); 
               return; 
           }
           
+          // 5. 切换玩家
           const nextPlayer = activePlayer === 'black' ? 'white' : 'black';
+          currentPlayerRef.current = nextPlayer; // 立即同步 Ref
           setCurrentPlayer(nextPlayer);
-          // [关键修复] 立即同步 Player Ref
-          currentPlayerRef.current = nextPlayer;
 
       } else {
+          // 非法落子处理
           if (!isRemote) {
-              try {
-                  playSfx('error');
-                  vibrate([10, 50]);
-              } catch(e) {}
+              try { playSfx('error'); } catch(e) {}
           }
       }
-  };
-
+    };
+    
+    
   const handleIntersectionClick = useCallback((x: number, y: number) => {
     if (appMode === 'review') return; 
     if (appMode === 'setup') {
