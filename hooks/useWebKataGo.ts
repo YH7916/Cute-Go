@@ -17,18 +17,44 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
 
     useEffect(() => {
         // 仅在非 Electron 环境下运行
-        // 注意：Vite 中引用 public 下的 worker 可以直接使用绝对路径
         if (!(window as any).electronAPI) {
-            const worker = new Worker('/worker/ai-worker.js');
+            
+            // --- 1. 计算基础目录 (兼容 H5 子目录 / index.html) ---
+            const pathName = window.location.pathname;
+            // 去掉 index.html，只保留目录路径 (例如 "/game/" 或 "/")
+            const directory = pathName.substring(0, pathName.lastIndexOf('/') + 1);
+            const baseUrl = `${window.location.origin}${directory}`;
+
+            // --- 2. 计算 Worker 和 Model 的绝对路径 ---
+            // 这样无论你在哪里，都能找到 public 下的文件
+            const workerUrl = `${baseUrl}worker/ai-worker.js`;
+            const modelUrl = `${baseUrl}models/model.json`; // <--- 这里定义了 modelUrl
+
+            console.log("Worker URL:", workerUrl);
+            console.log("Model URL:", modelUrl);
+
+            let worker: Worker;
+            try {
+                worker = new Worker(workerUrl);
+            } catch (e) {
+                console.error("Worker Init Failed:", e);
+                // 兜底尝试
+                worker = new Worker('worker/ai-worker.js');
+            }
+            
             workerRef.current = worker;
+
+            worker.onerror = (err) => {
+                console.error("CRITICAL: Web Worker Error", err);
+                setIsThinking(false);
+            };
 
             worker.onmessage = (e) => {
                 const msg = e.data;
                 if (msg.type === 'init-complete') {
                     console.log('Web AI Ready');
                     setIsWorkerReady(true);
-
-                    // 如果在模型初始化期间已触发 AI 请求，则此处补发一次
+                    
                     if (pendingRequestRef.current && workerRef.current) {
                         const pending = pendingRequestRef.current;
                         pendingRequestRef.current = null;
@@ -46,17 +72,10 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                     setIsThinking(false);
                     const { move, winRate } = msg.data;
                     setAiWinRate(winRate);
-                    
-                    if (move) {
-                        onAiMove(move.x, move.y);
-                    } else {
-                        onAiPass();
-                    }
+                    if (move) onAiMove(move.x, move.y);
+                    else onAiPass();
                 } else if (msg.type === 'ai-resign') {
                     setIsThinking(false);
-                    if (msg.data && typeof msg.data.winRate === 'number') {
-                        setAiWinRate(msg.data.winRate);
-                    }
                     onAiResign();
                 } else if (msg.type === 'error') {
                     console.error('[WebAI Error]', msg.message);
@@ -65,8 +84,11 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 }
             };
 
-            // 初始化模型
-            worker.postMessage({ type: 'init' });
+            // --- 3. 发送初始化消息 (带上 modelUrl) ---
+            worker.postMessage({ 
+                type: 'init',
+                payload: { modelPath: modelUrl } // <--- 现在这里不会报错了
+            });
 
             return () => {
                 worker.terminate();

@@ -217,16 +217,23 @@ const OPENING_BOOK = {
     }
 };
 
-async function loadModel() {
+// [修改] 接收 modelPath 参数
+async function loadModel(modelPath) {
     if (model) return;
     try {
-        model = await tf.loadGraphModel('/models/model.json');
+        // 如果主线程没传，就用默认值（兜底），但主要靠传参
+        const path = modelPath || 'models/model.json';
+        console.log("[Worker] Loading model from:", path);
+        
+        // 使用传入的动态路径加载
+        model = await tf.loadGraphModel(path);
+        
         postMessage({ type: 'init-complete' });
     } catch (e) {
+        console.error("[Worker] Model Load Error:", e);
         postMessage({ type: 'error', message: 'Model Load Error: ' + e.message });
     }
 }
-
 // === 4. MCTS 结构与特征 ===
 class MCTSNode {
     constructor(parent = null, move = null, prior = 0) {
@@ -524,8 +531,17 @@ async function runMCTS(initialBoard, history, myColor, size) {
 }
 
 onmessage = async function(e) {
-    const { type, data } = e.data;
-    if (type === 'init') { await loadModel(); return; }
+    // [注意] e.data 有时候直接是消息体，有时候包了一层，取决于你怎么发
+    // 根据你的 useWebKataGo.ts，你是直接发对象的，所以解构没问题
+    const { type, data, payload } = e.data; // [新增] 解构 payload
+
+    if (type === 'init') { 
+        // [修改] 从 payload 中获取 modelPath 并传给 loadModel
+        const modelPath = payload ? payload.modelPath : null;
+        await loadModel(modelPath); 
+        return; 
+    }
+    
     if (type === 'stop') {
         stopRequested = true;
         isBusy = false;
@@ -533,14 +549,33 @@ onmessage = async function(e) {
     }
     
     if (type === 'compute') {
-        if (!model) await loadModel();
+        // compute 时如果模型还没加载（理论上 init 已经加载了，这里是双保险）
+        // 这里很难拿到 modelPath，所以最好保证 init 必须先成功
+        if (!model) {
+             console.warn("Compute called before model loaded!");
+             // 紧急尝试用默认路径，或者直接报错
+             await loadModel('models/model.json'); 
+        }
+        
         if (isBusy) return;
         isBusy = true;
         stopRequested = false;
         try {
             const { board, history, color, size } = data;
             const result = await runMCTS(board, history, color, size);
+            
+            // 如果 stopRequested 为真，runMCTS 可能返回 null
+            if (!result && stopRequested) {
+                 isBusy = false;
+                 return;
+            }
+            
+            // 如果 MCTS 失败（比如无处可下），给一个兜底 Pass
             if (!result) {
+                postMessage({
+                    type: 'ai-response',
+                    data: { move: null, winRate: 50, scoreLead: 0 }
+                });
                 isBusy = false;
                 return;
             }

@@ -1221,7 +1221,7 @@ const App: React.FC = () => {
       }
     };
     
-    
+
   const handleIntersectionClick = useCallback((x: number, y: number) => {
     if (appMode === 'review') return; 
     if (appMode === 'setup') {
