@@ -148,6 +148,15 @@ const App: React.FC = () => {
   const [musicVolume, setMusicVolume] = useState<number>(() => loadState('musicVolume', 0.3));
   const [hapticEnabled, setHapticEnabled] = useState<boolean>(() => loadState('hapticEnabled', true));
 
+
+  // [这里是插入点 2：添加清理 Effect]
+  // [新增] 组件卸载时清理 AI 定时器，防止内存泄漏
+  useEffect(() => {
+    return () => {
+      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+    };
+  }, []);
+    
   // --- 3. 监听状态变化并自动保存 ---
   useEffect(() => {
     localStorage.setItem('boardSize', JSON.stringify(boardSize));
@@ -376,7 +385,8 @@ const App: React.FC = () => {
   const myColorRef = useRef(myColor);
   const onlineStatusRef = useRef(onlineStatus);
   // [新增] 添加 boardSizeRef，确保 WebRTC 回调能拿到最新的棋盘大小
-  const boardSizeRef = useRef(boardSize);
+    const boardSizeRef = useRef(boardSize);
+    const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => { boardSizeRef.current = boardSize; }, [boardSize]);
@@ -593,59 +603,79 @@ const App: React.FC = () => {
     setTimeout(() => setSocialTip(''), 2000);
   };
 
+  // 增加一个 Ref 锁，防止 React 严格模式或快速重渲染导致重复触发
+  const aiTurnLock = useRef(false);
+
+  // Reset lock when player moves
+  useEffect(() => {
+      if (currentPlayer === userColor) {
+          aiTurnLock.current = false;
+      }
+  }, [currentPlayer, userColor]);
+
   // --- AI Turn Trigger Update ---
   useEffect(() => {
-    // 基础检查
     if (appMode !== 'playing' || gameMode !== 'PvAI' || gameOver || showPassModal) return;
 
     const aiColor = userColor === 'black' ? 'white' : 'black';
     
     if (currentPlayer === aiColor) {
-      // === 场景 A: Electron PC 客户端 ===
-      if (isElectronAvailable && gameType === 'Go') {
-          if (!isElectronThinking) {
-              electronAiEngine.requestAiMove(aiColor, difficulty, maxVisits, getResignThreshold(difficulty)); 
-          }
-      } 
-      // === 场景 B: Web/Android 客户端 - 困难模式 ===
-      else if (!isElectronAvailable && gameType === 'Go' && difficulty === 'Hard') {
-          if (isWorkerReady && !isWebThinking) {
-              requestWebAiMove(board, aiColor, history);
-          } else if (!isWorkerReady) {
-              console.log("等待 Web AI 模型初始化...");
-          }
-      }
-      // === 场景 C: 简单/中等难度 或 五子棋 ===
-      else {
-          setIsThinking(true);
-          const timer = setTimeout(() => {
-            let prevHash = null; 
-            if (history.length > 0) prevHash = getBoardHash(history[history.length-1].board);
-            
-            const move = getAIMove(board, aiColor, gameType, difficulty, prevHash);
-            
-            if (move === 'RESIGN') {
-                 setIsThinking(false);
-                 endGame(userColor, 'AI 认为差距过大，投子认输');
-            } else if (move) {
-                 executeMove(move.x, move.y, false);
-                 setIsThinking(false);
-            } else {
-                 handlePass();
-                 setIsThinking(false);
+      // 检查锁
+      if (aiTurnLock.current) return;
+
+      // 场景 A: Electron / Web Worker
+      const shouldUseHighLevelAI = gameType === 'Go' && (difficulty === 'Hard' || isElectronAvailable); 
+
+        if (shouldUseHighLevelAI && (isWorkerReady || isElectronAvailable)) {
+            if (!showThinkingStatus) {
+                aiTurnLock.current = true; // 上锁
+              
+                // 延迟一丢丢，给 UI 喘息机会
+                setTimeout(() => {
+                    if (isElectronAvailable) {
+                        electronAiEngine.requestAiMove(aiColor, difficulty, maxVisits, getResignThreshold(difficulty));
+                    } else {
+                        // Web Worker Call
+                        webAiEngine.requestWebAiMove(board, aiColor, history);
+                    }
+                }, 100);
             }
-          }, 700);
-          return () => clearTimeout(timer);
-      }
-    } else {
-        // 轮到玩家落子时，确保 PC AI 停止思考状态（安全阀）
-        if (isElectronAvailable && isElectronThinking) {
-            electronAiEngine.stopThinking();
         }
-    }
+        // 场景 B: 本地算法 [这里是核心修改点]
+        else {
+            if (!showThinkingStatus) {
+                aiTurnLock.current = true; // 上锁
+                setIsThinking(true);
+              
+                // [关键修改] 使用 ref 存储 timer，且不在 useEffect cleanup 中清除它
+                if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+
+                aiTimerRef.current = setTimeout(() => {
+                    let prevHash = null;
+                    if (history.length > 0) prevHash = getBoardHash(history[history.length - 1].board);
+                
+                    const move = getAIMove(board, aiColor, gameType, difficulty, prevHash);
+                
+                    if (move === 'RESIGN') {
+                        setIsThinking(false);
+                        endGame(userColor, 'AI 认为差距过大，投子认输');
+                    } else if (move) {
+                        executeMove(move.x, move.y, false);
+                        setIsThinking(false);
+                    } else {
+                        handlePass(false);
+                        setIsThinking(false);
+                    }
+                    // 执行完后清空引用
+                    aiTimerRef.current = null;
+                }, 700);
+              
+                // [注意] 这里删除了 return () => clearTimeout(...) 这一行
+            }
+        }
+    } 
   }, [currentPlayer, gameMode, board, gameOver, gameType, difficulty, showPassModal, appMode, userColor, history, 
-      isElectronAvailable, isElectronThinking,
-      isWorkerReady, isWebThinking, requestWebAiMove, electronAiEngine, maxVisits]);
+      isElectronAvailable, showThinkingStatus, isWorkerReady]);
 
 
   // --- Helper: Board Stringify for Ko ---
