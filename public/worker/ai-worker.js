@@ -98,7 +98,7 @@ const MCTS_SIMULATIONS = 50;
 let model = null;
 let isBusy = false;
 
-// === 3. 定式库 (涵盖 9, 13, 19 及通用规则) ===
+// === 3. 定式库 ===
 const OPENING_BOOK = {
     // 9路
     9: {
@@ -108,14 +108,12 @@ const OPENING_BOOK = {
         ],
         "4,4": [{ x: 2, y: 2, weight: 50 }, { x: 6, y: 6, weight: 50 }]
     },
-    // 13路 (新增)
+    // 13路
     13: {
         0: [
-            { x: 3, y: 3, weight: 50 },  // 4-4 (星位)
-            { x: 9, y: 3, weight: 50 },
-            { x: 3, y: 9, weight: 50 },
-            { x: 9, y: 9, weight: 50 },
-            { x: 6, y: 6, weight: 80 }   // 天元
+            { x: 3, y: 3, weight: 50 }, { x: 9, y: 3, weight: 50 },
+            { x: 3, y: 9, weight: 50 }, { x: 9, y: 9, weight: 50 },
+            { x: 6, y: 6, weight: 80 }
         ]
     },
     // 19路
@@ -178,7 +176,6 @@ function getLibertiesForFeatures(boardData, x, y, color, size) {
 
 function generateTensorInput(microBoard, history, currentPlayer) {
     const realSize = microBoard.size;
-    // 【关键】自适应偏移量，适配 4~19 任意尺寸
     const offset = Math.floor((MODEL_SIZE - realSize) / 2);
     
     const features = new Float32Array(MODEL_SIZE * MODEL_SIZE * INPUT_CHANNELS).fill(0);
@@ -254,7 +251,6 @@ async function expandNode(node, board, history, color) {
         const my = Math.floor(i / MODEL_SIZE), mx = i % MODEL_SIZE;
         const ry = my - offset, rx = mx - offset;
 
-        // 边界过滤，自动适配任意 size
         if (rx >= 0 && rx < size && ry >= 0 && ry < size) {
             if (board.get(rx, ry) === 0) {
                  candidates.push({ x: rx, y: ry, p: policyData[i] });
@@ -289,8 +285,12 @@ async function runMCTS(initialBoard, history, myColor, size) {
             if (OPENING_BOOK[size][0]) bookMoves = OPENING_BOOK[size][0];
         } else if (history.length === 1) {
             const lastMove = history[0].lastMove;
-            const key = `${lastMove.x},${lastMove.y}`;
-            if (OPENING_BOOK[size][key]) bookMoves = OPENING_BOOK[size][key];
+            // 【关键修复】: 必须检查 lastMove 是否存在
+            // 如果上一步是 Pass，lastMove 为 null，读取 .x 会报错
+            if (lastMove) {
+                const key = `${lastMove.x},${lastMove.y}`;
+                if (OPENING_BOOK[size][key]) bookMoves = OPENING_BOOK[size][key];
+            }
         }
         if (bookMoves.length > 0) {
             const totalWeight = bookMoves.reduce((sum, m) => sum + m.weight, 0);
@@ -376,12 +376,14 @@ onmessage = async function(e) {
             const { board, history, color, size } = data;
             const result = await runMCTS(board, history, color, size);
             
+            // 认输判断 (胜率 < 5% 且 手数 > 30)
             if (result.winRate < 5.0 && history.length > 30) {
                 postMessage({ type: 'ai-resign', data: { winRate: result.winRate } });
                 isBusy = false; return;
             }
 
             let finalMove = result.move;
+            // 兜底随机落子
             if (!finalMove) {
                 for(let y=0; y<size; y++) {
                     for(let x=0; x<size; x++) { if (!board[y][x]) { finalMove = {x, y}; break; } }
