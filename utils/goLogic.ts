@@ -285,58 +285,52 @@ const getCandidateMoves = (board: BoardState, size: number, range: number = 2): 
   return Array.from(candidates).map(s => { const [x, y] = s.split(',').map(Number); return {x, y}; });
 };
 
-// 2. 围棋棋形评估 (Shape Analysis)
-const evaluateGoShape = (board: BoardState, x: number, y: number, player: Player): number => {
-    const size = board.length;
-    let score = 0;
-    
-    // 简单的 3x3 模式匹配
-    // 虎口检测 (Hanging connection / Tiger's mouth)
-    // 长 (Extend)
-    // 扳 (Hane)
-    
-    const opponent = player === 'black' ? 'white' : 'black';
-    const neighbors = getNeighbors({x, y}, size);
-    
-    let friendly = 0;
-    let enemy = 0;
-    let empty = 0;
+// --- 新增：简单的棋形评估 ---
+const evaluateShape = (board: BoardState, x: number, y: number, player: Player): number => {
+  const size = board.length;
+  let score = 0;
+  const opponent = player === 'black' ? 'white' : 'black';
 
-    neighbors.forEach(n => {
-        const s = board[n.y][n.x];
-        if (!s) empty++;
-        else if (s.color === player) friendly++;
-        else enemy++;
-    });
-
-    // 愚形惩罚 (Empty Triangle): 自己有2个邻居，且对角线也是自己，且形成了团状
-    if (friendly >= 2) {
-        // 简单检测：如果是实心的“团”，稍微扣分，鼓励舒展
-        // 这里只是非常简化的逻辑
+  // 1. 虎口/连接检测 (Tiger's Mouth / Connection)
+  const diagonals = [
+    {x: x-1, y: y-1}, {x: x+1, y: y-1},
+    {x: x-1, y: y+1}, {x: x+1, y: y+1}
+  ];
+  let myStonesDiag = 0;
+  diagonals.forEach(p => {
+    if (p.x >= 0 && p.x < size && p.y >= 0 && p.y < size) {
+      const stone = board[p.y][p.x];
+      if (stone && stone.color === player) myStonesDiag++;
     }
+  });
+  if (myStonesDiag >= 2) score += 15; // 鼓励连接形状
 
-    // 扳头奖励 (Hane at the head of two)
-    // 如果紧贴着对方，且对方气紧，这是好棋
-    if (enemy >= 1) {
-        score += 5; // 接触战积极
-    }
-    
-    // 连接奖励：如果这一步连接了两个原本不连通的己方棋块
-    if (friendly >= 2) {
-        score += 10;
-    }
+  // 2. 扭羊头/切断检测 (Cut)
+  const neighbors = getNeighbors({x, y}, size);
+  let opponentStones = 0;
+  neighbors.forEach(p => {
+    const stone = board[p.y][p.x];
+    if (stone && stone.color === opponent) opponentStones++;
+  });
+  if (opponentStones >= 2) score += 10; // 关键切断点
 
-    return score;
+  return score;
 };
 
-const isEye = (board: BoardState, x: number, y: number, color: Player): boolean => {
-    const size = board.length;
-    const neighbors = getNeighbors({x, y}, size);
-    if (neighbors.length === 0) return false;
-    const orthoCheck = neighbors.every(n => board[n.y][n.x]?.color === color);
-    if (!orthoCheck) return false;
-    return true;
-}
+// --- 新增：简单的影响力/位置评分 ---
+const evaluatePositionStrength = (x: number, y: number, size: number): number => {
+  if (size >= 13) {
+    const dX = Math.min(x, size - 1 - x);
+    const dY = Math.min(y, size - 1 - y);
+    if ((dX === 2 || dX === 3) && (dY === 2 || dY === 3)) return 25;
+    if (dX === 2 && dY === 4) return 20;
+    if (dX === 0 || dY === 0) return -20;
+    if (dX === 1 || dY === 1) return -5;
+  }
+  const center = Math.floor(size / 2);
+  const distToCenter = Math.abs(x - center) + Math.abs(y - center);
+  return Math.max(0, 10 - distToCenter);
+};
 
 // 3. 五子棋评估核心 (Heuristics)
 const evaluateGomokuDirection = (board: BoardState, x: number, y: number, dx: number, dy: number, player: Player): number => {
@@ -478,191 +472,128 @@ const minimaxGomoku = (
 
 // --- 主入口 ---
 export const getAIMove = (
-  board: BoardState, 
-  player: Player, 
-  gameType: 'Go' | 'Gomoku',
+  board: BoardState,
+  player: Player,
+  gameType: GameType,
   difficulty: Difficulty,
   previousBoardHash: string | null
 ): Point | null | 'RESIGN' => {
   const size = board.length;
-  // 获取候选点
-  const candidates = getCandidateMoves(board, size);
-  if (candidates.length === 0) return null;
-
   const opponent = player === 'black' ? 'white' : 'black';
 
-  // === 五子棋 AI ===
+  // === 五子棋 AI（保持原有逻辑）===
   if (gameType === 'Gomoku') {
-      // 简单：带噪声的贪心
-      if (difficulty === 'Easy') {
-          let bestScore = -Infinity;
-          let bestMoves: Point[] = [];
-          for (const move of candidates) {
-             let score = getGomokuScore(board, move.x, move.y, player, opponent, false);
-             score += Math.random() * 500; // 巨大噪声
-             if (score > bestScore) { bestScore = score; bestMoves = [move]; }
-             else if (Math.abs(score - bestScore) < 10) bestMoves.push(move);
-          }
-          return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    const candidates = getCandidateMoves(board, size);
+    if (candidates.length === 0) return null;
+
+    if (difficulty === 'Easy') {
+      let bestScore = -Infinity;
+      let bestMoves: Point[] = [];
+      for (const move of candidates) {
+       let score = getGomokuScore(board, move.x, move.y, player, opponent, false);
+       score += Math.random() * 500;
+       if (score > bestScore) { bestScore = score; bestMoves = [move]; }
+       else if (Math.abs(score - bestScore) < 10) bestMoves.push(move);
       }
+      return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    }
 
-      // 中等：纯贪心 (无噪声，防守严密)
-      if (difficulty === 'Medium') {
-          let bestScore = -Infinity;
-          let bestMoves: Point[] = [];
-          for (const move of candidates) {
-             const score = getGomokuScore(board, move.x, move.y, player, opponent, true); // Strict Mode
-             if (score > bestScore) { bestScore = score; bestMoves = [move]; }
-             else if (score === bestScore) bestMoves.push(move);
-          }
-          return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    if (difficulty === 'Medium') {
+      let bestScore = -Infinity;
+      let bestMoves: Point[] = [];
+      for (const move of candidates) {
+       const score = getGomokuScore(board, move.x, move.y, player, opponent, true);
+       if (score > bestScore) { bestScore = score; bestMoves = [move]; }
+       else if (score === bestScore) bestMoves.push(move);
       }
+      return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    }
 
-      // 困难：Minimax 深度搜索 (Depth 4)
-      if (difficulty === 'Hard') {
-          let bestScore = -Infinity;
-          let bestMoves: Point[] = [];
-          
-          // 预排序：先算一次贪心分，只对高分点进行 Minimax
-          const sortedMoves = candidates.map(m => ({
-              move: m,
-              score: getGomokuScore(board, m.x, m.y, player, opponent, true)
-          })).sort((a, b) => b.score - a.score);
-          
-          // 只取前 6 个点进行深度运算 (Beam Width = 6)
-          const topMoves = sortedMoves.slice(0, 6).map(i => i.move);
+    if (difficulty === 'Hard') {
+      let bestScore = -Infinity;
+      let bestMoves: Point[] = [];
+      const sortedMoves = candidates.map(m => ({
+        move: m,
+        score: getGomokuScore(board, m.x, m.y, player, opponent, true)
+      })).sort((a, b) => b.score - a.score);
+      const topMoves = sortedMoves.slice(0, 6).map(i => i.move);
 
-          for (const move of topMoves) {
-              board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'sim' };
-              if (checkGomokuWin(board, move)) { board[move.y][move.x] = null; return move; } // 绝杀
-              
-              // 搜索深度 3 (即: 我下 -> 对手回 -> 我再下 -> 对手再回评估)
-              const val = minimaxGomoku(board, 3, -Infinity, Infinity, false, player, move);
-              
-              const baseScore = getGomokuScore(board, move.x, move.y, player, opponent, true);
-              const finalScore = baseScore + val;
+      for (const move of topMoves) {
+        board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'sim' };
+        if (checkGomokuWin(board, move)) { board[move.y][move.x] = null; return move; }
+        const val = minimaxGomoku(board, 3, -Infinity, Infinity, false, player, move);
+        const baseScore = getGomokuScore(board, move.x, move.y, player, opponent, true);
+        const finalScore = baseScore + val;
+        board[move.y][move.x] = null;
 
-              board[move.y][move.x] = null;
-
-              if (finalScore > bestScore) {
-                  bestScore = finalScore;
-                  bestMoves = [move];
-              } else if (Math.abs(finalScore - bestScore) < 1) {
-                  bestMoves.push(move);
-              }
-          }
-          return bestMoves.length > 0 ? bestMoves[0] : candidates[0];
+        if (finalScore > bestScore) {
+          bestScore = finalScore;
+          bestMoves = [move];
+        } else if (Math.abs(finalScore - bestScore) < 1) {
+          bestMoves.push(move);
+        }
       }
+      return bestMoves.length > 0 ? bestMoves[0] : candidates[0];
+    }
   }
 
   // === 围棋 AI ===
-  
-  // 投降逻辑 (仅中困难)
-  if (difficulty !== 'Easy') {
-       let occupiedCount = 0;
-       for(let y=0; y<size; y++) for(let x=0; x<size; x++) if(board[y][x]) occupiedCount++;
-       if (occupiedCount > (size * size) * 0.5) {
-           const score = calculateScore(board);
-           const diff = player === 'black' ? score.black - score.white : score.white - score.black;
-           if (diff < -30) return 'RESIGN';
-       }
+  let possibleMoves: { x: number; y: number; score: number }[] = [];
+
+  for (let y = 0; y < size; y++) {
+  for (let x = 0; x < size; x++) {
+    if (board[y][x] !== null) continue;
+
+    const sim = attemptMove(board, x, y, player, 'Go', previousBoardHash);
+    if (!sim) continue;
+
+    const myNewGroup = getGroup(sim.newBoard, { x, y });
+    if (myNewGroup && myNewGroup.liberties === 0 && sim.captured === 0) continue;
+
+    let score = 0;
+
+    // A. 吃子
+    if (sim.captured > 0) {
+      score += 1000 + sim.captured * 50;
+    }
+
+    // B. 叫吃/打吃
+    const neighbors = getNeighbors({x, y}, size);
+    neighbors.forEach(n => {
+      if (board[n.y][n.x]?.color === opponent) {
+        const enemyGroup = getGroup(sim.newBoard, n);
+        if (enemyGroup && enemyGroup.liberties === 1) {
+          score += 200;
+        }
+      }
+    });
+
+    // C. 逃生/防守
+    if (myNewGroup && myNewGroup.liberties >= 3) score += 20;
+    if (myNewGroup && myNewGroup.liberties === 2) score -= 10;
+
+    // D. 棋形与位置
+    score += evaluateShape(board, x, y, player);
+    score += evaluatePositionStrength(x, y, size);
+
+    // E. 随机扰动
+    if (difficulty === 'Easy') {
+      score += Math.random() * 200;
+    } else if (difficulty === 'Medium') {
+      score += Math.random() * 30;
+    }
+
+    possibleMoves.push({ x, y, score });
+  }
   }
 
-  let bestMove: Point | null = null;
-  let maxWeight = -Infinity;
+  possibleMoves.sort((a, b) => b.score - a.score);
+  if (possibleMoves.length === 0) return null;
 
-  for (const move of candidates) {
-      if (isEye(board, move.x, move.y, player)) continue;
-
-      // 模拟落子 (Depth 1)
-      const sim = attemptMove(board, move.x, move.y, player, 'Go', previousBoardHash);
-      if (!sim) continue;
-
-      let weight = Math.random() * 5; 
-
-      // 1. 吃子 (Capture) - 权重极高
-      if (sim.captured > 0) weight += 100 + (sim.captured * 25);
-
-      // 2. 逃生 (Save Self)
-      const myNewGroup = getGroup(sim.newBoard, move);
-      const neighbors = getNeighbors(move, size);
-      
-      let selfAtari = false;
-      if (myNewGroup && myNewGroup.liberties === 1) selfAtari = true;
-
-      // 检查这一步是否救活了原本只有1口气的队友
-      let savedAlly = false;
-      neighbors.forEach(n => {
-          const s = board[n.y][n.x];
-          if (s && s.color === player) {
-              const gOld = getGroup(board, n);
-              if (gOld && gOld.liberties === 1 && myNewGroup && myNewGroup.liberties > 1) {
-                  weight += 80;
-                  savedAlly = true;
-              }
-          }
-      });
-
-      // 3. 送吃检查 (Snapback / Ladder check simplified)
-      // 如果这一步让自己变成了 1 口气 (Self-Atari)，且没有吃到子，也没有救活谁 -> 这是送死
-      if (selfAtari && sim.captured === 0 && !savedAlly) {
-          // 困难模式下，坚决不送死；简单模式可能会犯傻
-          if (difficulty === 'Hard') weight -= 1000;
-          else if (difficulty === 'Medium') weight -= 200;
-      }
-
-      // --- 进阶策略 (Medium / Hard) ---
-      if (difficulty !== 'Easy') {
-          // 4. 进攻 (Atari Opponent)
-          neighbors.forEach(n => {
-             const s = board[n.y][n.x];
-             if (s && s.color === opponent) {
-                 const g = getGroup(board, n);
-                 if (g && g.liberties === 2) {
-                     // 这一步把对手打成1口气
-                     weight += 40;
-                 }
-             }
-          });
-          
-          // 5. 棋形奖励 (Shape)
-          const shapeScore = evaluateGoShape(board, move.x, move.y, player);
-          weight += shapeScore;
-      }
-
-      // --- 专家策略 (Hard Only) ---
-      if (difficulty === 'Hard') {
-          // 6. 布局理论 (Fuseki)
-          if (size >= 9) {
-              const dX = Math.min(move.x, size - 1 - move.x);
-              const dY = Math.min(move.y, size - 1 - move.y);
-              // 金角银边草肚皮
-              // 优先占角 (3-3, 3-4, 4-4)
-              if ((dX === 2 || dX === 3) && (dY === 2 || dY === 3)) {
-                   const nearby = neighbors.filter(n => board[n.y][n.x] !== null).length;
-                   // 只有当周围空旷时才去占角，避免战斗中脱先
-                   if (nearby === 0) weight += 30;
-              }
-              // 极力避免爬一路线 (死亡线)
-              if (dX === 0 || dY === 0) weight -= 50;
-          }
-          
-          // 7. 倒扑检测 (Snapback Lookahead)
-          // 如果我这步棋虽然是自杀(1气)，但是能反杀对方(造成对方也0气)?
-          // 这里的 sim.captured 已经处理了提子。
-          // 如果提子后，自己的气数还是1? 
-          if (sim.captured > 0 && myNewGroup && myNewGroup.liberties === 1) {
-              // 这种情况叫“打劫”或者“倒扑”成功后还没活净
-              // 稍微加分，鼓励尝试
-              weight += 20; 
-          }
-      }
-
-      if (weight > maxWeight) {
-          maxWeight = weight;
-          bestMove = move;
-      }
+  if (difficulty === 'Easy') {
+    const topN = possibleMoves.slice(0, 5);
+    return topN[Math.floor(Math.random() * topN.length)];
   }
 
-  return bestMove || candidates[Math.floor(Math.random() * candidates.length)];
+  return possibleMoves[0];
 };

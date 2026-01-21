@@ -6,6 +6,7 @@ import { RotateCcw, Users, Cpu, Trophy, Settings, SkipForward, Play, Frown, Glob
 
 // [新增] 引入 AI Hook
 import { useKataGo, sliderToVisits, visitsToSlider, ExtendedDifficulty } from './hooks/useKataGo'; 
+import { useWebKataGo } from './hooks/useWebKataGo';
 import { useAchievements } from './hooks/useAchievements';
 
 // --- 1. 引入 Supabase ---
@@ -265,25 +266,44 @@ const App: React.FC = () => {
     userAchievements
   } = useAchievements(session?.user?.id);
 
-    const aiEngine = useKataGo({
-        boardSize,
-        // AI 落子时的回调（复用现有的 executeMove，视为非远程操作以记录历史）
-        onAiMove: (x, y) => executeMove(x, y, false), 
-        // AI 停着时的回调
-        onAiPass: () => handlePass(false),
-        // AI 认输时的回调
-        onAiResign: () => endGame(userColor, 'AI 认为差距过大，投子认输')
-    });
+      const electronAiEngine = useKataGo({
+            boardSize,
+            // AI 落子时的回调（复用现有的 executeMove，视为非远程操作以记录历史）
+            onAiMove: (x, y) => executeMove(x, y, false), 
+            // AI 停着时的回调
+            onAiPass: () => handlePass(false),
+            // AI 认输时的回调
+            onAiResign: () => endGame(userColor, 'AI 认为差距过大，投子认输')
+        });
   
-  // 解构出我们需要用到的状态
-  // isAvailable: 判断当前是否在 PC 端 (有 electronAPI)
-  const { isAvailable: isPcAiAvailable, aiWinRate: pcAiWinRate, isThinking: isPcAiThinking, isInitializing, setIsInitializing } = aiEngine;
+      // 解构出我们需要用到的状态
+      // isAvailable: 判断当前是否在 PC 端 (有 electronAPI)
+      const { 
+          isAvailable: isElectronAvailable, 
+          aiWinRate: electronWinRate, 
+          isThinking: isElectronThinking, 
+          isInitializing, 
+          setIsInitializing 
+      } = electronAiEngine;
+
+      const webAiEngine = useWebKataGo({
+          boardSize,
+          onAiMove: (x, y) => executeMove(x, y, false),
+          onAiPass: () => handlePass(false),
+          onAiResign: () => endGame(userColor, 'AI 认为胜率过低，投子认输')
+      });
+      const { 
+          isWorkerReady, 
+          isThinking: isWebThinking, 
+          aiWinRate: webWinRate, 
+          requestWebAiMove 
+      } = webAiEngine;
 
   // 记录是否首次运行 (用于显示不同的加载提示)
   const [isFirstRun] = useState(() => !localStorage.getItem('has_run_ai_before'));
   
   // [修改] 统一的思考状态：本地 JS 思考中 或 PC KataGo 思考中
-  const showThinkingStatus = isThinking || isPcAiThinking;
+    const showThinkingStatus = isThinking || isElectronThinking || isWebThinking;
 
   // --- [新增] 辅助函数：处理非线性滑块逻辑 ---
   // sliderToVisits 和 visitsToSlider 已移至 useKataGo hooks 中引用
@@ -506,15 +526,15 @@ const App: React.FC = () => {
       cleanupOnline();
 
       // [新增] PC 端重置 AI
-      if (isPcAiAvailable && tempGameType === 'Go') {
+      if (isElectronAvailable && tempGameType === 'Go') {
           // 重置 KataGo，默认贴目 7.5
-          aiEngine.resetAI(tempBoardSize, 7.5);
+          electronAiEngine.resetAI(tempBoardSize, 7.5);
           
           // 特殊情况：如果是人机对战，且玩家选白棋（AI执黑），需要让 AI 先行
           if (tempGameMode === 'PvAI' && tempUserColor === 'white') {
               setTimeout(() => {
                    // 1000 是 maxVisits，这里的 1000 是默认上限，也可以传 difficulty
-                   aiEngine.requestAiMove('black', tempDifficulty, 1000, getResignThreshold(tempDifficulty)); 
+                   electronAiEngine.requestAiMove('black', tempDifficulty, 1000, getResignThreshold(tempDifficulty)); 
               }, 500);
           }
       }
@@ -575,27 +595,33 @@ const App: React.FC = () => {
 
   // --- AI Turn Trigger Update ---
   useEffect(() => {
-    // 基本检查保持不变
+    // 基础检查
     if (appMode !== 'playing' || gameMode !== 'PvAI' || gameOver || showPassModal) return;
 
     const aiColor = userColor === 'black' ? 'white' : 'black';
     
     if (currentPlayer === aiColor) {
-      // [新增] 分支判断
-      if (isPcAiAvailable && gameType === 'Go') {
-          // --- 分支 A: PC 端 (Electron + KataGo) ---
-          // 如果 AI 目前没有在思考，则发送请求
-          if (!isPcAiThinking) {
-              // 这里传入 difficulty，hooks 内部会决定 visits
-              // [修改] 传入 maxVisits
-              aiEngine.requestAiMove(aiColor, difficulty, maxVisits, getResignThreshold(difficulty)); 
+      // === 场景 A: Electron PC 客户端 ===
+      if (isElectronAvailable && gameType === 'Go') {
+          if (!isElectronThinking) {
+              electronAiEngine.requestAiMove(aiColor, difficulty, maxVisits, getResignThreshold(difficulty)); 
           }
-      } else {
-          // --- 分支 B: 安卓/Web 端 (纯 JS 算法) ---
-          // 保持你原有的逻辑不变
+      } 
+      // === 场景 B: Web/Android 客户端 - 困难模式 ===
+      else if (!isElectronAvailable && gameType === 'Go' && difficulty === 'Hard') {
+          if (isWorkerReady && !isWebThinking) {
+              requestWebAiMove(board, aiColor, history);
+          } else if (!isWorkerReady) {
+              console.log("等待 Web AI 模型初始化...");
+          }
+      }
+      // === 场景 C: 简单/中等难度 或 五子棋 ===
+      else {
           setIsThinking(true);
           const timer = setTimeout(() => {
-            let prevHash = null; if (history.length > 0) prevHash = getBoardHash(history[history.length-1].board);
+            let prevHash = null; 
+            if (history.length > 0) prevHash = getBoardHash(history[history.length-1].board);
+            
             const move = getAIMove(board, aiColor, gameType, difficulty, prevHash);
             
             if (move === 'RESIGN') {
@@ -613,11 +639,13 @@ const App: React.FC = () => {
       }
     } else {
         // 轮到玩家落子时，确保 PC AI 停止思考状态（安全阀）
-        if (isPcAiAvailable && isPcAiThinking) {
-            aiEngine.stopThinking();
+        if (isElectronAvailable && isElectronThinking) {
+            electronAiEngine.stopThinking();
         }
     }
-  }, [currentPlayer, gameMode, board, gameOver, gameType, difficulty, showPassModal, appMode, userColor, history, isPcAiAvailable, isPcAiThinking, aiEngine]);
+  }, [currentPlayer, gameMode, board, gameOver, gameType, difficulty, showPassModal, appMode, userColor, history, 
+      isElectronAvailable, isElectronThinking,
+      isWorkerReady, isWebThinking, requestWebAiMove, electronAiEngine, maxVisits]);
 
 
   // --- Helper: Board Stringify for Ko ---
@@ -989,8 +1017,8 @@ const App: React.FC = () => {
     setCurrentPlayer('black'); setBlackCaptures(0); setWhiteCaptures(0); setLastMove(null); setGameOver(false); setWinner(null); setWinReason(''); setConsecutivePasses(0); setPassNotificationDismissed(false); setFinalScore(null); setHistory([]); setShowMenu(false); setShowPassModal(false); setIsThinking(false); setAppMode('playing');
     
     // [新增] PC 端简单的重置 (保持当前规则)
-    if (isPcAiAvailable && gameType === 'Go') {
-        aiEngine.resetAI(sizeToUse, 7.5);
+    if (isElectronAvailable && gameType === 'Go') {
+        electronAiEngine.resetAI(sizeToUse, 7.5);
     }
     
     // Always send RESTART if connected, so opponent resets too
@@ -1047,15 +1075,37 @@ const App: React.FC = () => {
              });
           }
 
-          if (result.captured > 0) { playSfx('capture'); vibrate([20, 30, 20]); } 
-          else { playSfx('move'); vibrate(15); }
+          if (result.captured > 0) {
+              playSfx('capture');
+              try {
+                  vibrate([20, 30, 20]);
+              } catch (e) {
+                  console.debug('Vibration blocked:', e);
+              }
+          } else {
+              playSfx('move');
+              try {
+                  vibrate(15);
+              } catch (e) {
+                  console.debug('Vibration blocked:', e);
+              }
+          }
           
           if (!isRemote) setHistory(prev => [...prev, { board: currentBoard, currentPlayer: activePlayer, blackCaptures, whiteCaptures, lastMove, consecutivePasses }]);
           setBoard(result.newBoard); setLastMove({ x, y }); setConsecutivePasses(0); setPassNotificationDismissed(false); 
           if (result.captured > 0) { if (activePlayer === 'black') setBlackCaptures(prev => prev + result.captured); else setWhiteCaptures(prev => prev + result.captured); }
           if (currentType === 'Gomoku' && checkGomokuWin(result.newBoard, {x, y})) { setTimeout(() => endGame(activePlayer, '五子连珠！'), 0); return; }
           setCurrentPlayer(prev => prev === 'black' ? 'white' : 'black');
-      } else { if (!isRemote) { playSfx('error'); vibrate([10, 50]); } }
+      } else {
+          if (!isRemote) {
+              playSfx('error');
+              try {
+                  vibrate([10, 50]);
+              } catch (e) {
+                  console.debug('Vibration blocked:', e);
+              }
+          }
+      }
   };
 
   const handleIntersectionClick = useCallback((x: number, y: number) => {
@@ -1075,12 +1125,12 @@ const App: React.FC = () => {
     if (onlineStatus === 'connected') { if (currentPlayer !== myColor) return; sendData({ type: 'MOVE', x, y }); }
     
     // [新增] 如果是 PC 端且是围棋模式，同步人类的一手棋给 KataGo
-    if (isPcAiAvailable && gameType === 'Go') {
-        aiEngine.syncHumanMove(currentPlayer, x, y);
+    if (isElectronAvailable && gameType === 'Go') {
+        electronAiEngine.syncHumanMove(currentPlayer, x, y);
     }
 
     executeMove(x, y, false);
-  }, [gameOver, gameMode, currentPlayer, onlineStatus, myColor, isThinking, appMode, setupTool, board, userColor, isPcAiAvailable, aiEngine, gameType]);
+    }, [gameOver, gameMode, currentPlayer, onlineStatus, myColor, isThinking, appMode, setupTool, board, userColor, isElectronAvailable, electronAiEngine, gameType]);
 
   const handlePass = useCallback((isRemote: boolean = false) => {
     if (gameOver) return;
@@ -1089,8 +1139,8 @@ const App: React.FC = () => {
     if (onlineStatusRef.current === 'connected' && !isRemote) { if (currentPlayerRef.current !== myColorRef.current) return; sendData({ type: 'PASS' }); }
     const isUserPassInPvAI = !isRemote && gameMode === 'PvAI' && gameType === 'Go' && currentPlayerRef.current === userColor;
     if (isUserPassInPvAI) {
-        if (isPcAiAvailable && isPcAiThinking) {
-            aiEngine.stopThinking();
+        if (isElectronAvailable && isElectronThinking) {
+            electronAiEngine.stopThinking();
         }
         setIsThinking(false);
         const score = calculateScore(boardRef.current);
@@ -1108,7 +1158,7 @@ const App: React.FC = () => {
     });
     setPassNotificationDismissed(false); 
     if (consecutivePasses < 1) { setCurrentPlayer(prev => prev === 'black' ? 'white' : 'black'); setLastMove(null); }
-  }, [gameOver, gameMode, gameType, consecutivePasses, blackCaptures, whiteCaptures, lastMove, userColor, isPcAiAvailable, isPcAiThinking, aiEngine]); 
+    }, [gameOver, gameMode, gameType, consecutivePasses, blackCaptures, whiteCaptures, lastMove, userColor, isElectronAvailable, isElectronThinking, electronAiEngine]); 
 
   const endGame = async (winnerColor: Player, reason: string) => { 
       setGameOver(true);
@@ -1191,12 +1241,47 @@ const App: React.FC = () => {
   const currentDisplayBoard = appMode === 'review' && history[reviewIndex] ? history[reviewIndex].board : board;
   const currentDisplayLastMove = appMode === 'review' && history[reviewIndex] ? history[reviewIndex].lastMove : lastMove;
   
-  // Win Rate Logic with Color Flip
-  const rawWinRate = showWinRate && !gameOver && appMode === 'playing' && gameType === 'Go' 
-      ? (isPcAiAvailable && pcAiWinRate !== 50 ? pcAiWinRate : calculateWinRate(board)) 
-      : 50;
-  // If user is White, show White's win rate (which is 100 - Black's win rate)
-  const displayWinRate = userColor === 'white' ? (100 - rawWinRate) : rawWinRate;
+  //胜率计算
+    
+  // 1. 判断当前的胜率来源
+  // 如果是 Electron 且可用 -> Electron WinRate
+  // 如果是 Web Hard 且 Worker 就绪 -> Web Worker WinRate
+  // 否则 -> 本地算法 WinRate
+  const currentRawWinRate = isElectronAvailable 
+      ? electronWinRate 
+      : (difficulty === 'Hard' && isWorkerReady ? webWinRate : calculateWinRate(board));
+
+  // 2. 确保数值有效 (非50初始值，否则回退到本地估算)
+  const validWinRate = (currentRawWinRate !== 50) ? currentRawWinRate : calculateWinRate(board);
+
+  // 3. 计算【玩家显示胜率】
+  let displayWinRate = 50;
+
+  // 仅在游戏进行中显示
+  if (showWinRate && !gameOver && appMode === 'playing' && gameType === 'Go') {
+      
+      // === 情况 A: Web Worker (困难模式 + 非 Electron) ===
+      // Worker 返回的是【AI 胜率】。
+      // 所以：玩家胜率 = 100 - AI胜率
+      if (!isElectronAvailable && difficulty === 'Hard' && isWorkerReady) {
+          displayWinRate = 100 - validWinRate;
+      }
+      
+      // === 情况 B: Electron (PC KataGo) ===
+      // KataGo 引擎通常返回【黑棋胜率】。
+      // 如果 Electron 代码没改过，它遵循 GTP 标准。
+      else if (isElectronAvailable) {
+          // 如果玩家执白，显示 (100 - 黑棋胜率)
+          // 如果玩家执黑，显示 (黑棋胜率)
+          displayWinRate = userColor === 'white' ? (100 - validWinRate) : validWinRate;
+      }
+
+      // === 情况 C: 本地简单/中等算法 ===
+      // 该算法 (goLogic.ts) 返回的是【黑棋胜率】。
+      else {
+          displayWinRate = userColor === 'white' ? (100 - validWinRate) : validWinRate;
+      }
+  }
   
   const getSliderBackground = (val: number, min: number, max: number) => { const percentage = ((val - min) / (max - min)) * 100; return `linear-gradient(to right, #5d4037 ${percentage}%, #d4b483 ${percentage}%)`; };
 
@@ -1281,7 +1366,7 @@ const App: React.FC = () => {
           
           {showThinkingStatus && (
               <div className="absolute top-4 left-4 bg-white/80 px-4 py-2 rounded-full text-xs font-bold text-[#5c4033] animate-pulse border-2 border-[#e3c086] shadow-sm z-20">
-                  {isPcAiAvailable ? 'KataGo 正在计算...' : 'AI 正在思考...'}
+                  {isElectronAvailable ? 'KataGo 正在计算...' : 'AI 正在思考...'}
               </div>
           )}
           
@@ -1510,7 +1595,7 @@ const App: React.FC = () => {
                             </div>
 
                             {/* [新增] 思考量滑块 (仅对 PC 围棋模式有效) */}
-                            {isPcAiAvailable && tempGameType === 'Go' && (
+                            {isElectronAvailable && tempGameType === 'Go' && (
                                 <div className="bg-[#fff]/50 p-2 rounded-xl border border-[#e3c086] flex flex-col gap-2">
                                     <div className="flex justify-between items-center px-1">
                                         <span className="text-xs font-bold text-[#5c4033] flex items-center gap-1">
@@ -2047,7 +2132,7 @@ const App: React.FC = () => {
       )}
 
       {/* [新增] AI 初始化弹窗 (复刻 App copy.tsx 样式) */}
-      {isInitializing && isPcAiAvailable && (
+    {isInitializing && isElectronAvailable && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-500">
             <div className="bg-[#fcf6ea] rounded-3xl p-8 w-full max-w-sm shadow-2xl border-[6px] border-[#8c6b38] flex flex-col items-center text-center relative">
                 
