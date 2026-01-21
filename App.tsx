@@ -36,7 +36,7 @@ interface HistoryItem {
 type AppMode = 'playing' | 'review' | 'setup';
 
 // --- 常量配置 ---
-const CURRENT_VERSION = '1.8.0';
+const CURRENT_VERSION = '2.0.0';
 // 默认下载链接（官网或Fallback）
 const DEFAULT_DOWNLOAD_LINK = 'https://yesterhaze.codes'; 
 
@@ -1117,12 +1117,18 @@ const App: React.FC = () => {
   };
 
   const executeMove = (x: number, y: number, isRemote: boolean) => {
-      const currentBoard = boardRef.current; const activePlayer = currentPlayerRef.current; const currentType = gameTypeRef.current;
+      // 1. 获取当前状态
+      const currentBoard = boardRef.current; 
+      const activePlayer = currentPlayerRef.current; 
+      const currentType = gameTypeRef.current;
+      
       let prevHash = null;
       if (history.length > 0) prevHash = getBoardHash(history[history.length - 1].board);
+      
       const result = attemptMove(currentBoard, x, y, activePlayer, currentType, prevHash);
+      
       if (result) {
-          // [新增] 成就检测：每一步落子
+          // [新增] 成就检测
           if (!isRemote && session?.user?.id) {
              checkMoveAchievements({
                x, y, 
@@ -1132,35 +1138,53 @@ const App: React.FC = () => {
              });
           }
 
-          if (result.captured > 0) {
-              playSfx('capture');
-              try {
+          // 2. 音效播放 (增加 try-catch 防止手机端报错中断逻辑)
+          try {
+              if (result.captured > 0) {
+                  playSfx('capture');
                   vibrate([20, 30, 20]);
-              } catch (e) {
-                  console.debug('Vibration blocked:', e);
-              }
-          } else {
-              playSfx('move');
-              try {
+              } else {
+                  playSfx('move');
                   vibrate(15);
-              } catch (e) {
-                  console.debug('Vibration blocked:', e);
               }
+          } catch (e) {
+              // 手机浏览器可能会因为没有用户交互而拒绝播放声音，忽略此错误，保证棋局继续
+              console.warn("Audio/Vibrate blocked:", e); 
           }
           
           if (!isRemote) setHistory(prev => [...prev, { board: currentBoard, currentPlayer: activePlayer, blackCaptures, whiteCaptures, lastMove, consecutivePasses }]);
-          setBoard(result.newBoard); setLastMove({ x, y }); setConsecutivePasses(0); setPassNotificationDismissed(false); 
-          if (result.captured > 0) { if (activePlayer === 'black') setBlackCaptures(prev => prev + result.captured); else setWhiteCaptures(prev => prev + result.captured); }
-          if (currentType === 'Gomoku' && checkGomokuWin(result.newBoard, {x, y})) { setTimeout(() => endGame(activePlayer, '五子连珠！'), 0); return; }
-          setCurrentPlayer(prev => prev === 'black' ? 'white' : 'black');
+          
+          // 3. 更新状态
+          setBoard(result.newBoard); 
+          setLastMove({ x, y }); 
+          setConsecutivePasses(0); 
+          setPassNotificationDismissed(false); 
+          
+          if (result.captured > 0) { 
+              if (activePlayer === 'black') setBlackCaptures(prev => prev + result.captured); 
+              else setWhiteCaptures(prev => prev + result.captured); 
+          }
+
+          // [关键修复] 立即手动更新 Ref，不要等待 useEffect
+          // 这能确保在手机端下一次快速计算时，Ref 绝对是最新的
+          boardRef.current = result.newBoard;
+
+          if (currentType === 'Gomoku' && checkGomokuWin(result.newBoard, {x, y})) { 
+              setTimeout(() => endGame(activePlayer, '五子连珠！'), 0); 
+              return; 
+          }
+          
+          const nextPlayer = activePlayer === 'black' ? 'white' : 'black';
+          setCurrentPlayer(nextPlayer);
+          // [关键修复] 立即同步 Player Ref
+          currentPlayerRef.current = nextPlayer;
+
       } else {
           if (!isRemote) {
-              playSfx('error');
               try {
+                  playSfx('error');
                   vibrate([10, 50]);
-              } catch (e) {
-                  console.debug('Vibration blocked:', e);
-              }
+              } catch(e) {}
           }
       }
   };
