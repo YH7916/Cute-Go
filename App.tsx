@@ -265,13 +265,15 @@ const App: React.FC = () => {
     userAchievements
   } = useAchievements(session?.user?.id);
 
-  const aiEngine = useKataGo({
-    boardSize,
-    // AI 落子时的回调（复用现有的 executeMove，视为非远程操作以记录历史）
-    onAiMove: (x, y) => executeMove(x, y, false), 
-    // AI 停着时的回调
-    onAiPass: () => handlePass(false) 
-  });
+    const aiEngine = useKataGo({
+        boardSize,
+        // AI 落子时的回调（复用现有的 executeMove，视为非远程操作以记录历史）
+        onAiMove: (x, y) => executeMove(x, y, false), 
+        // AI 停着时的回调
+        onAiPass: () => handlePass(false),
+        // AI 认输时的回调
+        onAiResign: () => endGame(userColor, 'AI 认为差距过大，投子认输')
+    });
   
   // 解构出我们需要用到的状态
   // isAvailable: 判断当前是否在 PC 端 (有 electronAPI)
@@ -293,6 +295,14 @@ const App: React.FC = () => {
           case 'Medium': setTempMaxVisits(10); break;
           case 'Hard': setTempMaxVisits(100); break;
       }
+  };
+
+  // AI 认输阈值 (胜率 0~1，越小越不容易认输)
+  const getResignThreshold = (diff: ExtendedDifficulty) => {
+      if (diff === 'Easy') return 0.02;
+      if (diff === 'Medium') return 0.03;
+      if (diff === 'Hard') return 0.05;
+      return 0.05;
   };
 
   const handleCustomChange = (val: number) => {
@@ -504,7 +514,7 @@ const App: React.FC = () => {
           if (tempGameMode === 'PvAI' && tempUserColor === 'white') {
               setTimeout(() => {
                    // 1000 是 maxVisits，这里的 1000 是默认上限，也可以传 difficulty
-                   aiEngine.requestAiMove('black', tempDifficulty, 1000); 
+                   aiEngine.requestAiMove('black', tempDifficulty, 1000, getResignThreshold(tempDifficulty)); 
               }, 500);
           }
       }
@@ -578,7 +588,7 @@ const App: React.FC = () => {
           if (!isPcAiThinking) {
               // 这里传入 difficulty，hooks 内部会决定 visits
               // [修改] 传入 maxVisits
-              aiEngine.requestAiMove(aiColor, difficulty, maxVisits); 
+              aiEngine.requestAiMove(aiColor, difficulty, maxVisits, getResignThreshold(difficulty)); 
           }
       } else {
           // --- 分支 B: 安卓/Web 端 (纯 JS 算法) ---

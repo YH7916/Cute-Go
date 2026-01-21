@@ -49,10 +49,11 @@ interface UseKataGoProps {
   boardSize: BoardSize;
   onAiMove: (x: number, y: number) => void; // AI 落子回调
   onAiPass: () => void; // AI 停着回调
+  onAiResign?: () => void; // AI 认输回调 (可选)
 }
 
 // --- Hook 实现 ---
-export const useKataGo = ({ boardSize, onAiMove, onAiPass }: UseKataGoProps) => {
+export const useKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseKataGoProps) => {
   const [isThinking, setIsThinking] = useState(false);
   const [aiWinRate, setAiWinRate] = useState<number>(50);
   const [isInitializing, setIsInitializing] = useState(true); // 引擎加载状态
@@ -101,12 +102,18 @@ export const useKataGo = ({ boardSize, onAiMove, onAiPass }: UseKataGoProps) => 
 
         // 解析落子坐标 (只有在思考时才响应)
         // 增加 content 长度校验，防止误判
-        if (isThinkingRef.current && (content.match(/^[A-T][0-9]+$/) || content.toLowerCase() === 'pass')) {
-          const move = fromGTP(content, boardSizeRef.current);
-          if (move) {
-            onAiMove(move.x, move.y);
+        if (isThinkingRef.current && (content.match(/^[A-T][0-9]+$/) || content.toLowerCase() === 'pass' || content.toLowerCase() === 'resign')) {
+          const lower = content.toLowerCase();
+          if (lower === 'resign') {
+            if (onAiResign) onAiResign();
+            else onAiPass();
           } else {
-            onAiPass();
+            const move = fromGTP(content, boardSizeRef.current);
+            if (move) {
+              onAiMove(move.x, move.y);
+            } else {
+              onAiPass();
+            }
           }
           setIsThinking(false);
         }
@@ -152,7 +159,8 @@ export const useKataGo = ({ boardSize, onAiMove, onAiPass }: UseKataGoProps) => 
   const requestAiMove = useCallback((
     aiColor: Player, 
     difficulty: ExtendedDifficulty, 
-    maxVisits: number
+    maxVisits: number,
+    resignThreshold: number = 0.05
   ) => {
     if (!isElectron) return;
     if (isThinkingRef.current) return; // 防止重复请求
@@ -167,6 +175,8 @@ export const useKataGo = ({ boardSize, onAiMove, onAiPass }: UseKataGoProps) => 
     else if (difficulty === 'Custom') visits = maxVisits;
 
     sendCommand(`kata-set-param maxVisits ${visits}`);
+    // 胜率低于阈值才会认输 (0~1)
+    sendCommand(`kata-set-param resignThreshold ${resignThreshold}`);
     
     // 稍微延时发送 genmove 确保参数生效
     setTimeout(() => {
