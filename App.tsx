@@ -81,9 +81,13 @@ const App: React.FC = () => {
     // Import/Export
     const [showImportModal, setShowImportModal] = useState(false);
     const [importKey, setImportKey] = useState('');
+    
+    // [Fix SGF Export] Track initial setup stones (Handicap/AB/AW)
+    const [initialStones, setInitialStones] = useState<{x: number, y: number, color: Player}[]>([]); 
 
     // About/Update
     const [showAboutModal, setShowAboutModal] = useState(false);
+
     const [checkingUpdate, setCheckingUpdate] = useState(false);
     const [updateMsg, setUpdateMsg] = useState('');
     const [downloadUrl, setDownloadUrl] = useState<string>(DEFAULT_DOWNLOAD_LINK);
@@ -218,6 +222,7 @@ const App: React.FC = () => {
         gameState.setPassNotificationDismissed(false);
         gameState.setFinalScore(null);
         gameState.setHistory([]);
+        setInitialStones([]); // Clear setup
         setShowMenu(false);
         setShowPassModal(false);
         setIsThinking(false);
@@ -1057,8 +1062,10 @@ const App: React.FC = () => {
                              settings.setBoardSize(sgfState.boardSize);
                              gameState.setBlackCaptures(sgfState.blackCaptures);
                              gameState.setWhiteCaptures(sgfState.whiteCaptures);
-                             // HISTORY: We should restore history to allow review!
+                             // HISTORY & SETUP
                              gameState.setHistory(sgfState.history); 
+                             setInitialStones(sgfState.initialStones); // Restore initial stones
+
                              gameState.setGameOver(false); 
                              gameState.setWinner(null);
                              gameState.setConsecutivePasses(0); 
@@ -1075,12 +1082,19 @@ const App: React.FC = () => {
                     if (gs) {
                         gameState.setBoard(gs.board); gameState.setCurrentPlayer(gs.currentPlayer); settings.setGameType(gs.gameType); settings.setBoardSize(gs.boardSize);
                         gameState.setBlackCaptures(gs.blackCaptures); gameState.setWhiteCaptures(gs.whiteCaptures); gameState.setHistory([]); gameState.setGameOver(false); gameState.setWinner(null);
+                        setInitialStones([]);
                         gameState.setConsecutivePasses(0); gameState.setAppMode('playing'); setShowImportModal(false); playSfx('move'); vibrate(20);
                     } else alert('无效的棋谱格式 (支持 SGF 或 CuteGo 代码)');
                 }}
                 onCopy={() => { 
                     // Changed to SGF Copy
-                    const s = generateSGF(gameState.history, settings.boardSize);
+                    // [Fix] Append current state to history for export (history lags by 1 move)
+                    const fullHistory = [...gameState.history];
+                    if (gameState.lastMove) {
+                         fullHistory.push({ board: gameState.board, currentPlayer: gameState.currentPlayer, lastMove: gameState.lastMove } as any);
+                    }
+                    const s = generateSGF(fullHistory, settings.boardSize, 7.5, initialStones);
+                    
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         navigator.clipboard.writeText(s).then(() => {
                             setGameCopied(true); setTimeout(() => setGameCopied(false), 2000); vibrate(10);
@@ -1094,7 +1108,13 @@ const App: React.FC = () => {
                     }
                 }}
                 onExportSGF={() => {
-                    const sgf = generateSGF(gameState.history, settings.boardSize);
+                    // [Fix] Append current state
+                    const fullHistory = [...gameState.history];
+                    if (gameState.lastMove) {
+                         fullHistory.push({ board: gameState.board, currentPlayer: gameState.currentPlayer, lastMove: gameState.lastMove } as any);
+                    }
+                    const sgf = generateSGF(fullHistory, settings.boardSize, 7.5, initialStones);
+                    
                     const blob = new Blob([sgf], { type: 'application/x-go-sgf' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');

@@ -836,10 +836,12 @@ export const getAIMove = (
 };
 
 // --- SGF Export ---
+// --- SGF Export ---
 export const generateSGF = (
     history: { board: BoardState, currentPlayer: Player, lastMove: {x:number,y:number}|null }[],
     boardSize: number,
-    komi: number = 7.5
+    komi: number = 7.5,
+    initialStones: {x: number, y: number, color: Player}[] = []
 ): string => {
     const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     let sgf = `(;GM[1]FF[4]CA[UTF-8]AP[CuteGo:1.0]ST[2]\n`;
@@ -849,30 +851,33 @@ export const generateSGF = (
     // Coordinates mapping: 0->a, 1->b (SGF does NOT skip 'i')
     const toSgfCoord = (c: number) => String.fromCharCode(97 + c);
 
+    // [Fix] Export Initial Stones (Handicap/Setup)
+    if (initialStones.length > 0) {
+        let ab = "";
+        let aw = "";
+        initialStones.forEach(s => {
+            const coord = toSgfCoord(s.x) + toSgfCoord(s.y);
+            if (s.color === 'black') ab += `[${coord}]`;
+            else aw += `[${coord}]`;
+        });
+        if (ab) sgf += `AB${ab}`;
+        if (aw) sgf += `AW${aw}`;
+        sgf += "\n";
+    }
+
     history.forEach((h, index) => {
-        const color = h.currentPlayer === 'black' ? 'B' : 'W';
+        // [Fix] History stores 'Next Player' (who is about to move). 
+        // So the move h.lastMove was made by the Opponent.
+        // If h.currentPlayer is 'black', it means White just moved.
+        const color = h.currentPlayer === 'black' ? 'W' : 'B';
         let moveStr = "";
-        
-        let isPass = false;
-        // Check if board state is identical to previous one (implies Pass)
-        // Note: history[index] is the state AFTER the move.
-        // history[index-1] is the state BEFORE the move (result of previous move).
-        // If history[index].board === history[index-1].board (same ref), it's a pass.
-        // App.tsx handlePass uses logic that copies reference or similar. 
-        // We will trust lastMove field primarily.
         
         if (h.lastMove) {
              moveStr = toSgfCoord(h.lastMove.x) + toSgfCoord(h.lastMove.y);
+             sgf += `;${color}[${moveStr}]`;
         } else {
-             // If lastMove is null, it's a pass (or initial state? initial state isn't usually in history unless pushed)
-             // Cute-Go history contains moves.
-             moveStr = ""; // Pass
+             // Skip null moves (setup nodes)
         }
-        
-        // Backup check: consecutive passes logic is in state, not history item.
-        // But if lastMove is null, it is definitely a pass or start.
-
-        sgf += `;${color}[${moveStr}]`;
     });
 
     sgf += ")";
@@ -882,7 +887,8 @@ export const generateSGF = (
 // --- SGF Import ---
 export const parseSGF = (sgf: string): { 
     board: BoardState, currentPlayer: Player, gameType: GameType, boardSize: BoardSize, 
-    blackCaptures: number, whiteCaptures: number, history: any[], komi: number 
+    blackCaptures: number, whiteCaptures: number, history: any[], komi: number,
+    initialStones: {x: number, y: number, color: Player}[] 
 } | null => {
     try {
         // 1. Basic Metadata
@@ -897,6 +903,7 @@ export const parseSGF = (sgf: string): {
         let blackCaptures = 0;
         let whiteCaptures = 0;
         let consectivePasses = 0;
+        const initialStones: {x: number, y: number, color: Player}[] = [];
 
         // 2. Setup Stones (AB/AW)
         // Matches AB[aa][bb]...
@@ -909,6 +916,7 @@ export const parseSGF = (sgf: string): {
                 const y = s.charCodeAt(1) - 97;
                 if (x >= 0 && x < size && y >= 0 && y < size) {
                     board[y][x] = { color: 'black', x, y, id: `setup-b-${x}-${y}` };
+                    initialStones.push({x, y, color: 'black'});
                 }
             });
         }
@@ -921,13 +929,12 @@ export const parseSGF = (sgf: string): {
                 const y = s.charCodeAt(1) - 97;
                 if (x >= 0 && x < size && y >= 0 && y < size) {
                     board[y][x] = { color: 'white', x, y, id: `setup-w-${x}-${y}` };
+                    initialStones.push({x, y, color: 'white'});
                 }
             });
         }
 
         // 3. Moves Main Loop
-        // Regex to find ;B[...] or ;W[...]
-        // Global regex to iterate
         const moveRegex = /;([BW])\[([a-z]{0,2})\]/g;
         let match;
         
@@ -936,22 +943,18 @@ export const parseSGF = (sgf: string): {
             const coordStr = match[2]; // aa or empty
             const player = colorCode === 'B' ? 'black' : 'white';
             
-            // Sync current player if SGF implicitly sets turn
-            // But usually SGF just lists moves. We trust the file order.
-            
             if (!coordStr || coordStr === "" || coordStr === "tt" && size <= 19) {
                 // PASS
-                // Push history check
+                // [Fix] Store NEXT Player in history context to match App.tsx logic
+                const nextPlayer = player === 'black' ? 'white' : 'black';
                  history.push({ 
-                    board: board, // Ref to state BEFORE pass? No, history stores state AFTER move? 
-                    // CuteGo history stores state AFTER move. So if Pass, board doesn't change.
-                    // But we must store exact same board ref if we want to detect pass later?
-                    currentPlayer: player, 
+                    board: board, 
+                    currentPlayer: nextPlayer, 
                     lastMove: null,
                     blackCaptures, whiteCaptures, consecutivePasses: consectivePasses + 1 
                 });
                 consectivePasses++;
-                currentPlayer = player === 'black' ? 'white' : 'black';
+                currentPlayer = nextPlayer;
                 continue;
             }
 
@@ -966,14 +969,16 @@ export const parseSGF = (sgf: string): {
                     if (player === 'black') blackCaptures += result.captured;
                     else whiteCaptures += result.captured;
                     
+                    const nextPlayer = player === 'black' ? 'white' : 'black';
+
                     history.push({
                         board: board,
-                        currentPlayer: player,
+                        currentPlayer: nextPlayer, 
                         lastMove: {x, y},
                         blackCaptures, whiteCaptures, consecutivePasses: 0
                     });
                     consectivePasses = 0;
-                    currentPlayer = player === 'black' ? 'white' : 'black';
+                    currentPlayer = nextPlayer;
                 }
             }
         }
@@ -986,7 +991,8 @@ export const parseSGF = (sgf: string): {
             blackCaptures,
             whiteCaptures,
             history,
-            komi
+            komi,
+            initialStones
         };
 
     } catch (e) {
