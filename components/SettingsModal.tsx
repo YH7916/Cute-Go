@@ -75,7 +75,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             setTempBoardSize(currentGameSettings.boardSize);
             setTempGameType(currentGameSettings.gameType);
             setTempGameMode(currentGameSettings.gameMode);
-            setTempDifficulty(currentGameSettings.difficulty);
+            
+            // Auto-migrate Legacy Difficulty
+            let diff = currentGameSettings.difficulty;
+            if (diff === 'Easy') diff = '18k';
+            else if (diff === 'Medium') diff = '10k';
+            else if (diff === 'Hard') diff = '1d';
+            
+            setTempDifficulty(diff);
             setTempMaxVisits(currentGameSettings.maxVisits);
             setTempUserColor(currentGameSettings.userColor);
         }
@@ -171,25 +178,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 
                                 <div className="relative h-8 flex items-center px-2">
                                      <input 
-                                        type="range" min="0" max={RANKS.length - 1} step="1"
-                                        value={RANKS.indexOf(tempDifficulty) >= 0 ? RANKS.indexOf(tempDifficulty) : RANKS.indexOf('1d')} 
+                                        type="range" min="0" max="100" step="1"
+                                        value={(() => {
+                                            const idx = RANKS.indexOf(tempDifficulty);
+                                            const safeIdx = idx >= 0 ? idx : RANKS.indexOf('1d');
+                                            // Non-linear mapping: 0-18 (18k-1d) -> 0-50, 18-26 (1d-9d) -> 50-100
+                                            const splitIdx = RANKS.indexOf('1d');
+                                            if (safeIdx <= splitIdx) {
+                                                return (safeIdx / splitIdx) * 50;
+                                            } else {
+                                                return 50 + ((safeIdx - splitIdx) / (RANKS.length - 1 - splitIdx)) * 50;
+                                            }
+                                        })()} 
                                         onChange={(e) => {
-                                            const rank = RANKS[parseInt(e.target.value)];
+                                            const val = parseInt(e.target.value);
+                                            const splitIdx = RANKS.indexOf('1d');
+                                            let targetIdx = 0;
+                                            if (val <= 50) {
+                                                targetIdx = Math.round((val / 50) * splitIdx);
+                                            } else {
+                                                targetIdx = splitIdx + Math.round(((val - 50) / 50) * (RANKS.length - 1 - splitIdx));
+                                            }
+                                            const rank = RANKS[targetIdx];
                                             if (rank) setTempDifficulty(rank);
                                         }}
                                         className="cute-range w-full"
                                         style={{ 
-                                            background: getSliderBackground(RANKS.indexOf(tempDifficulty) >= 0 ? RANKS.indexOf(tempDifficulty) : 10, 0, RANKS.length - 1),
+                                            background: getSliderBackground((() => {
+                                                const idx = RANKS.indexOf(tempDifficulty);
+                                                const safeIdx = idx >= 0 ? idx : RANKS.indexOf('1d');
+                                                const splitIdx = RANKS.indexOf('1d');
+                                                if (safeIdx <= splitIdx) return (safeIdx / splitIdx) * 50;
+                                                else return 50 + ((safeIdx - splitIdx) / (RANKS.length - 1 - splitIdx)) * 50;
+                                            })(), 0, 100),
                                             touchAction: 'none'
                                         }}
                                     />
                                 </div>
-                                <div className="flex justify-between px-1">
+                                <div className="flex justify-between px-1 relative">
                                     <span className="text-[10px] text-[#8c6b38]/60 font-medium">18k</span>
-                                    <span className="text-[10px] text-[#8c6b38]/60 font-medium">1d</span>
+                                    <span className="text-[10px] text-[#8c6b38]/60 font-medium absolute left-1/2 -translate-x-1/2">1d</span>
                                     <span className="text-[10px] text-[#8c6b38]/60 font-medium">9d</span>
                                 </div>
                             </div>
+
 
                             {/* Thinking Visits Slider (Only for PC Go & High Rank) */}
                             {isElectronAvailable && tempGameType === 'Go' && (
