@@ -1,7 +1,19 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameBoard } from './components/GameBoard';
 import { BoardSize, Player, GameMode, GameType } from './types';
-import { createBoard, attemptMove, getAIMove, checkGomokuWin, calculateScore, calculateWinRate, serializeGame, deserializeGame } from './utils/goLogic';
+import { 
+  createBoard,
+  attemptMove, 
+  getAIMove,
+  checkGomokuWin, 
+  calculateScore, 
+  calculateWinRate,
+  serializeGame,
+  deserializeGame, 
+  generateSGF,
+  parseSGF
+} from './utils/goLogic';
 import { getAIConfig } from './utils/aiConfig';
 import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown } from 'lucide-react';
 
@@ -1034,19 +1046,67 @@ const App: React.FC = () => {
                onClose={() => setShowImportModal(false)}
                importKey={importKey}
                setImportKey={setImportKey}
-               onImport={() => { 
-                   const gs = deserializeGame(importKey);
-                   if (gs) {
-                       gameState.setBoard(gs.board); gameState.setCurrentPlayer(gs.currentPlayer); settings.setGameType(gs.gameType); settings.setBoardSize(gs.boardSize);
-                       gameState.setBlackCaptures(gs.blackCaptures); gameState.setWhiteCaptures(gs.whiteCaptures); gameState.setHistory([]); gameState.setGameOver(false); gameState.setWinner(null);
-                       gameState.setConsecutivePasses(0); gameState.setAppMode('playing'); setShowImportModal(false); playSfx('move'); vibrate(20);
-                   } else alert('无效的棋局密钥');
-               }}
-               onCopy={() => { 
-                   const s = serializeGame(gameState.board, gameState.currentPlayer, settings.gameType, gameState.blackCaptures, gameState.whiteCaptures);
-                   navigator.clipboard.writeText(s); setGameCopied(true); setTimeout(() => setGameCopied(false), 2000); vibrate(10);
-               }}
-               isCopied={gameCopied}
+                onImport={() => { 
+                    // Try SGF first
+                    if (importKey.trim().startsWith('(;')) {
+                         const sgfState = parseSGF(importKey);
+                         if (sgfState) {
+                             gameState.setBoard(sgfState.board);
+                             gameState.setCurrentPlayer(sgfState.currentPlayer);
+                             settings.setGameType(sgfState.gameType);
+                             settings.setBoardSize(sgfState.boardSize);
+                             gameState.setBlackCaptures(sgfState.blackCaptures);
+                             gameState.setWhiteCaptures(sgfState.whiteCaptures);
+                             // HISTORY: We should restore history to allow review!
+                             gameState.setHistory(sgfState.history); 
+                             gameState.setGameOver(false); 
+                             gameState.setWinner(null);
+                             gameState.setConsecutivePasses(0); 
+                             gameState.setAppMode('playing');
+                             // If history exists, maybe jump to Review mode? Or stay in Playing?
+                             // User usually wants to continue or review. Let's stay in Playing at end state.
+                             setShowImportModal(false); playSfx('move'); vibrate(20);
+                             return;
+                         }
+                    }
+
+                    // Fallback to Legacy JSON
+                    const gs = deserializeGame(importKey);
+                    if (gs) {
+                        gameState.setBoard(gs.board); gameState.setCurrentPlayer(gs.currentPlayer); settings.setGameType(gs.gameType); settings.setBoardSize(gs.boardSize);
+                        gameState.setBlackCaptures(gs.blackCaptures); gameState.setWhiteCaptures(gs.whiteCaptures); gameState.setHistory([]); gameState.setGameOver(false); gameState.setWinner(null);
+                        gameState.setConsecutivePasses(0); gameState.setAppMode('playing'); setShowImportModal(false); playSfx('move'); vibrate(20);
+                    } else alert('无效的棋谱格式 (支持 SGF 或 CuteGo 代码)');
+                }}
+                onCopy={() => { 
+                    // Changed to SGF Copy
+                    const s = generateSGF(gameState.history, settings.boardSize);
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(s).then(() => {
+                            setGameCopied(true); setTimeout(() => setGameCopied(false), 2000); vibrate(10);
+                        }).catch(err => {
+                             console.error('Clipboard failed', err);
+                             alert("复制失败，请手动导出 SGF");
+                        });
+                    } else {
+                        // Fallback
+                        alert("浏览器限制，请使用下方‘导出 SGF’按钮");
+                    }
+                }}
+                onExportSGF={() => {
+                    const sgf = generateSGF(gameState.history, settings.boardSize);
+                    const blob = new Blob([sgf], { type: 'application/x-go-sgf' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `cutego_${new Date().getTime()}.sgf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    vibrate(10);
+                }}
+                isCopied={gameCopied}
            />
 
            <EndGameModal 

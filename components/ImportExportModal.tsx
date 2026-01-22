@@ -8,6 +8,7 @@ interface ImportExportModalProps {
     setImportKey: (key: string) => void;
     onImport: () => void;
     onCopy: () => void;
+    onExportSGF: () => void;
     isCopied: boolean;
 }
 
@@ -18,6 +19,7 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
     setImportKey,
     onImport,
     onCopy,
+    onExportSGF,
     isCopied
 }) => {
     if (!isOpen) return null;
@@ -29,16 +31,19 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
                 <h2 className="text-xl font-black text-[#5c4033] mb-4 flex items-center gap-2"><FileUp className="text-[#5c4033]"/> 导入/导出棋局</h2>
                 <div className="space-y-4">
                     <div className="bg-[#fff] p-3 rounded-xl border-2 border-[#e3c086]">
-                        <p className="text-xs font-bold text-[#8c6b38] uppercase mb-2">导出当前棋局</p>
+                        <p className="text-xs font-bold text-[#8c6b38] uppercase mb-2">导出 SGF</p>
                         <button onClick={onCopy} className="w-full py-2 bg-[#fcf6ea] border border-[#e3c086] text-[#5c4033] font-bold rounded-lg hover:bg-[#e3c086] hover:text-white flex items-center justify-center gap-2 transition-all">
                              {isCopied ? <Check size={16}/> : <Copy size={16}/>}
-                             {isCopied ? '已复制' : '复制棋局代码'}
+                             {isCopied ? '已复制 SGF' : '复制 SGF 文本'}
+                        </button>
+                        <button onClick={onExportSGF} className="w-full mt-2 py-2 bg-[#fcf6ea] border border-[#e3c086] text-[#5c4033] font-bold rounded-lg hover:bg-[#e3c086] hover:text-white flex items-center justify-center gap-2 transition-all">
+                             <FileUp size={16}/> 导出 SGF 文件
                         </button>
                     </div>
                     <div className="bg-[#fff] p-3 rounded-xl border-2 border-[#e3c086]">
-                        <p className="text-xs font-bold text-[#8c6b38] uppercase mb-2">导入棋局</p>
-                        <textarea className="w-full p-2 text-xs font-mono bg-[#fcf6ea] border border-[#e3c086] rounded-lg h-20 resize-none outline-none focus:border-[#5c4033] text-[#5c4033]" placeholder="在此粘贴棋局代码..." value={importKey} onChange={(e) => setImportKey(e.target.value)}/>
-                        <button onClick={onImport} disabled={!importKey} className="btn-retro btn-brown w-full mt-2 py-2 rounded-lg">加载棋局</button>
+                        <p className="text-xs font-bold text-[#8c6b38] uppercase mb-2">导入 SGF</p>
+                        <textarea className="w-full p-2 text-xs font-mono bg-[#fcf6ea] border border-[#e3c086] rounded-lg h-20 resize-none outline-none focus:border-[#5c4033] text-[#5c4033]" placeholder="请粘贴 SGF 文本内容..." value={importKey} onChange={(e) => setImportKey(e.target.value)}/>
+                        <button onClick={onImport} disabled={!importKey} className="btn-retro btn-brown w-full mt-2 py-2 rounded-lg">解析并加载</button>
                     </div>
                 </div>
             </div>

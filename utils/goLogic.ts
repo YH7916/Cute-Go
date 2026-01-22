@@ -834,3 +834,163 @@ export const getAIMove = (
 
   return bestMove;
 };
+
+// --- SGF Export ---
+export const generateSGF = (
+    history: { board: BoardState, currentPlayer: Player, lastMove: {x:number,y:number}|null }[],
+    boardSize: number,
+    komi: number = 7.5
+): string => {
+    const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    let sgf = `(;GM[1]FF[4]CA[UTF-8]AP[CuteGo:1.0]ST[2]\n`;
+    sgf += `RU[Chinese]SZ[${boardSize}]KM[${komi}]\n`;
+    sgf += `DT[${date}]PW[White]PB[Black]GN[CuteGo Game]\n`;
+
+    // Coordinates mapping: 0->a, 1->b (SGF does NOT skip 'i')
+    const toSgfCoord = (c: number) => String.fromCharCode(97 + c);
+
+    history.forEach((h, index) => {
+        const color = h.currentPlayer === 'black' ? 'B' : 'W';
+        let moveStr = "";
+        
+        let isPass = false;
+        // Check if board state is identical to previous one (implies Pass)
+        // Note: history[index] is the state AFTER the move.
+        // history[index-1] is the state BEFORE the move (result of previous move).
+        // If history[index].board === history[index-1].board (same ref), it's a pass.
+        // App.tsx handlePass uses logic that copies reference or similar. 
+        // We will trust lastMove field primarily.
+        
+        if (h.lastMove) {
+             moveStr = toSgfCoord(h.lastMove.x) + toSgfCoord(h.lastMove.y);
+        } else {
+             // If lastMove is null, it's a pass (or initial state? initial state isn't usually in history unless pushed)
+             // Cute-Go history contains moves.
+             moveStr = ""; // Pass
+        }
+        
+        // Backup check: consecutive passes logic is in state, not history item.
+        // But if lastMove is null, it is definitely a pass or start.
+
+        sgf += `;${color}[${moveStr}]`;
+    });
+
+    sgf += ")";
+    return sgf;
+};
+
+// --- SGF Import ---
+export const parseSGF = (sgf: string): { 
+    board: BoardState, currentPlayer: Player, gameType: GameType, boardSize: BoardSize, 
+    blackCaptures: number, whiteCaptures: number, history: any[], komi: number 
+} | null => {
+    try {
+        // 1. Basic Metadata
+        const szMatch = sgf.match(/SZ\[(\d+)\]/);
+        const size = szMatch ? parseInt(szMatch[1]) : 19;
+        const komiMatch = sgf.match(/KM\[([\d.]+)\]/);
+        const komi = komiMatch ? parseFloat(komiMatch[1]) : 7.5;
+        
+        let board = createBoard(size);
+        let currentPlayer: Player = 'black'; // Default start
+        const history: any[] = [];
+        let blackCaptures = 0;
+        let whiteCaptures = 0;
+        let consectivePasses = 0;
+
+        // 2. Setup Stones (AB/AW)
+        // Matches AB[aa][bb]...
+        const abMatch = sgf.match(/AB((?:\[[a-z]{2}\])+)/);
+        if (abMatch) {
+            const coords = abMatch[1].match(/\[([a-z]{2})\]/g);
+            coords?.forEach(c => {
+                const s = c.replace(/[\[\]]/g, '');
+                const x = s.charCodeAt(0) - 97;
+                const y = s.charCodeAt(1) - 97;
+                if (x >= 0 && x < size && y >= 0 && y < size) {
+                    board[y][x] = { color: 'black', x, y, id: `setup-b-${x}-${y}` };
+                }
+            });
+        }
+        const awMatch = sgf.match(/AW((?:\[[a-z]{2}\])+)/);
+        if (awMatch) {
+            const coords = awMatch[1].match(/\[([a-z]{2})\]/g);
+            coords?.forEach(c => {
+                const s = c.replace(/[\[\]]/g, '');
+                const x = s.charCodeAt(0) - 97;
+                const y = s.charCodeAt(1) - 97;
+                if (x >= 0 && x < size && y >= 0 && y < size) {
+                    board[y][x] = { color: 'white', x, y, id: `setup-w-${x}-${y}` };
+                }
+            });
+        }
+
+        // 3. Moves Main Loop
+        // Regex to find ;B[...] or ;W[...]
+        // Global regex to iterate
+        const moveRegex = /;([BW])\[([a-z]{0,2})\]/g;
+        let match;
+        
+        while ((match = moveRegex.exec(sgf)) !== null) {
+            const colorCode = match[1]; // B or W
+            const coordStr = match[2]; // aa or empty
+            const player = colorCode === 'B' ? 'black' : 'white';
+            
+            // Sync current player if SGF implicitly sets turn
+            // But usually SGF just lists moves. We trust the file order.
+            
+            if (!coordStr || coordStr === "" || coordStr === "tt" && size <= 19) {
+                // PASS
+                // Push history check
+                 history.push({ 
+                    board: board, // Ref to state BEFORE pass? No, history stores state AFTER move? 
+                    // CuteGo history stores state AFTER move. So if Pass, board doesn't change.
+                    // But we must store exact same board ref if we want to detect pass later?
+                    currentPlayer: player, 
+                    lastMove: null,
+                    blackCaptures, whiteCaptures, consecutivePasses: consectivePasses + 1 
+                });
+                consectivePasses++;
+                currentPlayer = player === 'black' ? 'white' : 'black';
+                continue;
+            }
+
+            const x = coordStr.charCodeAt(0) - 97;
+            const y = coordStr.charCodeAt(1) - 97;
+
+            // Execute Move
+            if (x >= 0 && x < size && y >= 0 && y < size) {
+                const result = attemptMove(board, x, y, player, 'Go'); // Assuming Go for SGF
+                if (result) {
+                    board = result.newBoard;
+                    if (player === 'black') blackCaptures += result.captured;
+                    else whiteCaptures += result.captured;
+                    
+                    history.push({
+                        board: board,
+                        currentPlayer: player,
+                        lastMove: {x, y},
+                        blackCaptures, whiteCaptures, consecutivePasses: 0
+                    });
+                    consectivePasses = 0;
+                    currentPlayer = player === 'black' ? 'white' : 'black';
+                }
+            }
+        }
+
+        return {
+            board,
+            currentPlayer,
+            gameType: 'Go', // SGF is usually Go
+            boardSize: size as BoardSize,
+            blackCaptures,
+            whiteCaptures,
+            history,
+            komi
+        };
+
+    } catch (e) {
+        console.error("SGF Parse Failed", e);
+        return null;
+    }
+};
