@@ -15,7 +15,7 @@ export const useAppSettings = () => {
   const [boardSize, setBoardSize] = useState<BoardSize>(() => loadState('boardSize', 9));
   const [gameType, setGameType] = useState<GameType>(() => loadState('gameType', 'Go'));
   const [gameMode, setGameMode] = useState<GameMode>(() => loadState('gameMode', 'PvP'));
-  const [difficulty, setDifficulty] = useState<ExtendedDifficulty>(() => loadState('difficulty', 'Medium'));
+  const [difficulty, setDifficulty] = useState<ExtendedDifficulty>(() => loadState('difficulty', '1d'));
   
   // 思考量状态 (默认 5)
   const [maxVisits, setMaxVisits] = useState<number>(() => loadState('maxVisits', 5));

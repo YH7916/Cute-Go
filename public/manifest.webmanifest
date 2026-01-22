@@ -1,0 +1,22 @@
+{
+  "name": "Cute-Go",
+  "short_name": "Cute-Go",
+  "description": "A cute Go game application",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7e7ce",
+  "theme_color": "#f7e7ce",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

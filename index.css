@@ -2,4 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 你的其他自定义样式可以写在下面 */
+@font-face {
+  font-family: "GenSenRounded";
+  src: url("/GenSenRounded2PJP-M.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  font-family: "GenSenRounded", sans-serif;
+}
