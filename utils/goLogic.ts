@@ -81,7 +81,7 @@ export const getAllGroups = (board: BoardState): Group[] => {
   return groups;
 };
 
-const hashBoard = (board: BoardState): string => {
+export const getBoardHash = (board: BoardState): string => {
     // 字符串拼接对于 React Hook 依赖检查是必须的，保持不变
     let str = '';
     for(let y=0; y<board.length; y++) {
@@ -167,7 +167,7 @@ export const attemptMove = (
   if (myGroup && myGroup.liberties === 0 && capturedCount === 0) return null; 
 
   if (previousBoardStateHash) {
-      const currentHash = hashBoard(safeBoard);
+      const currentHash = getBoardHash(safeBoard);
       if (currentHash === previousBoardStateHash) return null; // 简单的劫争检查
   }
 

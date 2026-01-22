@@ -12,7 +12,8 @@ import {
   serializeGame,
   deserializeGame, 
   generateSGF,
-  parseSGF
+  parseSGF,
+  getBoardHash
 } from './utils/goLogic';
 import { getAIConfig } from './utils/aiConfig';
 import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown } from 'lucide-react';
@@ -545,7 +546,10 @@ const App: React.FC = () => {
                           }
                           // Pass history logic for AI
                           let prevHash = null;
-                          if (gameState.history && gameState.history.length > 0) prevHash = getBoardHash(gameState.history[gameState.history.length - 1].board); // For AI internal check
+                          const currentHistory = gameState.historyRef.current;
+                          if (currentHistory && currentHistory.length > 0) {
+                              prevHash = getBoardHash(currentHistory[currentHistory.length - 1].board);
+                          }
 
                           const move = getAIMove(currentRealBoard, aiColor, settings.gameType, settings.difficulty, prevHash);
                           setIsThinking(false);
