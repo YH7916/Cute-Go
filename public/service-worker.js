@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cute-go-v1';
+const CACHE_NAME = 'cute-go-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -12,12 +12,37 @@ self.addEventListener('install', (event) => {
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
+  const { request } = event;
+
+  // HTML 文档使用网络优先，避免缓存旧 index.html
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // 其它静态资源缓存优先
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    caches.match(request).then((response) => {
+      if (response) return response;
+      return fetch(request).then((networkResponse) => {
+        if (networkResponse && networkResponse.ok) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
+        return networkResponse;
+      });
     })
   );
 });
@@ -34,4 +59,5 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.clients.claim();
 });
