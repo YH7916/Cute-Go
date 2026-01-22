@@ -515,9 +515,11 @@ const App: React.FC = () => {
         if (gameState.appMode !== 'playing' || gameState.gameOver || showPassModal || settings.gameMode !== 'PvAI') return;
         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
         
-        if (gameState.currentPlayer === aiColor) {
+      if (gameState.currentPlayer === aiColor) {
           if (aiTurnLock.current) return;
-          const shouldUseHighLevelAI = settings.gameType === 'Go' && (settings.difficulty === 'Hard' || isElectronAvailable); 
+          // [Fix] Correctly check if we should use the Neural Network (WebAI or Electron)
+          const aiConfig = getAIConfig(settings.difficulty);
+          const shouldUseHighLevelAI = settings.gameType === 'Go' && (aiConfig.useModel || isElectronAvailable); 
     
           if (shouldUseHighLevelAI) {
               if (!aiTurnLock.current) {
@@ -526,7 +528,10 @@ const App: React.FC = () => {
                       if (isElectronAvailable) {
                           electronAiEngine.requestAiMove(aiColor, settings.difficulty, settings.maxVisits, getResignThreshold(settings.difficulty));
                       } else {
-                          webAiEngine.requestWebAiMove(gameState.boardRef.current, aiColor, gameState.history);
+                          // Web AI Request
+                          const simulations = aiConfig.simulations;
+                          console.log(`[App] Requesting WebAI move. Difficulty: ${settings.difficulty}, Sims: ${simulations}`);
+                          webAiEngine.requestWebAiMove(gameState.boardRef.current, aiColor, gameState.historyRef.current, simulations);
                       }
                   }, 100);
               }

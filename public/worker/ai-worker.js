@@ -298,6 +298,17 @@ async function loadModel(modelPath) {
         const path = modelPath || 'models/model.json';
         console.log("[Worker] Loading model from:", path);
         
+        // [Fix] Ensure Backend is ready (Try WebGL, fallback to CPU if needed)
+        try {
+            await tf.setBackend('webgl');
+            await tf.ready();
+            console.log(`[Worker] TFJS Backend: ${tf.getBackend()}`);
+        } catch(e) {
+            console.warn("[Worker] WebGL failed, falling back to cpu", e);
+            await tf.setBackend('cpu');
+            await tf.ready();
+        }
+
         // 使用传入的动态路径加载
         model = await tf.loadGraphModel(path);
 
@@ -476,11 +487,19 @@ async function expandNode(node, board, history, color) {
     try {
         // [Fix] Revert to 3D Input: [Batch, 361, Channels]
         // The model meta-data explicitly requires [-1, 361, 22].
-        const inputX = tf.tensor(features, [1, MODEL_SIZE * MODEL_SIZE, INPUT_CHANNELS]);
-        const inputG = tf.tensor(globalInput, [1, 19]);
+        // Debug Log
+        console.log(`[Worker] Preparing Input Tensors. Features length: ${features.length}`);
+        
+        const inputX = tf.tensor(features, [1, MODEL_SIZE * MODEL_SIZE, INPUT_CHANNELS], 'float32');
+        const inputG = tf.tensor(globalInput, [1, 19], 'float32');
+        
+        console.log(`[Worker] Input tensor shapes: X=${inputX.shape}, G=${inputG.shape}`);
+        console.log(`[Worker] Executing Model...`);
+
         const results = await model.executeAsync({
             "swa_model/bin_inputs": inputX, "swa_model/global_inputs": inputG
         });
+        console.log(`[Worker] Model Execution Complete.`);
         const rawPolicy = Array.isArray(results) ? results[1] : results;
         const rawValue = Array.isArray(results) ? results[2] : results;
         const policyProbs = tf.softmax(rawPolicy); 
