@@ -827,13 +827,11 @@ export const getAIMove = (
       let depth = 2;
       
       if (safeDifficulty === 'Easy') {
-          depth = 2; 
-          // Easy: Reduced depth, slightly less aggressive evaluation weights?
-          // No, kept deterministic but shallow.
+          depth = 2; // Fast
       } else if (safeDifficulty === 'Medium') {
-          depth = 4;
+          depth = 3; // Balanced
       } else if (safeDifficulty === 'Hard') {
-          depth = 6; 
+          depth = 4; // Deep enough for 99% of casual games, vastly faster than 6
       }
       
       let bestMove: Point | null = null;
@@ -856,7 +854,11 @@ export const getAIMove = (
           score: getGomokuScore(board, pt.x, pt.y, player, opColor, true)
       })).sort((a,b) => b.score - a.score);
       
-      const searchCount = safeDifficulty === 'Hard' ? 12 : 8;
+      // Adaptive beam width
+      let searchCount = 4;
+      if (safeDifficulty === 'Medium') searchCount = 6;
+      if (safeDifficulty === 'Hard') searchCount = 8;
+
       const topMoves = scoredCandidates.slice(0, searchCount).map(s => s.pt);
       
       // Easy Mode Special Behavior: deterministically suboptimal?
