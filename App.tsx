@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameBoard } from './components/GameBoard';
 import { BoardSize, Player, GameMode, GameType } from './types';
 import { createBoard, attemptMove, getAIMove, checkGomokuWin, calculateScore, calculateWinRate, serializeGame, deserializeGame } from './utils/goLogic';
+import { getAIConfig } from './utils/aiConfig';
 import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown } from 'lucide-react';
 
 // Hooks
@@ -161,7 +162,7 @@ const App: React.FC = () => {
         onAiPass: () => handlePass(false),
         onAiResign: () => endGame(settings.userColor, 'AI 认为胜率过低，投子认输')
     });
-    const { isWorkerReady, isThinking: isWebThinking, aiWinRate: webWinRate, stopThinking: stopWebThinking } = webAiEngine;
+    const { isWorkerReady, isThinking: isWebThinking, aiWinRate: webWinRate, stopThinking: stopWebThinking, requestWebAiMove } = webAiEngine;
 
     const [isFirstRun] = useState(() => !localStorage.getItem('has_run_ai_before'));
     const showThinkingStatus = isThinking || isElectronThinking || isWebThinking;
@@ -270,7 +271,25 @@ const App: React.FC = () => {
         const currentType = gameTypeRef.current;
         
         let prevHash = null;
-        if (gameState.history && gameState.history.length > 0) prevHash = getBoardHash(gameState.history[gameState.history.length - 1].board);
+        // Ko Rule Fix: We must check against the state *before* the opponent's last move.
+        // History contains: [Move1, Move2, ... MoveN(Opponent)].
+        // We are making Move N+1. State after our move cannot be same as State after Move N-1.
+        // So we check history[length - 1].
+        // Wait, array is 0-indexed. length is N. last is index N-1. 
+        // We want index N-2. 
+        if (gameState.history && gameState.history.length >= 1) {
+             // For standard Ko (retake immediately), checking N-1 (previous state) is redundant (impossible to encompass same space).
+             // But actually, checking against 'current board' is useless.
+             // We need to check against the board state 'before the last move resulted in current state'. 
+             // Yes, history[len - 2].
+             // If history has 1 element (Open -> B1), White moves. len=1. index -1 is invalid.
+             // If history has 2 elements (B1 -> W1), Black moves. 
+             // If Black captures and causes Ko, board looks like B1.
+             // B1 is history[0]. length=2. We want index 0 -> len-2.
+             if (gameState.history.length >= 2) {
+                 prevHash = getBoardHash(gameState.history[gameState.history.length - 2].board);
+             }
+        }
         
         const result = attemptMove(currentBoard, x, y, activePlayer, currentType, prevHash);
         
@@ -332,6 +351,13 @@ const App: React.FC = () => {
     const handlePass = useCallback((isRemote: boolean = false) => {
         if (gameState.gameOver) return;
         vibrate(10);
+        
+        // Fix: Reset AI state if it passed
+        if (isRemote) {
+            aiTurnLock.current = false;
+            setIsThinking(false);
+        }
+
         if (!isRemote) gameState.setHistory(prev => [...prev, { board: gameState.boardRef.current, currentPlayer: gameState.currentPlayerRef.current, blackCaptures: gameState.blackCaptures, whiteCaptures: gameState.whiteCaptures, lastMove: gameState.lastMove, consecutivePasses: gameState.consecutivePasses }]);
         
         if (onlineStatusRef.current === 'connected' && !isRemote) { 
@@ -340,14 +366,20 @@ const App: React.FC = () => {
         }
 
         const isUserPassInPvAI = !isRemote && settings.gameMode === 'PvAI' && settings.gameType === 'Go' && gameState.currentPlayerRef.current === settings.userColor;
-        
-        if (isUserPassInPvAI) {
+        const isAIPassInPvAI = !isRemote && settings.gameMode === 'PvAI' && settings.gameType === 'Go' && gameState.currentPlayerRef.current !== settings.userColor;
+
+        if (isUserPassInPvAI || isAIPassInPvAI) {
             if (isElectronAvailable && isElectronThinking) electronAiEngine.stopThinking();
             setIsThinking(false);
+            // 确保 AI 锁被释放
+            aiTurnLock.current = false;
+
             const score = calculateScore(gameState.boardRef.current);
             gameState.setFinalScore(score);
             setShowPassModal(false);
-            gameState.setConsecutivePasses(2);
+            gameState.setConsecutivePasses(2); // 视为双停
+            
+            // AI Pass or User Pass -> Immediate Settlement
             if (score.black > score.white) endGame('black', `比分: 黑 ${score.black} - 白 ${score.white}`);
             else endGame('white', `比分: 白 ${score.white} - 黑 ${score.black}`);
             return;
@@ -376,25 +408,35 @@ const App: React.FC = () => {
     }, [gameState.gameOver, settings.gameMode, settings.gameType, gameState.consecutivePasses, settings.userColor, isElectronAvailable, isElectronThinking]);
 
     const handleUndo = () => {
-        if (gameState.history.length === 0 || isThinking || gameState.gameOver || onlineStatus === 'connected') return;
-        vibrate(10);
-        let stepsToUndo = 1;
-        if (settings.gameMode === 'PvAI' && settings.userColor === gameState.currentPlayer && gameState.history.length >= 2) stepsToUndo = 2; 
-        else if (settings.gameMode === 'PvAI' && settings.userColor !== gameState.currentPlayer && gameState.history.length >= 1) stepsToUndo = 1;
+         if (gameState.history.length === 0 || isThinking || gameState.gameOver || onlineStatus === 'connected') return;
+         vibrate(10);
+         let stepsToUndo = 1;
+         if (settings.gameMode === 'PvAI' && settings.userColor === gameState.currentPlayer && gameState.history.length >= 2) stepsToUndo = 2; 
+         else if (settings.gameMode === 'PvAI' && settings.userColor !== gameState.currentPlayer && gameState.history.length >= 1) stepsToUndo = 1;
+ 
+         const prev = gameState.history[gameState.history.length - stepsToUndo];
+         gameState.setBoard(prev.board); 
+         gameState.setCurrentPlayer(prev.currentPlayer); 
+         gameState.setBlackCaptures(prev.blackCaptures); 
+         gameState.setWhiteCaptures(prev.whiteCaptures); 
+         gameState.setLastMove(prev.lastMove); 
+         gameState.setConsecutivePasses(prev.consecutivePasses); 
+         gameState.setPassNotificationDismissed(false); 
+         // Reset AI Lock on Undo
+         aiTurnLock.current = false;
+         setIsThinking(false);
+         if (aiTimerRef.current) { clearTimeout(aiTimerRef.current); aiTimerRef.current = null; }
 
-        const prev = gameState.history[gameState.history.length - stepsToUndo];
-        gameState.setBoard(prev.board); 
-        gameState.setCurrentPlayer(prev.currentPlayer); 
-        gameState.setBlackCaptures(prev.blackCaptures); 
-        gameState.setWhiteCaptures(prev.whiteCaptures); 
-        gameState.setLastMove(prev.lastMove); 
-        gameState.setConsecutivePasses(prev.consecutivePasses); 
-        gameState.setPassNotificationDismissed(false); 
-        gameState.setHistory(prevHistory => prevHistory.slice(0, prevHistory.length - stepsToUndo));
+         gameState.setHistory(prevHistory => prevHistory.slice(0, prevHistory.length - stepsToUndo));
     };
 
     const endGame = async (winnerColor: Player, reason: string) => { 
         gameState.setGameOver(true);
+        // Ensure to unlock AI just in case
+        aiTurnLock.current = false;
+        setIsThinking(false);
+        if (aiTimerRef.current) { clearTimeout(aiTimerRef.current); aiTimerRef.current = null; }
+
         gameState.setWinner(winnerColor);
         gameState.setWinReason(reason);
         vibrate([50, 50, 50, 50]);
@@ -480,31 +522,71 @@ const App: React.FC = () => {
                   aiTimerRef.current = setTimeout(() => {
                       try {
                           const currentRealBoard = gameState.boardRef.current;
+                          // If remote/user moved before AI could, abort
                           if (gameState.currentPlayerRef.current !== aiColor) {
                               setIsThinking(false); aiTurnLock.current = false; return;
                           }
+                          // Pass history logic for AI
                           let prevHash = null;
-                          if (gameState.history && gameState.history.length > 0) prevHash = getBoardHash(gameState.history[gameState.history.length - 1].board);
+                          if (gameState.history && gameState.history.length > 0) prevHash = getBoardHash(gameState.history[gameState.history.length - 1].board); // For AI internal check
+
                           const move = getAIMove(currentRealBoard, aiColor, settings.gameType, settings.difficulty, prevHash);
                           setIsThinking(false);
+                          
                           if (move === 'RESIGN') endGame(settings.userColor, 'AI 认为差距过大，投子认输');
                           else if (move) executeMove(move.x, move.y, false);
-                          else handlePass(false);
+                          else handlePass(false); // AI Passes
                       } catch (error: any) {
                           console.error("AI Error:", error);
                           setIsThinking(false);
                           setToastMsg(`AI 出错: ${error?.message || '未知错误'}`);
                           setTimeout(() => setToastMsg(null), 5000);
                       } finally {
+                          if (gameState.currentPlayerRef.current === aiColor && !gameState.gameOver) {
+                               // If AI move failed or finished, unlock.
+                               // Note: executeMove unlocks logic by switching player, but we ensure it here.
+                               // Actually executeMove switches player, so the useEffect dependency 'currentPlayer' will change, 
+                               // triggering this effect again (but failing the if check), which is correct.
+                               // However, if AI passed (handlePass), we need to ensure lock is freed.
+                          }
                           aiTurnLock.current = false; aiTimerRef.current = null;
                       }
                   }, 500); 
               }
           }
         } else {
+            // User turn, ensure lock is free
             if (gameState.currentPlayer === settings.userColor) aiTurnLock.current = false;
         }
     }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable]);
+
+    // --- Web AI Turn (Worker) ---
+    useEffect(() => {
+        if (gameState.appMode !== 'playing' || gameState.gameOver || showPassModal || settings.gameMode !== 'PvAI') return;
+        const aiColor = settings.userColor === 'black' ? 'white' : 'black';
+
+        if (gameState.currentPlayer === aiColor && !isElectronAvailable && isWorkerReady && !isThinking) {
+            if (aiTurnLock.current) return; // Prevent re-triggering
+
+            const aiConfig = getAIConfig(settings.difficulty);
+            
+            if (aiConfig.useModel) {
+                // High Rank: Use Web Worker
+                aiTurnLock.current = true;
+                setIsThinking(true);
+                requestWebAiMove(
+                    gameState.boardRef.current, 
+                    gameState.currentPlayerRef.current, 
+                    gameState.historyRef.current,
+                    aiConfig.simulations
+                );
+            } else {
+                // Low Rank: Logic handled by the "Computer Move" effect below
+                // (which calls getAIMove directly)
+            }
+        }
+    }, [gameState.currentPlayer, settings.gameMode, isElectronAvailable, isWorkerReady, isThinking, requestWebAiMove, settings.difficulty, showPassModal, gameState.appMode, settings.userColor, gameState.gameOver]);
+
 
     // --- Online Logic (Simplified & kept in App) ---
     // (Moving full online logic to separate file would be ideal but referencing refs and state setters is tricky)
@@ -825,7 +907,12 @@ const App: React.FC = () => {
                    consecutivePasses={gameState.consecutivePasses} 
                    gameOver={gameState.gameOver} 
                    passNotificationDismissed={gameState.passNotificationDismissed}
-                   onDismiss={() => gameState.setPassNotificationDismissed(true)}
+                   onDismiss={() => {
+                       gameState.setPassNotificationDismissed(true);
+                       // Force unlock state in case AI logic didn't clear it correctly
+                       setIsThinking(false);
+                       aiTurnLock.current = false;
+                   }}
                    onPass={() => handlePass(false)}
                />
            </div>
@@ -838,7 +925,7 @@ const App: React.FC = () => {
                         {gameState.appMode === 'setup' ? '电子挂盘' : gameState.appMode === 'review' ? '复盘模式' : (settings.gameType === 'Go' ? '围棋' : '五子棋')}
                         {gameState.appMode === 'playing' && (
                             <span className="text-[10px] font-bold text-[#8c6b38] bg-[#e3c086]/30 px-2 py-1 rounded-full border border-[#e3c086]">
-                                {settings.boardSize}路 • {settings.gameMode === 'PvP' ? '双人' : (settings.difficulty === 'Hard' ? '困难' : settings.difficulty === 'Medium' ? '中等' : '简单')} • {onlineStatus === 'connected' ? '在线' : (settings.gameMode === 'PvAI' ? '人机' : '本地')}
+                                {settings.boardSize}路 • {settings.gameMode === 'PvP' ? '双人' : settings.difficulty} • {onlineStatus === 'connected' ? '在线' : (settings.gameMode === 'PvAI' ? '人机' : '本地')}
                             </span>
                         )}
                         {onlineStatus === 'connected' && (

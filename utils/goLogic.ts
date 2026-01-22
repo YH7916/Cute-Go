@@ -1,4 +1,5 @@
 import { BoardState, Player, Point, Stone, Group, BoardSize, Difficulty, GameType } from '../types';
+import { getAIConfig } from './aiConfig';
 
 // --- 基础工具函数 ---
 export const createBoard = (size: number): BoardState => {
@@ -244,13 +245,77 @@ export const calculateScore = (board: BoardState): { black: number, white: numbe
   return { black: blackScore, white: whiteScore };
 };
 
+// [优化] 计算启发式分数（不仅看地盘，还看棋子安全性与潜力）
+const calculateHeuristicScore = (board: BoardState): { black: number, white: number } => {
+    const size = board.length;
+    let blackScore = 0, whiteScore = 0;
+    const visited = new Set<number>();
+    const allGroups = getAllGroups(board);
+
+    // 1. 基础地盘分（Territory）
+    const territoryScore = calculateScore(board);
+    blackScore += territoryScore.black;
+    whiteScore += territoryScore.white;
+
+    // 2. 棋子安全性修正 (Group Safety)
+    allGroups.forEach(group => {
+        const isBlack = group.stones[0].color === 'black';
+        const numStones = group.stones.length;
+        
+        // 惩罚：气太少（不稳定）
+        if (group.liberties === 1) {
+            // 极度危险，可以说是死棋（除非是打劫或杀气，这里做静态悲观估计）
+            // 扣除掉这些子的价值，甚至倒扣
+            if (isBlack) blackScore -= numStones * 1.5; 
+            else whiteScore -= numStones * 1.5;
+        } else if (group.liberties === 2) {
+            // 危险
+            if (isBlack) blackScore -= numStones * 0.5;
+            else whiteScore -= numStones * 0.5;
+        } else if (group.liberties >= 5) {
+            // 奖励：气长（厚势）
+            if (isBlack) blackScore += 2;
+            else whiteScore += 2;
+        }
+
+        // 3. 影响力修正 (Influence - 仅在开局/中局有效)
+        // 鼓励占据星位和天元附近
+        group.stones.forEach(s => {
+             const distToCenter = Math.abs(s.x - size / 2) + Math.abs(s.y - size / 2);
+             const normalizedDist = distToCenter / (size / 2); // 0 (center) ~ 1 (edge)
+             
+             // 中心区域（影响力）加分，但在边缘（实地）通常已经被 territoryScore 算进去了
+             // 所以这里只给中间的子一点“潜力分”
+             if (normalizedDist < 0.6) {
+                 if (isBlack) blackScore += 0.2;
+                 else whiteScore += 0.2;
+             }
+        });
+    });
+
+    return { black: blackScore, white: whiteScore };
+};
+
 export const calculateWinRate = (board: BoardState): number => {
     let stoneCount = 0;
-    for(let y=0; y<board.length; y++) for(let x=0; x<board.length; x++) if (board[y][x]) stoneCount++;
-    if (stoneCount < 10) return 50;
-    const score = calculateScore(board);
-    const diff = score.black - score.white; 
-    const k = 0.12; 
+    const size = board.length;
+    const totalPoints = size * size;
+    for(let y=0; y<size; y++) for(let x=0; x<size; x++) if (board[y][x]) stoneCount++;
+    
+    // 开局阶段（小于5%手），不确定性极大，强制接近 50%
+    // if (stoneCount < totalPoints * 0.05) return 50; // Removed hard limit to allow subtle heuristics to show
+
+    const fillRatio = stoneCount / totalPoints;
+    const heuristic = calculateHeuristicScore(board);
+    const diff = heuristic.black - heuristic.white; 
+
+    // K 值动态调整：
+    // 开局 (fill=0.1) -> k 小 (0.08) -> 分数差距对胜率影响小（还早）
+    // 终局 (fill=0.9) -> k 大 (0.25) -> 分数差距即使小，胜率也倾斜大（基本定型）
+    const baseK = 0.08;
+    const endK = 0.35;
+    const k = baseK + (endK - baseK) * (fillRatio * fillRatio); // 平方曲线，中盘才开始变陡
+
     return (1 / (1 + Math.exp(-k * diff))) * 100;
 };
 
@@ -575,6 +640,16 @@ export const getAIMove = (
   const size = board.length;
   const opponent = player === 'black' ? 'white' : 'black';
 
+  // Use new config system
+  const config = getAIConfig(difficulty);
+  
+  // If rank is high enough (e.g. 9k+), we prefer WebAI (handled by App.tsx logic).
+  // But if App.tsx calls this function, it means WebAI is unavailable OR rank is low (Local).
+  // If we are here, we are running Local JS Logic.
+  
+  // Apply randomness based on rank
+  const randomFactor = config.randomness; // 0.8 for 18k, 0.05 for 9k
+
   // === 五子棋 AI ===
   if (gameType === 'Gomoku') {
     const candidates = getCandidateMoves(board, size);
@@ -643,6 +718,27 @@ export const getAIMove = (
   const possibleMoves: { x: number; y: number; score: number }[] = [];
   const candidates = getCandidateMoves(board, size, 2); 
 
+  // Resign Check:
+  // If we have played enough moves (>30% of board) and we are losing by HUGE margin, resign.
+  // Using calculateWinRate for this check.
+  const winRate = calculateWinRate(board);
+  const totalSpots = size * size;
+  let stoneCount = 0;
+  for(let r=0; r<size; r++) for(let c=0; c<size; c++) if(board[r][c]) stoneCount++;
+  
+  if (difficulty !== 'Easy' && stoneCount > totalSpots * 0.3) {
+      // 检查当前的比分差距
+      const heuristic = calculateHeuristicScore(board);
+      const isBlack = player === 'black'; // AI color
+      const scoreDiff = isBlack ? (heuristic.black - heuristic.white) : (heuristic.white - heuristic.black);
+      
+      // 如果落后超过 35 目，且棋盘比较满，投降
+      // 或者如果落后超过 50 目，直接投降
+      if (scoreDiff < -50 || (scoreDiff < -35 && stoneCount > totalSpots * 0.6)) {
+          return 'RESIGN';
+      }
+  }
+
   for (const move of candidates) {
     const { x, y } = move;
     
@@ -659,81 +755,82 @@ export const getAIMove = (
 
     // --- 基础评估 (Level 0) ---
     // A. 吃子
-    if (sim.captured > 0) score += 2000 + sim.captured * 100;
+    if (sim.captured > 0) score += 2000 + sim.captured * 150;
     
-    // B. 叫吃检测 (Atari)
+    // B. 叫吃检测 (Atari) - 提升权重
     const neighbors = getNeighbors({x, y}, size);
     neighbors.forEach(n => {
        const stone = board[n.y][n.x];
        if (stone && stone.color === opponent) {
            const enemyGroup = getGroup(sim.newBoard, n);
-           if (enemyGroup && enemyGroup.liberties === 1) score += 300; // 制造叫吃
+           if (enemyGroup && enemyGroup.liberties === 1) score += 800; // 制造叫吃 (was 300) -> Aggression Up
        }
     });
 
-    // C. 自身安全 (Safety)
+    // C. 自身安全 (Safety) - 提升权重
     if (myNewGroup) {
-        if (myNewGroup.liberties === 1) score -= 500; // 除非为了吃子，否则别把自己填死
-        if (myNewGroup.liberties >= 3) score += 50;   // 长气
+        if (myNewGroup.liberties === 1) score -= 800; // 除非为了吃子，否则极力避免被叫吃
+        if (myNewGroup.liberties >= 3) score += 100;   // 长气
     }
 
     // D. 棋形 (Shape)
-    score += evaluateShape(board, x, y, player);
+    score += evaluateShape(board, x, y, player) * 2; // 提升棋形权重 (Cut, Tiger)
     score += evaluatePositionStrength(x, y, size);
 
-    // --- 进阶评估 (Level 1: Opponent Response) for Hard Mode ---
-    // 如果是 Hard 模式，模拟对手的最佳应对
-    if (difficulty === 'Hard') {
-       // 这是一个简单的“极大极小”的一层半：我走一步，看对手最好的一步会让我的局面变得多差
-       // 我们只需要看局部响应 (例如周围 2 格)
+    // --- 进阶评估 (Level 1: Opponent Response) ---
+    // 现在 Medium 和 Hard 都启用这一层，增加计算深度
+    if (difficulty === 'Hard' || difficulty === 'Medium') {
        const localResponses = getCandidateMoves(sim.newBoard, size, 2); 
-       let minOpponentOutcome = 0; // 对手造成的最大破坏（负分）
-
-       // 我们只采样对手最好的 3 步棋（为了性能）
-       // 如何知道哪步最好？简单扫一遍打分
+       let minOpponentOutcome = 0; 
        let bestOpponentMoves = [];
        for (const opMove of localResponses) {
-           // 简单防守检查：是否在真眼中（我们不应该让对手填我们的眼，除非是假眼）
-           // 这里 board 是 sim.newBoard
            if (sim.newBoard[opMove.y][opMove.x]) continue; 
-
            const opSim = attemptMove(sim.newBoard, opMove.x, opMove.y, opponent, 'Go', null);
            if (!opSim) continue;
            
-           // 评估对手这步棋的价值
            let opScore = 0;
-           if (opSim.captured > 0) opScore += 5000; // 对手能反提我！绝路！
-           
-           // 检查对手是否叫吃我
+           if (opSim.captured > 0) opScore += 5000; 
            const opNewGroup = getGroup(opSim.newBoard, {x: opMove.x, y: opMove.y});
-           const myGroupAfterOpStr = getGroup(opSim.newBoard, {x, y}); // 我刚下的子的 group
-           if (myGroupAfterOpStr && myGroupAfterOpStr.liberties === 1) opScore += 1000; // 我被叫吃了
+           const myGroupAfterOpStr = getGroup(opSim.newBoard, {x, y});
+           if (myGroupAfterOpStr && myGroupAfterOpStr.liberties === 1) opScore += 1200; // 怕被对方叫吃
 
            if (opScore > 50) bestOpponentMoves.push({move: opMove, score: opScore});
        }
 
        bestOpponentMoves.sort((a,b) => b.score - a.score);
-       const topOp = bestOpponentMoves.slice(0, 1); // 只看最狠的一步
-       
+       const topOp = bestOpponentMoves.slice(0, 1);
        if (topOp.length > 0) {
-           score -= topOp[0].score; // 减去对手造成的破坏
+           score -= topOp[0].score; 
        }
     }
 
-    // E. 随机扰动
-    if (difficulty === 'Easy') score += Math.random() * 300;
-    else if (difficulty === 'Medium') score += Math.random() * 50;
+    // E. 随机扰动 (大幅降低)
+    if (difficulty === 'Easy') score += Math.random() * 150; // was 300
+    // Medium 不再加随机扰动，或者加极少
+    else if (difficulty === 'Medium') score += Math.random() * 20;
 
     possibleMoves.push({ x, y, score });
   }
 
   possibleMoves.sort((a, b) => b.score - a.score);
+  
   if (possibleMoves.length === 0) return null;
+  const bestMove = possibleMoves[0];
+
+  // Pass Logic Check:
+  // 如果最佳的一步棋分数很低（负分或极低分），说明没棋下了，不如停着
+  // 但为了防止过早停着，我们要求这种状态至少持续几步，或者分数非常低
+  // 简单判定：如果最佳得分 <= 0 且此时不是终局打劫状态，则停着
+  // [Fix] 提高停着门槛：棋盘满了 60% 后才考虑停着，防止中盘突然停着引发强制结算
+  if (bestMove.score <= 0 && stoneCount > size * size * 0.6) {
+       return null; 
+  }
 
   if (difficulty === 'Easy') {
+    // Top 5 random
     const topN = possibleMoves.slice(0, 5);
     return topN[Math.floor(Math.random() * topN.length)];
   }
 
-  return possibleMoves[0];
+  return bestMove;
 };

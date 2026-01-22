@@ -3,6 +3,7 @@ import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, PenT
 import { BoardSize, GameType, GameMode, Player, ExtendedDifficulty } from '../types';
 import { getSliderBackground, getCalculatedVisits } from '../utils/helpers';
 import { sliderToVisits, visitsToSlider } from '../hooks/useKataGo';
+import { RANKS } from '../utils/aiConfig';
 
 export interface GameSettingsData {
     boardSize: BoardSize;
@@ -155,48 +156,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                     )}
 
-                        {/* Difficulty */}
+                    {/* Difficulty (Rank Selection) */}
                     {tempGameMode === 'PvAI' && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                             {/* Difficulty Buttons */}
-                            <div className="grid grid-cols-3 gap-2">
-                                {(['Easy', 'Medium', 'Hard'] as const).map((level) => (
-                                    <button 
-                                        key={level} 
-                                        onClick={() => handleDifficultySelect(level)} 
-                                        className={`btn-retro py-2 rounded-xl font-bold text-sm transition-all ${tempDifficulty === level ? 'bg-[#8c6b38] text-[#fcf6ea] border-[#5c4033]' : 'bg-[#fff] text-[#8c6b38] border-[#e3c086]'}`}
-                                    >
-                                        {level === 'Easy' ? '简单' : level === 'Medium' ? '中等' : '困难'}
-                                    </button>
-                                ))}
+                            <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
+                                <div className="flex justify-between items-center px-1">
+                                    <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
+                                        <Cpu size={16} className="text-[#8c6b38]"/> AI 棋力
+                                    </span>
+                                    <span className="text-xs font-black text-[#fcf6ea] bg-[#8c6b38] px-2 py-0.5 rounded-md shadow-sm">
+                                        {tempDifficulty}
+                                    </span>
+                                </div>
+                                
+                                <div className="relative h-8 flex items-center px-2">
+                                     <input 
+                                        type="range" min="0" max={RANKS.length - 1} step="1"
+                                        value={RANKS.indexOf(tempDifficulty) >= 0 ? RANKS.indexOf(tempDifficulty) : RANKS.indexOf('1d')} 
+                                        onChange={(e) => {
+                                            const rank = RANKS[parseInt(e.target.value)];
+                                            if (rank) setTempDifficulty(rank);
+                                        }}
+                                        className="cute-range w-full"
+                                        style={{ 
+                                            background: getSliderBackground(RANKS.indexOf(tempDifficulty) >= 0 ? RANKS.indexOf(tempDifficulty) : 10, 0, RANKS.length - 1),
+                                            touchAction: 'none'
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex justify-between px-1">
+                                    <span className="text-[10px] text-[#8c6b38]/60 font-medium">18k</span>
+                                    <span className="text-[10px] text-[#8c6b38]/60 font-medium">1d</span>
+                                    <span className="text-[10px] text-[#8c6b38]/60 font-medium">9d</span>
+                                </div>
                             </div>
 
-                            {/* Thinking Visits Slider (Only for PC Go) */}
+                            {/* Thinking Visits Slider (Only for PC Go & High Rank) */}
                             {isElectronAvailable && tempGameType === 'Go' && (
-                                <div className="bg-[#fff]/50 p-2 rounded-xl border border-[#e3c086] flex flex-col gap-2">
+                                <div className="bg-[#fff]/50 p-2 rounded-xl border border-[#e3c086] flex flex-col gap-2 opacity-60 pointer-events-none grayscale">
                                     <div className="flex justify-between items-center px-1">
                                         <span className="text-xs font-bold text-[#5c4033] flex items-center gap-1">
-                                            <Cpu size={14} className="text-[#8c6b38]"/> 思考量
-                                        </span>
-                                        <span className="text-[10px] font-black text-[#fcf6ea] bg-[#8c6b38] px-1.5 py-0.5 rounded shadow-sm">
-                                            {tempDifficulty === 'Custom' ? `${tempMaxVisits} Visits` : `${getCalculatedVisits(tempDifficulty, tempMaxVisits)} Visits`}
+                                            <Cpu size={14} className="text-[#8c6b38]"/> 思考量 (自动)
                                         </span>
                                     </div>
-                                    <div className="relative h-6 flex items-center px-1">
-                                        <input 
-                                            type="range" min="0" max="100" step="1"
-                                            value={visitsToSlider(tempMaxVisits)} 
-                                            onChange={(e) => handleCustomChange(sliderToVisits(parseInt(e.target.value)))}
-                                            className="cute-range w-full"
-                                            style={{ 
-                                                background: getSliderBackground(visitsToSlider(tempMaxVisits), 0, 100),
-                                                touchAction: 'none'
-                                            }}
-                                        />
-                                    </div>
-                                    {tempDifficulty === 'Custom' && (
-                                        <p className="text-[9px] text-[#8c6b38] text-center font-bold opacity-75">自定义模式</p>
-                                    )}
+                                    {/* Disabled custom limits for simplified Rank system */}
                                 </div>
                             )}
                         </div>

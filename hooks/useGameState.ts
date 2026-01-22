@@ -28,9 +28,11 @@ export const useGameState = (initialBoardSize: BoardSize) => {
   // Refs for State (needed for callbacks/intervals to access fresh state)
   const boardRef = useRef(board);
   const currentPlayerRef = useRef(currentPlayer);
+  const historyRef = useRef(history);
 
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => { currentPlayerRef.current = currentPlayer; }, [currentPlayer]);
+  useEffect(() => { historyRef.current = history; }, [history]);
 
   return {
       board, setBoard,
@@ -48,6 +50,6 @@ export const useGameState = (initialBoardSize: BoardSize) => {
       reviewIndex, setReviewIndex,
       setupTool, setSetupTool,
       history, setHistory,
-      boardRef, currentPlayerRef
+      boardRef, currentPlayerRef, historyRef
   };
 };

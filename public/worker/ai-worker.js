@@ -196,11 +196,84 @@ class MicroBoard {
 // === 2. AI 配置 ===
 const MODEL_SIZE = 19; 
 const INPUT_CHANNELS = 22; 
-const MCTS_SIMULATIONS = 50; 
+// [优化] 模拟次数调整
+// baseSimulations 会从消息中动态获取，这里保留默认值
+const DEFAULT_SIMULATIONS = 45; 
 
 let model = null;
 let isBusy = false;
 let stopRequested = false;
+
+// === 5. 混合启发式评估 (Balanced) ===
+function heuristicEval(board, x, y, color, size, historyLength) {
+    let score = 1.0;
+    const opponent = color === 1 ? 2 : 1;
+    const idx = board.idx(x, y);
+
+    // 1. 战术检查：提子 (Capture)
+    const captured = board.checkCapture(x, y, color);
+    if (captured > 0) {
+        score += 3.0 + captured * 1.0; 
+    }
+
+    // 2. 战术检查：自保 (Safety)
+    const nbs = [idx-1, idx+1, idx-size, idx+size];
+    let savedGroup = false;
+    for(let n of nbs) {
+        if(n>=0 && n<size*size && board.board[n] === color) {
+            if (board.getLibertiesCount(n) === 1) {
+                // 救队友
+                score += 2.0; 
+                savedGroup = true;
+            }
+        }
+    }
+
+    // 3. 战术检查：进攻 (Atari)
+    if (!savedGroup) {
+        for(let n of nbs) {
+            if(n>=0 && n<size*size && board.board[n] === opponent) {
+                const libs = board.getLibertiesCount(n);
+                if (libs === 2) {
+                    score += 1.0; 
+                }
+            }
+        }
+    }
+
+    // 4. 棋形：切断 (Cut)
+    const diags = [idx-size-1, idx-size+1, idx+size-1, idx+size+1];
+    for(let d of diags) {
+        if(d>=0 && d<size*size && board.board[d] === opponent) {
+             score += 0.3;
+        }
+    }
+
+    // 5. 位置评分 (原有逻辑)
+    const center = (size - 1) / 2;
+    const distToCenter = Math.abs(x - center) + Math.abs(y - center);
+
+    // 边缘惩罚 (布局阶段)
+    if (historyLength < 30) {
+        const dX = Math.min(x, size - 1 - x);
+        const dY = Math.min(y, size - 1 - y);
+        const minEdge = Math.min(dX, dY);
+
+        if (minEdge === 0) {
+            score *= 0.1; // 死亡线
+        } else if (minEdge === 1) {
+            const isCorner = (dX === 1 && dY === 1);
+            if (!isCorner) score *= 0.5; // 二路爬
+            else score += 2.0; // 3-3点
+        } else if (minEdge === 2) {
+             score += 1.0; // 3线实地
+        } else {
+            score += (Math.max(0, 4 - distToCenter) * 0.1); // 中腹
+        }
+    }
+    
+    return score;
+}
 
 // === 3. 定式库 ===
 const OPENING_BOOK = {
@@ -227,6 +300,13 @@ async function loadModel(modelPath) {
         
         // 使用传入的动态路径加载
         model = await tf.loadGraphModel(path);
+
+        console.log("[Worker] Model Loaded Successfully!");
+        if (model.inputs) {
+            model.inputs.forEach((inp, i) => {
+                console.log(`[Worker] Model Input ${i}:`, inp.name, inp.shape);
+            });
+        }
         
         postMessage({ type: 'init-complete' });
     } catch (e) {
@@ -309,34 +389,82 @@ function generateTensorInput(microBoard, history, currentPlayer) {
 
 // === 5. 混合启发式评估 ===
 function heuristicEval(board, x, y, color, size, historyLength) {
-    // 1. 战术检查：提子 (Capture)
-    // 这是一个巨大的加分项，保证 AI 只要能吃子，就会去吃
+    let score = 1.0;
+    const opponent = color === 1 ? 2 : 1;
+    const idx = board.idx(x, y);
+
+    // 1. 战术检查：提子 (Capture) - 巨大加分
     const captured = board.checkCapture(x, y, color);
     if (captured > 0) {
-        return 10.0 + captured * 2.0; 
+        score += 10.0 + captured * 2.0; 
     }
 
-    // 2. 位置评分
+    // 2. 战术检查：自保 (Safety / Save Atari)
+    // 检查这步棋是否连接了自己的短气块（1气 -> 多气）
+    const nbs = [idx-1, idx+1, idx-size, idx+size];
+    let savedGroup = false;
+    for(let n of nbs) {
+        if(n>=0 && n<size*size && board.board[n] === color) {
+            // 如果队友只有1气，这一步是“接”
+            if (board.getLibertiesCount(n) === 1) {
+                // 简单的判断：接上后气变多了吗？
+                // 暂时不模拟，默认接上总比不接好，除非接上还是死（那是瞎劫）
+                // 稍微加点分，鼓励就不死的棋
+                score += 5.0; 
+                savedGroup = true;
+            }
+        }
+    }
+
+    // 3. 战术检查：进攻 (Atari)
+    // 检查这步棋是否把对方走到只剩1气
+    // 模拟落子太慢，我们可以只检查邻居做简单预判
+    if (!savedGroup) {
+        for(let n of nbs) {
+            if(n>=0 && n<size*size && board.board[n] === opponent) {
+                // 如果对手有2气，贴上去可能变成1气
+                const libs = board.getLibertiesCount(n);
+                if (libs === 2) {
+                    score += 2.0; // 叫吃加分
+                }
+            }
+        }
+    }
+
+    // 4. 棋形：切断 (Cut)
+    // 检查对角线是否有对方的子，且可能被分断
+    const diags = [idx-size-1, idx-size+1, idx+size-1, idx+size+1];
+    for(let d of diags) {
+        if(d>=0 && d<size*size && board.board[d] === opponent) {
+            // 如果对角是对面，且两侧是空或者我有子，可能是切断点
+            // 简单加一点分，鼓励这种激烈的下法
+            score += 0.5;
+        }
+    }
+
+    // 5. 位置评分 (原有逻辑)
     const center = (size - 1) / 2;
     const distToCenter = Math.abs(x - center) + Math.abs(y - center);
-    let score = 1.0;
 
-    // 3. 边缘惩罚 (布局阶段)
+    // 边缘惩罚 (布局阶段)
     if (historyLength < 30) {
         const dX = Math.min(x, size - 1 - x);
         const dY = Math.min(y, size - 1 - y);
         const minEdge = Math.min(dX, dY);
 
         if (minEdge === 0) {
-            score = 0.01; // 死亡线
+            score *= 0.1; // 死亡线 (Multiply instead of replace)
         } else if (minEdge === 1) {
             const isCorner = (dX === 1 && dY === 1);
-            if (!isCorner) score = 0.4; // 二路爬
-            else score = 1.2; // 3-3点
+            if (!isCorner) score *= 0.5; // 二路爬
+            else score += 2.0; // 3-3点
+        } else if (minEdge === 2) {
+             score += 1.0; // 3线实地
         } else {
             score += (Math.max(0, 4 - distToCenter) * 0.1); // 中腹
         }
     }
+    
     return score;
 }
 
@@ -346,6 +474,8 @@ async function expandNode(node, board, history, color) {
     let policyData, valueData;
     
     try {
+        // [Fix] Revert to 3D Input: [Batch, 361, Channels]
+        // The model meta-data explicitly requires [-1, 361, 22].
         const inputX = tf.tensor(features, [1, MODEL_SIZE * MODEL_SIZE, INPUT_CHANNELS]);
         const inputG = tf.tensor(globalInput, [1, 19]);
         const results = await model.executeAsync({
@@ -359,7 +489,8 @@ async function expandNode(node, board, history, color) {
         inputX.dispose(); inputG.dispose(); policyProbs.dispose();
         if(Array.isArray(results)) results.forEach(r=>r.dispose()); else results.dispose();
     } catch (e) {
-        console.error("Model exec error", e);
+        console.error("CRITICAL: Model Execution Failed!", e);
+        if (model && model.inputs) console.error("Model Expects:", model.inputs.map(i => i.shape));
         return { value: 0, scoreLead: 0 };
     }
 
@@ -418,7 +549,7 @@ function selectChild(node) {
     return best;
 }
 
-async function runMCTS(initialBoard, history, myColor, size) {
+async function runMCTS(initialBoard, history, myColor, size, maxSimulations = DEFAULT_SIMULATIONS) {
     stopRequested = false;
     // 1. 定式与开局逻辑
     if (history.length < 4 && OPENING_BOOK[size]) {
@@ -453,49 +584,163 @@ async function runMCTS(initialBoard, history, myColor, size) {
             if (initialBoard[y][x]) rootBoard.set(x, y, initialBoard[y][x].color === 'black' ? 1 : 2);
         }
     }
+    // [Fix] Ko Rule Initialization
+    // 检测当前是否处于劫争状态：如果上一手只剩一气，且提掉它会回到上上步骤的盘面，则该点为禁着点
+    if (history && history.length > 0) {
+        // history 的最后一项是“对手落子之前的状态”
+        // 不，history 里的最后一项是“我们落子之前的状态”？
+        // App.tsx: push { board: currentBoard }. Then setBoard(new).
+        // 所以 history[last] 保存的是“对手落子前”的盘面 (Pre-Opponent-Move).
+        // 也就是 State(T). 当前是 State(T+1).
+        // 我们需要找出 Opponent 走了哪里。
+        const prevBoardObj = history[history.length - 1]; 
+        const prevBoard = prevBoardObj.board;
+
+        let lastMoveIdx = -1;
+        // 1. 寻找对手最后落子的位置 (Diff)
+        // 遍历当前棋盘，找到一个点：当前有子，但 prevBoard 没子
+        for(let i=0; i<size*size; i++) {
+            const xy = rootBoard.xy(i);
+            const currVal = rootBoard.board[i]; // 1 or 2
+            
+            const pCell = prevBoard[xy.y][xy.x];
+            const prevVal = pCell ? (pCell.color === 'black' ? 1 : 2) : 0;
+
+            if (currVal !== 0 && prevVal === 0) {
+                lastMoveIdx = i;
+                break; // 找到了新增的子（对手的落子）
+            }
+        }
+        
+        if (lastMoveIdx !== -1) {
+             // 2. 检查这颗子是否只有一气
+             if (rootBoard.getLibertiesCount(lastMoveIdx) === 1) {
+                 // 找到那一口气的位置
+                 let koCandidate = -1;
+                 const nbs = [lastMoveIdx-1, lastMoveIdx+1, lastMoveIdx-size, lastMoveIdx+size];
+                 for(let n of nbs) {
+                     if (n >= 0 && n < size*size) {
+                         const nXY = rootBoard.xy(n);
+                         const cXY = rootBoard.xy(lastMoveIdx);
+                         if (Math.abs(nXY.x - cXY.x) + Math.abs(nXY.y - cXY.y) === 1 && rootBoard.board[n] === 0) {
+                              koCandidate = n;
+                              break;
+                         }
+                     }
+                 }
+                 
+                 // 3. 模拟提劫，看是否复原到 prevBoard
+                 if (koCandidate !== -1) {
+                     const sim = rootBoard.clone();
+                     const myColVal = myColor === 'black' ? 1 : 2;
+                     const success = sim.play(sim.xy(koCandidate).x, sim.xy(koCandidate).y, myColVal);
+                     
+                     if (success) {
+                          let isIdentical = true;
+                          for(let y=0; y<size; y++) {
+                              for(let x=0; x<size; x++) {
+                                  const val = sim.get(x, y);
+                                  const pCell = prevBoard[y][x];
+                                  const pVal = pCell ? (pCell.color === 'black' ? 1 : 2) : 0;
+                                  if (val !== pVal) {
+                                      isIdentical = false;
+                                      break;
+                                  }
+                              }
+                              if(!isIdentical) break;
+                          }
+                          
+                          if (isIdentical) {
+                              rootBoard.ko = koCandidate;
+                          }
+                     }
+                 }
+             }
+        }
+    }
+
     const myColorVal = myColor === 'black' ? 1 : 2;
     const root = new MCTSNode(null, null, 0);
 
+    // [Step 1] Initial Expansion (Root)
     const { scoreLead } = await expandNode(root, rootBoard, history, myColorVal);
 
-    for(let i=0; i<MCTS_SIMULATIONS; i++) {
-        if (stopRequested) {
-            return null;
+    // [Step 2] Adaptive MCTS Loop (动态思考)
+    // 基础模拟次数: 20次 (快速响应)
+    // 最大模拟次数: 100次 (复杂局面)
+    // 提前终止条件: 第一名访问量 > 第二名 * 1.5 (胜券在握)
+    
+    const BASE_SIMS = 20;
+    const MAX_SIMS = 100;
+    
+    let simCount = 0;
+
+    // 必须至少跑完 Base Sims
+    while (simCount < MAX_SIMS) {
+        if (stopRequested) return null;
+
+        // 检查是否可以提前结束
+        if (simCount >= BASE_SIMS) {
+            // 找出前两名
+            let first = null, second = null;
+            for(let child of root.children) {
+                 if (!first || child.visits > first.visits) {
+                     second = first;
+                     first = child;
+                 } else if (!second || child.visits > second.visits) {
+                     second = child;
+                 }
+            }
+            
+            // 如果第一名特别稳 (访问量不仅是第二名的两倍，而且 Policy 也很高)
+            if (first && second) {
+                if (first.visits > second.visits * 2.5) break; // 极其自信
+                if (first.visits > second.visits * 1.5 && first.prior > 0.6) break; // 比较自信
+            }
+            // 如果只有一个合法的点，直接停
+            if (first && !second) break;
         }
+
         let node = root;
         let simBoard = rootBoard.clone();
         let currColor = myColorVal;
 
+        // Selection
         while(node.children.length > 0) {
             const nextNode = selectChild(node);
             if (!nextNode) break;
             node = nextNode;
-            
-            // 这里因为 expandNode 已经保证了 candidates 合法，
-            // 理论上这里 play 一定成功，但为了保险，还是保留检查
             const success = simBoard.play(node.move.x, node.move.y, currColor);
             if (!success) { 
-                node.valueSum -= 10000; // 极刑
-                // 并将此节点从父节点移除？太复杂，直接降权即可
+                node.valueSum -= 10000; 
                 break; 
             }
             currColor = currColor === 1 ? 2 : 1;
         }
 
+        // Expansion & Evaluation (Simulate)
+        // Expansion & Evaluation (Simulate)
+        let backVal = 0;
+        let currNodeForBackup = node;
+
         if (node.visits > 0 && node.children.length === 0) {
              const { value } = await expandNode(node, simBoard, [], currColor);
-             let backVal = value;
-             let currNode = node;
-             while(currNode) {
-                 currNode.visits++;
-                 currNode.valueSum += backVal;
+             backVal = value;
+             // Backpropagation
+             while(currNodeForBackup) {
+                 currNodeForBackup.visits++;
+                 currNodeForBackup.valueSum += backVal;
                  backVal = -backVal;
-                 currNode = currNode.parent;
+                 currNodeForBackup = currNodeForBackup.parent;
              }
         } else {
-             let currNode = node;
-             while(currNode) { currNode.visits++; currNode = currNode.parent; }
+             // 这种情况通常是刚创建的 Node，直接反向传播
+             while(currNodeForBackup) { 
+                 currNodeForBackup.visits++; 
+                 currNodeForBackup = currNodeForBackup.parent; 
+             }
         }
+        simCount++;
     }
 
     let bestChild = null;
@@ -522,10 +767,28 @@ async function runMCTS(initialBoard, history, myColor, size) {
 
     if (stopRequested) return null;
     
-    const winRate = (1 / (1 + Math.exp(-0.3 * scoreLead))) * 100;
+    // [Fix] 使用 MCTS 搜索后的最佳分支评分来计算胜率，而不是仅看静态的初始评分
+    // bestChild.valueSum 是从对手视角累积的分数（因为 bestChild 是对手落子后的状态？）
+    // 不，root 是当前盘面。children 是这里产生的一步变化（变为对手回合）。
+    // 所以 children 的 valueSum 是对手视角的收益。
+    // 如果对我们有利，对手视角应该是负分。
+    // 所以 Q = bestChild.valueSum / bestChild.visits (对手得分)
+    // 我们胜率 = (-Q + 1) / 2 * 100
+    let finalWinRate = 50;
+    if (bestChild && bestChild.visits > 0) {
+        const qValue = bestChild.valueSum / bestChild.visits;
+        // qValue 是对手视角的 [-1, 1]
+        // 我们的 value = -qValue
+        // 映射到 0~100
+        finalWinRate = ((-qValue) + 1) * 50;
+    } else {
+        // Fallback to static
+        finalWinRate = (1 / (1 + Math.exp(-0.3 * scoreLead))) * 100;
+    }
+
     return {
         move: finalMove,
-        winRate: winRate,
+        winRate: finalWinRate,
         scoreLead: scoreLead 
     };
 }
@@ -561,8 +824,8 @@ onmessage = async function(e) {
         isBusy = true;
         stopRequested = false;
         try {
-            const { board, history, color, size } = data;
-            const result = await runMCTS(board, history, color, size);
+            const { board, history, color, size, simulations } = data;
+            const result = await runMCTS(board, history, color, size, simulations);
             
             // 如果 stopRequested 为真，runMCTS 可能返回 null
             if (!result && stopRequested) {

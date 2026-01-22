@@ -27,8 +27,9 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
 
             // --- 2. 计算 Worker 和 Model 的绝对路径 ---
             // 这样无论你在哪里，都能找到 public 下的文件
-            const workerUrl = `${baseUrl}worker/ai-worker.js`;
-            const modelUrl = `${baseUrl}models/model.json`; // <--- 这里定义了 modelUrl
+            const ts = Date.now();
+            const workerUrl = `${baseUrl}worker/ai-worker.js?v=${ts}`;
+            const modelUrl = `${baseUrl}models/model.json?v=${ts}`; // <--- 这里定义了 modelUrl
 
             console.log("Worker URL:", workerUrl);
             console.log("Model URL:", modelUrl);
@@ -99,14 +100,15 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const requestWebAiMove = useCallback((
         board: BoardState,
         playerColor: Player,
-        history: any[]
+        history: any[],
+        simulations: number = 45 // [New] Dynamic simulations
     ) => {
         if (!workerRef.current || isThinking) return;
         
         setIsThinking(true);
         if (!isWorkerReady) {
             // 模型还未加载完成，先缓存请求，等 init-complete 后补发
-            pendingRequestRef.current = { board, playerColor, history };
+            pendingRequestRef.current = { board, playerColor, history }; // Note: pending logic needs update too if strictly needed, but simple fallback is ok
             return;
         }
 
@@ -117,7 +119,8 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 board, // 原始棋盘数据
                 history, // 原始历史数据
                 color: playerColor,
-                size: boardSize
+                size: boardSize,
+                simulations
             }
         });
     }, [boardSize, isThinking, isWorkerReady]);
