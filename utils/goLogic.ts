@@ -135,10 +135,10 @@ export const attemptMove = (
   if (board[y][x] !== null) return null;
   const size = board.length;
   
-  // 浅拷贝 + 行拷贝优化
-  // 注意：AI 模拟时这里是性能热点，但为了保证逻辑正确性（提子、劫争），
-  // 完全的不可变数据结构是必要的。
-  const safeBoard = board.map(row => row.map(s => s ? { ...s } : null));
+  // 浅拷贝优化：由于 Stone 对象在逻辑中通常视为不可变（只会被替换或移除，不会修改其属性），
+  // 我们可以只复制棋盘的行数组结构，而不需要复制每个棋子对象。
+  // 这将大幅减少内存分配和垃圾回收压力。
+  const safeBoard = board.map(row => [...row]);
 
   safeBoard[y][x] = { color: player, id: `${player}-${Date.now()}-${x}-${y}`, x, y };
 
@@ -301,11 +301,19 @@ const getCandidateMoves = (board: BoardState, size: number, range: number = 2): 
 
   if (!hasStones) {
       const center = Math.floor(size / 2);
-      const points = [{x: center, y: center}];
-      if (size >= 9) {
-          const offset = size >= 13 ? 3 : 2;
-          points.push({x: offset, y: offset}, {x: size-1-offset, y: offset}, {x: offset, y: size-1-offset}, {x: size-1-offset, y: size-1-offset});
-      }
+      // 9x9 天元
+      if (size <= 9) return [{x: center, y: center}];
+      
+      // 13x13 或 19x19 推荐星位
+      const points: Point[] = [];
+      const offset = size >= 19 ? 3 : 3; // 19路或13路都通常在4线(index 3)或3线
+      // 传统星位 (4线)
+      points.push(
+          {x: 3, y: 3}, {x: size-4, y: 3}, 
+          {x: 3, y: size-4}, {x: size-4, y: size-4}
+      );
+      // 加上天元
+      points.push({x: center, y: center});
       return points;
   }
 
@@ -326,6 +334,8 @@ const getCandidateMoves = (board: BoardState, size: number, range: number = 2): 
   }
   
   if (candidates.size === 0) {
+      // 极罕见情况：棋盘满了或者只有无气的子？
+      // 回退到遍历所有空点
       const all: Point[] = [];
       for(let y=0; y<size; y++) for(let x=0; x<size; x++) if(!board[y][x]) all.push({x,y});
       return all;
@@ -380,7 +390,15 @@ const evaluatePositionStrength = (x: number, y: number, size: number): number =>
   return Math.max(0, 10 - distToCenter);
 };
 
-// 4. 五子棋评估核心 (Heuristics) - 保持不变
+// 4. 五子棋评估核心 (Heuristics)
+// 权重调整：活三其实比冲四危险，因为活三下一步能变活四（无解），而冲四下一步变五（必须堵，但堵住就没事）
+// Revised Weights:
+// Win (5): 100,000,000
+// Live 4: 10,000,000 (Game Over unless already 5)
+// Dead 4: 1,000,000 (Must block)
+// Live 3: 800,000 (Dangerous, turns into Live 4)
+// Dead 3: 50,000
+// Live 2: 10,000
 const evaluateGomokuDirection = (board: BoardState, x: number, y: number, dx: number, dy: number, player: Player): number => {
   let count = 0;
   let blockedStart = false; let blockedEnd = false;
@@ -400,18 +418,24 @@ const evaluateGomokuDirection = (board: BoardState, x: number, y: number, dx: nu
   }
 
   const total = count + 1;
-  if (total >= 5) return 1000000;
+  const isBlocked = blockedStart || blockedEnd;
+  const isCap = blockedStart && blockedEnd;
+
+  if (total >= 5) return 100000000;
   if (total === 4) {
-      if (!blockedStart && !blockedEnd) return 50000; // 活四
-      if (!blockedStart || !blockedEnd) return 5000;  // 冲四
+      if (!isBlocked) return 10000000; // 活四
+      if (!isCap) return 1000000;      // 冲四 (还有一头空)
+      return 0; // 死四 (两头都被堵，没用)
   }
   if (total === 3) {
-      if (!blockedStart && !blockedEnd) return 5000;  // 活三
-      if (!blockedStart || !blockedEnd) return 500;   // 眠三
+      if (!isBlocked) return 800000;   // 活三
+      if (!isCap) return 50000;        // 眠三 (有一头空)
+      return 0;
   }
   if (total === 2) {
-      if (!blockedStart && !blockedEnd) return 500;   // 活二
-      if (!blockedStart || !blockedEnd) return 50;
+      if (!isBlocked) return 10000;    // 活二
+      if (!isCap) return 1000;
+      return 0;
   }
   return 1;
 };
@@ -426,45 +450,72 @@ const getGomokuScore = (board: BoardState, x: number, y: number, player: Player,
         defenseScore += evaluateGomokuDirection(board, x, y, dx, dy, opponent);
     }
     
+    // 进攻是最好的防守，但也必须防守对方的必杀
+    // 如果我们要评估“这一步有多好”，不仅看攻击力，还要看它是否阻止了对方的胜利
     if (strict) {
-        if (attackScore >= 50000) return 9999999; 
-        if (defenseScore >= 50000) return 8000000;
-        if (attackScore >= 5000) return 40000; 
-        if (defenseScore >= 5000) return 30000;
+        // 必杀：我已经成5
+        if (attackScore >= 50000000) return 100000000; 
+        
+        // 救命：对方下一步要成5，或者已经是活4，必须堵
+        // 原逻辑 defenseScore >= 50000 (Live 4) 
+        if (defenseScore >= 8000000) return 50000000; // 必须防守
+
+        // 强攻：我有活4 (对方必须堵我)
+        if (attackScore >= 8000000) return 40000000; 
+
+        // 防守冲四：对方有冲四，虽然不是必死，但如果不理会可能变活四
+        if (defenseScore >= 500000) return 20000000;
     }
-    return attackScore + defenseScore;
+    return attackScore + defenseScore; // 综合分
 };
 
-// 5. 五子棋 Minimax - 保持不变
+// 5. 五子棋 Minimax (Improved)
 const minimaxGomoku = (
     board: BoardState, depth: number, alpha: number, beta: number, isMaximizing: boolean, player: Player, lastMove: Point | null
 ): number => {
+    // 终局状态检查
     if (lastMove && checkGomokuWin(board, lastMove)) {
-        return isMaximizing ? -10000000 + depth : 10000000 - depth; 
+        // 越快赢分越高，越晚输分越低
+        return isMaximizing ? -1000000000 + depth : 1000000000 - depth; 
     }
     if (depth === 0) return 0;
 
     const size = board.length;
-    let candidates = getCandidateMoves(board, size);
+    // 限制搜索范围：只搜索有棋子的邻域
+    let candidates = getCandidateMoves(board, size, 2); 
     const opponent = player === 'black' ? 'white' : 'black';
 
+    // Move Ordering: 先算高分点，利于 Alpha-Beta 剪枝
     const scoredCandidates = candidates.map(move => {
+         // 使用快速评估 (Strict=true)
         const score = getGomokuScore(board, move.x, move.y, isMaximizing ? player : opponent, isMaximizing ? opponent : player, true);
         return { move, score };
     });
 
+    // 排序：高分在前
     scoredCandidates.sort((a, b) => b.score - a.score);
-    const topCandidates = scoredCandidates.slice(0, 8).map(sc => sc.move);
+    
+    // 只取前 6 个最好的点进行深搜 (Width Pruning)
+    // 如果是第一层(最高层)，可以稍微多看几个，深层则少看
+    const beamWidth = depth > 2 ? 8 : 5;
+    const topCandidates = scoredCandidates.slice(0, beamWidth).map(sc => sc.move);
 
     if (isMaximizing) {
         let maxEval = -Infinity;
         for (const move of topCandidates) {
             board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'sim' };
-            const score = getGomokuScore(board, move.x, move.y, player, opponent, true);
-            if (score >= 9000000) { board[move.y][move.x] = null; return score; }
+            
+            // 立即检查是否获胜，如果是，直接返回（不用递归了）
+            if (checkGomokuWin(board, move)) {
+                 board[move.y][move.x] = null;
+                 return 1000000000 - (10 - depth); // Prefer faster win
+            }
 
             const val = minimaxGomoku(board, depth - 1, alpha, beta, false, player, move);
-            const totalVal = score + val * 0.8; 
+            
+            // 加上位置分作为微调，防止在必胜/必输之外的地方乱走
+            const positionalScore = getGomokuScore(board, move.x, move.y, player, opponent, false) * 0.01;
+            const totalVal = val + positionalScore;
 
             board[move.y][move.x] = null;
             maxEval = Math.max(maxEval, totalVal);
@@ -476,11 +527,16 @@ const minimaxGomoku = (
         let minEval = Infinity;
         for (const move of topCandidates) {
             board[move.y][move.x] = { color: opponent, x: move.x, y: move.y, id: 'sim' };
-            const score = getGomokuScore(board, move.x, move.y, opponent, player, true);
-            if (score >= 9000000) { board[move.y][move.x] = null; return -score; }
+            
+            if (checkGomokuWin(board, move)) {
+                board[move.y][move.x] = null;
+                return -1000000000 + (10 - depth);
+            }
 
             const val = minimaxGomoku(board, depth - 1, alpha, beta, true, player, move);
-            const totalVal = -score + val * 0.8;
+            
+            const positionalScore = getGomokuScore(board, move.x, move.y, opponent, player, false) * 0.01;
+            const totalVal = val - positionalScore;
 
             board[move.y][move.x] = null;
             minEval = Math.min(minEval, totalVal);
@@ -491,6 +547,22 @@ const minimaxGomoku = (
     }
 };
 
+// --- Go Minimax (New) ---
+// 简单的 2层 Minimax，用于围棋局部战斗
+const evaluateGoBoard = (board: BoardState, player: Player, simResult: NonNullable<ReturnType<typeof attemptMove>>): number => {
+    let score = 0;
+    const size = board.length;
+    
+    // 1. 提子 (Huge value)
+    if (simResult.captured > 0) score += 5000 + simResult.captured * 200;
+
+    // 2. 气数变化
+    // （这里需要比较复杂的判断，简单处理：如果我的气非常少，扣分）
+    // （在 attemptMove 外面判断可能更准，但这里只能根据 newBoard 判）
+    // 暂时略过复杂的全盘气数计算，太慢
+    
+    return score;
+};
 
 // --- 主入口 ---
 export const getAIMove = (
@@ -508,14 +580,15 @@ export const getAIMove = (
     const candidates = getCandidateMoves(board, size);
     if (candidates.length === 0) return null;
 
+    // Easy & Medium 保持原来的逻辑，但使用新的 getGomokuScore 可能会变强一点点
     if (difficulty === 'Easy') {
       let bestScore = -Infinity;
       let bestMoves: Point[] = [];
       for (const move of candidates) {
        let score = getGomokuScore(board, move.x, move.y, player, opponent, false);
-       score += Math.random() * 500;
+       score += Math.random() * 2000; // 增加随机性
        if (score > bestScore) { bestScore = score; bestMoves = [move]; }
-       else if (Math.abs(score - bestScore) < 10) bestMoves.push(move);
+       else if (Math.abs(score - bestScore) < 500) bestMoves.push(move);
       }
       return bestMoves[Math.floor(Math.random() * bestMoves.length)];
     }
@@ -534,24 +607,31 @@ export const getAIMove = (
     if (difficulty === 'Hard') {
       let bestScore = -Infinity;
       let bestMoves: Point[] = [];
+      // 先用静态评分筛选出 Top 10
       const sortedMoves = candidates.map(m => ({
         move: m,
         score: getGomokuScore(board, m.x, m.y, player, opponent, true)
       })).sort((a, b) => b.score - a.score);
-      const topMoves = sortedMoves.slice(0, 6).map(i => i.move);
+      const topMoves = sortedMoves.slice(0, 10).map(i => i.move);
 
       for (const move of topMoves) {
+        // 模拟落子
         board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'sim' };
-        if (checkGomokuWin(board, move)) { board[move.y][move.x] = null; return move; }
-        const val = minimaxGomoku(board, 3, -Infinity, Infinity, false, player, move);
-        const baseScore = getGomokuScore(board, move.x, move.y, player, opponent, true);
-        const finalScore = baseScore + val;
+        
+        // 只有 Hard 模式才会搜索 4 层 (我方-敌方-我方-敌方)
+        // 这样可以看出双活三等杀招
+        const val = minimaxGomoku(board, 4, -Infinity, Infinity, false, player, move);
+        
+        // 加上基础分，倾向于即便搜索不到杀招，也要走好形
+        const baseScore = getGomokuScore(board, move.x, move.y, player, opponent, true) * 0.1;
+        const finalScore = val + baseScore;
+        
         board[move.y][move.x] = null;
 
         if (finalScore > bestScore) {
           bestScore = finalScore;
           bestMoves = [move];
-        } else if (Math.abs(finalScore - bestScore) < 1) {
+        } else if (Math.abs(finalScore - bestScore) < 10) {
           bestMoves.push(move);
         }
       }
@@ -560,68 +640,97 @@ export const getAIMove = (
   }
 
   // === 围棋 AI (本地) ===
-  let possibleMoves: { x: number; y: number; score: number }[] = [];
+  const possibleMoves: { x: number; y: number; score: number }[] = [];
+  const candidates = getCandidateMoves(board, size, 2); 
 
-  for (let y = 0; y < size; y++) {
-  for (let x = 0; x < size; x++) {
-    if (board[y][x] !== null) continue;
-
-    // [优化] 如果确定是真眼，直接跳过，防止自杀式填眼
+  for (const move of candidates) {
+    const { x, y } = move;
+    
+    // 真眼保护
     if (isSimpleEye(board, x, y, player)) continue;
 
+    // 1. 我方尝试落子
     const sim = attemptMove(board, x, y, player, 'Go', previousBoardHash);
     if (!sim) continue;
-
     const myNewGroup = getGroup(sim.newBoard, { x, y });
-    // 如果下完这步棋，自己的气是 0 (自杀)，attemptMove 已经处理返回 null，但双重保险
-    if (myNewGroup && myNewGroup.liberties === 0 && sim.captured === 0) continue;
+    if (myNewGroup && myNewGroup.liberties === 0 && sim.captured === 0) continue; // 自杀检测
 
     let score = 0;
 
-    // A. 吃子 (最高优先级)
-    if (sim.captured > 0) {
-      score += 1000 + sim.captured * 50;
-    }
-
-    // B. 叫吃/打吃
+    // --- 基础评估 (Level 0) ---
+    // A. 吃子
+    if (sim.captured > 0) score += 2000 + sim.captured * 100;
+    
+    // B. 叫吃检测 (Atari)
     const neighbors = getNeighbors({x, y}, size);
     neighbors.forEach(n => {
-      if (board[n.y][n.x]?.color === opponent) {
-        const enemyGroup = getGroup(sim.newBoard, n);
-        if (enemyGroup && enemyGroup.liberties === 1) {
-          score += 200;
-        }
-      }
+       const stone = board[n.y][n.x];
+       if (stone && stone.color === opponent) {
+           const enemyGroup = getGroup(sim.newBoard, n);
+           if (enemyGroup && enemyGroup.liberties === 1) score += 300; // 制造叫吃
+       }
     });
 
-    // C. 逃生/防守
-    // 如果原本只有1口气，现在变多了，加分
-    if (myNewGroup && myNewGroup.liberties >= 3) score += 20;
-    // 如果下完只有2口气，有点危险，减分
-    if (myNewGroup && myNewGroup.liberties === 2) score -= 10;
-    // 如果下完只有1口气，且没吃到子，非常危险（可能是愚型）
-    if (myNewGroup && myNewGroup.liberties === 1 && sim.captured === 0) score -= 50;
+    // C. 自身安全 (Safety)
+    if (myNewGroup) {
+        if (myNewGroup.liberties === 1) score -= 500; // 除非为了吃子，否则别把自己填死
+        if (myNewGroup.liberties >= 3) score += 50;   // 长气
+    }
 
-    // D. 棋形与位置
+    // D. 棋形 (Shape)
     score += evaluateShape(board, x, y, player);
     score += evaluatePositionStrength(x, y, size);
 
-    // E. 随机扰动 (避免 AI 每次走棋都一样)
-    if (difficulty === 'Easy') {
-      score += Math.random() * 200;
-    } else if (difficulty === 'Medium') {
-      score += Math.random() * 30;
+    // --- 进阶评估 (Level 1: Opponent Response) for Hard Mode ---
+    // 如果是 Hard 模式，模拟对手的最佳应对
+    if (difficulty === 'Hard') {
+       // 这是一个简单的“极大极小”的一层半：我走一步，看对手最好的一步会让我的局面变得多差
+       // 我们只需要看局部响应 (例如周围 2 格)
+       const localResponses = getCandidateMoves(sim.newBoard, size, 2); 
+       let minOpponentOutcome = 0; // 对手造成的最大破坏（负分）
+
+       // 我们只采样对手最好的 3 步棋（为了性能）
+       // 如何知道哪步最好？简单扫一遍打分
+       let bestOpponentMoves = [];
+       for (const opMove of localResponses) {
+           // 简单防守检查：是否在真眼中（我们不应该让对手填我们的眼，除非是假眼）
+           // 这里 board 是 sim.newBoard
+           if (sim.newBoard[opMove.y][opMove.x]) continue; 
+
+           const opSim = attemptMove(sim.newBoard, opMove.x, opMove.y, opponent, 'Go', null);
+           if (!opSim) continue;
+           
+           // 评估对手这步棋的价值
+           let opScore = 0;
+           if (opSim.captured > 0) opScore += 5000; // 对手能反提我！绝路！
+           
+           // 检查对手是否叫吃我
+           const opNewGroup = getGroup(opSim.newBoard, {x: opMove.x, y: opMove.y});
+           const myGroupAfterOpStr = getGroup(opSim.newBoard, {x, y}); // 我刚下的子的 group
+           if (myGroupAfterOpStr && myGroupAfterOpStr.liberties === 1) opScore += 1000; // 我被叫吃了
+
+           if (opScore > 50) bestOpponentMoves.push({move: opMove, score: opScore});
+       }
+
+       bestOpponentMoves.sort((a,b) => b.score - a.score);
+       const topOp = bestOpponentMoves.slice(0, 1); // 只看最狠的一步
+       
+       if (topOp.length > 0) {
+           score -= topOp[0].score; // 减去对手造成的破坏
+       }
     }
+
+    // E. 随机扰动
+    if (difficulty === 'Easy') score += Math.random() * 300;
+    else if (difficulty === 'Medium') score += Math.random() * 50;
 
     possibleMoves.push({ x, y, score });
   }
-  }
 
   possibleMoves.sort((a, b) => b.score - a.score);
-  if (possibleMoves.length === 0) return null; // 无处可下，停着
+  if (possibleMoves.length === 0) return null;
 
   if (difficulty === 'Easy') {
-    // 简单模式：在前5好的点里随机选
     const topN = possibleMoves.slice(0, 5);
     return topN[Math.floor(Math.random() * topN.length)];
   }

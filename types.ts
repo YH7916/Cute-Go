@@ -50,3 +50,24 @@ export interface UserAchievement {
 export interface DisplayAchievement extends AchievementDef {
   progress: UserAchievement | null; // null 表示从未触发过
 }
+
+// Undo History Item
+export interface HistoryItem {
+  board: BoardState;
+  currentPlayer: Player;
+  blackCaptures: number;
+  whiteCaptures: number;
+  lastMove: { x: number, y: number } | null;
+  consecutivePasses: number;
+}
+
+export type AppMode = 'playing' | 'review' | 'setup';
+
+// 信令消息类型
+export type SignalMessage =
+  | { type: 'join' }
+  | { type: 'offer'; sdp: RTCSessionDescriptionInit }
+  | { type: 'answer'; sdp: RTCSessionDescriptionInit }
+  | { type: 'ice'; candidate: RTCIceCandidateInit };
+
+export type ExtendedDifficulty = Difficulty | 'Custom';

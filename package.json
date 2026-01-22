@@ -7,17 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-
     "//--- 下面是新增的一键自动化脚本 ---": "",
     "version:sync": "node update-version.js",
     "icon:gen": "capacitor-assets generate --android",
-    
     "//--- 终极懒人命令：版本同步 + 编译React + 生成图标 + 同步到安卓 ---": "",
     "make-android": "npm run version:sync && npm run build && npm run icon:gen && npx cap sync android"
   },
-  
   "dependencies": {
     "@capacitor/android": "^8.0.1",
+    "@sabaki/immutable-gametree": "^1.9.4",
+    "@sabaki/sgf": "^3.4.7",
     "@supabase/supabase-js": "^2.90.1",
     "lucide-react": "^0.562.0",
     "peerjs": "1.5.2",
