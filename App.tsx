@@ -121,6 +121,7 @@ const App: React.FC = () => {
     const dataChannelRef = useRef<RTCDataChannel | null>(null);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
     const isManualDisconnect = useRef<boolean>(false);
+    const isSigningOutRef = useRef<boolean>(false);
 
     // --- Auth Logic ---
     const fetchProfile = async (userId: string) => {
@@ -146,17 +147,64 @@ const App: React.FC = () => {
         return () => subscription.unsubscribe();
     }, []);
 
+    const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
     const handleLogin = async (email: string, pass: string) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-        if (error) alert('登录失败: ' + error.message);
+        const cleanEmail = normalizeEmail(email);
+        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: pass });
+        if (error) {
+            console.error('登录失败', { message: error.message, status: error.status, code: (error as any)?.code });
+            const hint = error.message === 'Invalid login credentials'
+                ? '账号不存在 / 密码错误 / 账号未确认或已被禁用'
+                : error.message;
+            alert('登录失败: ' + hint);
+        }
     };
 
     const handleRegister = async (email: string, pass: string, nickname: string) => {
-        const { error } = await supabase.auth.signUp({
-            email, password: pass, options: { data: { nickname: nickname || '棋手' } }
+        const cleanEmail = normalizeEmail(email);
+        const safeNickname = nickname?.trim() || '棋手';
+        const { data, error } = await supabase.auth.signUp({
+            email: cleanEmail, password: pass, options: { data: { nickname: safeNickname } }
         });
         if (error) alert('注册失败: ' + error.message);
-        else alert('注册成功！请直接登录。');
+        else {
+            if (data?.session) {
+                alert('注册成功！已自动登录。');
+            } else {
+                alert('注册成功！如仍无法登录，请检查该账号是否已确认或被禁用。');
+            }
+        }
+    };
+
+    const clearSupabaseLocalSession = () => {
+        try {
+            const keys = Object.keys(localStorage);
+            for (const key of keys) {
+                if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                    localStorage.removeItem(key);
+                }
+            }
+            const sessionKeys = Object.keys(sessionStorage);
+            for (const key of sessionKeys) {
+                if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                    sessionStorage.removeItem(key);
+                }
+            }
+        } catch {}
+        setSession(null);
+        setUserProfile(null);
+    };
+
+    const handleSignOut = async () => {
+        if (isSigningOutRef.current) return;
+        isSigningOutRef.current = true;
+        try {
+            supabase.auth.stopAutoRefresh?.();
+            clearSupabaseLocalSession();
+        } finally {
+            isSigningOutRef.current = false;
+        }
     };
 
     // --- Achievements ---
@@ -1034,7 +1082,7 @@ const App: React.FC = () => {
                achievementsList={achievementsList}
                userAchievements={userAchievements}
                onLoginClick={() => { setShowLoginModal(true); setShowUserPage(false); }}
-               onSignOutClick={() => supabase.auth.signOut()}
+               onSignOutClick={handleSignOut}
            />
 
            <OnlineMenu 
