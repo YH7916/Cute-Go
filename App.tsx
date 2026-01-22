@@ -681,6 +681,8 @@ const App: React.FC = () => {
         if (connectionTimeoutRef.current) { clearTimeout(connectionTimeoutRef.current); connectionTimeoutRef.current = null; }
         setOnlineStatus('disconnected');
         setOpponentProfile(null);
+        setPeerId('');
+        setRemotePeerId('');
     };
 
     const getIceServers = async () => {
