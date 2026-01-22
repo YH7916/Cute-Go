@@ -455,181 +455,350 @@ const evaluatePositionStrength = (x: number, y: number, size: number): number =>
   return Math.max(0, 10 - distToCenter);
 };
 
-// 4. 五子棋评估核心 (Heuristics)
-// 权重调整：活三其实比冲四危险，因为活三下一步能变活四（无解），而冲四下一步变五（必须堵，但堵住就没事）
-// Revised Weights:
-// Win (5): 100,000,000
-// Live 4: 10,000,000 (Game Over unless already 5)
-// Dead 4: 1,000,000 (Must block)
-// Live 3: 800,000 (Dangerous, turns into Live 4)
-// Dead 3: 50,000
-// Live 2: 10,000
-const evaluateGomokuDirection = (board: BoardState, x: number, y: number, dx: number, dy: number, player: Player): number => {
-  let count = 0;
-  let blockedStart = false; let blockedEnd = false;
+// 4. 五子棋评估核心 (Heuristics - Stronger Version)
+const GOMOKU_SCORES = {
+  WIN: 100000000,
+  OPEN_4: 10000000,
+  CLOSED_4: 1000000, // Still deadly if not blocked
+  OPEN_3: 100000,    // Major threat
+  CLOSED_3: 1000,
+  OPEN_2: 100,
+  CLOSED_2: 10
+};
+
+// Check for specific patterns in a line (bitmask style or string match logic)
+const evaluateLine = (board: BoardState, x: number, y: number, dx: number, dy: number, player: Player): number => {
   const size = board.length;
+  // Extract a line of 9 points centered at x,y:  [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+  // 0 is the candidate move position (which is currently empty or simulated)
+  
+  const line: number[] = []; // 1=Me, -1=Opponent, 0=Empty, 2=Wall
+  
+  for (let i = -4; i <= 4; i++) {
+    const nx = x + dx * i;
+    const ny = y + dy * i;
+    if (nx < 0 || nx >= size || ny < 0 || ny >= size) {
+      line.push(2); // Wall
+    } else {
+      const stone = board[ny][nx];
+      if (stone) {
+        line.push(stone.color === player ? 1 : -1);
+      } else {
+        if (i === 0) line.push(1); // Assume we play here
+        else line.push(0);
+      }
+    }
+  }
 
+  // Current pos is at index 4 (center)
+  // Simple pattern matching for optimization
+  // Convert to string for regex-like matching or perform manual checks
+  // Let's do a sliding window check for 5 positions containing the center
+  
+  let score = 0;
+
+  // Helper to count metrics in a window
+  // "Window" size 5.
+  // We check all windows of size 5 that include index 4.
+  // Windows starting at: 0 (0-4), 1 (1-5), 2 (2-6), 3 (3-7), 4 (4-8)
+  
+  let maxConsecutive = 0;
+  let open4 = 0;
+  let closed4 = 0;
+  let open3 = 0;
+  let broken3 = 0; // X.XX or XX.X
+
+  // --- Strict 5-in-a-row Check ---
+  // If any window of 5 is all 1s -> WIN
+  for (let start = 0; start <= 4; start++) {
+    let count = 0;
+    for (let k = 0; k < 5; k++) {
+      if (line[start + k] === 1) count++;
+      else if (line[start + k] === -1 || line[start + k] === 2) { count = -99; break; }
+    }
+    if (count === 5) return GOMOKU_SCORES.WIN;
+  }
+  
+  // If not win, detailed analysis
+  // We analyze the full line segment to find the "best" shape we created.
+  
+  // 1. Check for Open 4 ( .XXXX. )
+  // The line array has 9 elements. Center is 4.
+  // We need to look for patterns involving index 4.
+  
+  // Convert line to simplified string for easier logic? 
+  // 1: Stone, 0: Empty, -1: Opp, 2: Wall
+  // Optimizing: Just scan directions for "Live 4", "Dead 4", "Live 3"
+  
+  // Reuse the logic of counting consecutive stones + openings
+  let consec = 1;
+  let leftOpen = false;
+  let rightOpen = false;
+  
+  // Left scan
   for (let i = 1; i <= 4; i++) {
-    const nx = x + dx * i; const ny = y + dy * i;
-    if (nx < 0 || nx >= size || ny < 0 || ny >= size) { blockedEnd = true; break; }
-    const stone = board[ny][nx];
-    if (stone?.color === player) count++; else if (stone) { blockedEnd = true; break; } else break; 
+      const val = line[4 - i];
+      if (val === 1) consec++;
+      else {
+          if (val === 0) leftOpen = true;
+          break;
+      }
   }
+  
+  // Right scan
   for (let i = 1; i <= 4; i++) {
-    const nx = x - dx * i; const ny = y - dy * i;
-    if (nx < 0 || nx >= size || ny < 0 || ny >= size) { blockedStart = true; break; }
-    const stone = board[ny][nx];
-    if (stone?.color === player) count++; else if (stone) { blockedStart = true; break; } else break;
+      const val = line[4 + i];
+      if (val === 1) consec++;
+      else {
+          if (val === 0) rightOpen = true;
+          break;
+      }
   }
-
-  const total = count + 1;
-  const isBlocked = blockedStart || blockedEnd;
-  const isCap = blockedStart && blockedEnd;
-
-  if (total >= 5) return 100000000;
-  if (total === 4) {
-      if (!isBlocked) return 10000000; // 活四
-      if (!isCap) return 1000000;      // 冲四 (还有一头空)
-      return 0; // 死四 (两头都被堵，没用)
+  
+  if (consec >= 5) return GOMOKU_SCORES.WIN;
+  if (consec === 4) {
+      if (leftOpen && rightOpen) return GOMOKU_SCORES.OPEN_4;
+      if (leftOpen || rightOpen) return GOMOKU_SCORES.CLOSED_4;
+      return 0; // Totally blocked 4 is useless
   }
-  if (total === 3) {
-      if (!isBlocked) return 800000;   // 活三
-      if (!isCap) return 50000;        // 眠三 (有一头空)
+  if (consec === 3) {
+      if (leftOpen && rightOpen) {
+          // Check for "Jump 4" (Broken 4) e.g. X.XXX
+          // If we have open ends, it is at least Open 3.
+          // But check if we can extend to 4 through the gap?
+          return GOMOKU_SCORES.OPEN_3;
+      }
+      if (leftOpen || rightOpen) return GOMOKU_SCORES.CLOSED_3;
       return 0;
   }
-  if (total === 2) {
-      if (!isBlocked) return 10000;    // 活二
-      if (!isCap) return 1000;
-      return 0;
+  if (consec === 2) {
+      if (leftOpen && rightOpen) return GOMOKU_SCORES.OPEN_2;
+      return GOMOKU_SCORES.CLOSED_2;
   }
-  return 1;
+  
+  // Special Case: Broken 4 (X.XXX or XX.XX)
+  // This is as strong as Closed 4 (requires immediate block)
+  // Check pattern X X . X X  (Center can be the dot or the X)
+  // In this function, center IS an X (simulated).
+  // So we look for 1 0 1 1 1 etc.
+  
+  // Hard to scan generically. Let's do specific pattern checks for "Broken" shapes centered at 4.
+  // Pattern: 1 1 0 1 -> If index 4 closes the gap
+  
+  const checkPattern = (pat: number[]) => {
+      // Pat is an array like [1, 1, 1, 0, 1] relative to center?
+      // Too complex.
+      return false;
+  };
+
+  return score;
+};
+
+// Simplified but Stronger Shape Evaluator
+const getGomokuShapeScore = (board: BoardState, x: number, y: number, player: Player): number => {
+    const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+    let totalScore = 0;
+    const size = board.length;
+
+    for (const [dx, dy] of directions) {
+        // Collect line for 9 cells
+        const line: number[] = [];
+        for(let k=-4; k<=4; k++) {
+            const nx = x + k*dx;
+            const ny = y + k*dy;
+            if(nx<0||nx>=size||ny<0||ny>=size) line.push(2); // Wall
+            else {
+                const s = board[ny][nx];
+                if(s) line.push(s.color === player ? 1 : -1);
+                else line.push(0);
+            }
+        }
+        // Center is at index 4, assume we play there (1)
+        line[4] = 1; 
+
+        // Analyze this line buffer
+        totalScore += analyzeLineBuffer(line);
+    }
+    return totalScore;
+};
+
+const analyzeLineBuffer = (line: number[]): number => {
+    // line length 9. 1=Me, -1=Opp, 0=Empty, 2=Wall
+    // We look for patterns of '1'
+    
+    let score = 0;
+    
+    // Convert to string for internal pattern matching
+    // Map: 1->X, -1->O, 0->_, 2->|
+    const str = line.map(v => v===1?'X':(v===-1||v===2?'O':'_')).join('');
+    
+    // Patterns
+    if (str.includes('XXXXX')) return GOMOKU_SCORES.WIN;
+    
+    // Live 4: _XXXX_
+    if (str.includes('_XXXX_')) return GOMOKU_SCORES.OPEN_4;
+    
+    // Dead 4: OXXXX_ or _XXXXO or X_XXX or XXX_X or XX_XX 
+    // (Broken 4s are effectively Dead 4s usually, or better if open edges)
+    if (str.includes('XXXX_') || str.includes('_XXXX')) return GOMOKU_SCORES.CLOSED_4;
+    if (str.includes('X_XXX') || str.includes('XXX_X') || str.includes('XX_XX')) {
+        // These are broken 4s. If they are bounded by _, they are huge.
+        // e.g. _XX_XX_ is a "Live Broken 4" -> effectively Open 4 logic? 
+        // No, _XX_XX_ needs 1 move to become _XXXXX_ (Win). 
+        // Standard Open 4 _XXXX_ needs 1 move to Win.
+        // So Broken 4 is roughly equal to Closed 4 (Force opponent to block).
+        return GOMOKU_SCORES.CLOSED_4;
+    }
+
+    // Live 3: _XXX_ or _X_XX_ or _XX_X_
+    if (str.includes('_XXX_')) return GOMOKU_SCORES.OPEN_3;
+    if (str.includes('_X_XX_') || str.includes('_XX_X_')) return GOMOKU_SCORES.OPEN_3;
+
+    // Dead 3: _XXXO or OXXX_
+    if (str.includes('_XXX') || str.includes('XXX_')) return GOMOKU_SCORES.CLOSED_3;
+    
+    // Live 2: _XX_ or _X_X_
+    if (str.includes('_XX_') || str.includes('_X_X_')) return GOMOKU_SCORES.OPEN_2;
+    
+    return 0;
 };
 
 const getGomokuScore = (board: BoardState, x: number, y: number, player: Player, opponent: Player, strict: boolean): number => {
-    const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
-    let attackScore = 0;
-    let defenseScore = 0;
+    // 1. Offensive Score (What I gain)
+    const attackScore = getGomokuShapeScore(board, x, y, player);
+    
+    // 2. Defensive Score (What I deny opponent)
+    // Pretend opponent plays here
+    const defendScore = getGomokuShapeScore(board, x, y, opponent);
 
-    for (const [dx, dy] of directions) {
-        attackScore += evaluateGomokuDirection(board, x, y, dx, dy, player);
-        defenseScore += evaluateGomokuDirection(board, x, y, dx, dy, opponent);
+    // Weights
+    // If I can WIN, do it.
+    if (attackScore >= GOMOKU_SCORES.WIN) return GOMOKU_SCORES.WIN * 10;
+    
+    // If Opponent can WIN, MUST Block (unless I win first, covered above).
+    if (defendScore >= GOMOKU_SCORES.WIN) return GOMOKU_SCORES.WIN; // Critical Block
+    
+    // If I have Open 4, I will win next turn (unless opponnent wins now).
+    if (attackScore >= GOMOKU_SCORES.OPEN_4) return GOMOKU_SCORES.OPEN_4 * 10;
+    
+    // If Opponent has Open 4, I lose if I don't block. 
+    // Actually, if opponent has Open 4, blocking one side leaves the other. It's usually game over.
+    // But we must try.
+    if (defendScore >= GOMOKU_SCORES.OPEN_4) return GOMOKU_SCORES.OPEN_4; 
+    
+    // If I make a Closed 4 (Threat), opponent must answer.
+    // If Opponent makes Closed 4, I must answer.
+    
+    // General formula: Attack + Defense typically triggers good moves.
+    // But we prioritize critical threats.
+    
+    // Strict Mode: For filtering candidate moves in Minimax
+    if (strict) {
+       // Only return high value moves
+       if (attackScore + defendScore < GOMOKU_SCORES.CLOSED_2) return 0;
     }
     
-    // 进攻是最好的防守，但也必须防守对方的必杀
-    // 如果我们要评估“这一步有多好”，不仅看攻击力，还要看它是否阻止了对方的胜利
-    if (strict) {
-        // 必杀：我已经成5
-        if (attackScore >= 50000000) return 100000000; 
-        
-        // 救命：对方下一步要成5，或者已经是活4，必须堵
-        // 原逻辑 defenseScore >= 50000 (Live 4) 
-        if (defenseScore >= 8000000) return 50000000; // 必须防守
-
-        // 强攻：我有活4 (对方必须堵我)
-        if (attackScore >= 8000000) return 40000000; 
-
-        // 防守冲四：对方有冲四，虽然不是必死，但如果不理会可能变活四
-        if (defenseScore >= 500000) return 20000000;
-    }
-    return attackScore + defenseScore; // 综合分
+    // Weight Defense slightly higher to be safe? 
+    // Or Attack? 
+    // In Gomoku, initiative is key.
+    return attackScore + defendScore * 0.9;
 };
 
-// 5. 五子棋 Minimax (Improved)
 const minimaxGomoku = (
-    board: BoardState, depth: number, alpha: number, beta: number, isMaximizing: boolean, player: Player, lastMove: Point | null
+    board: BoardState, 
+    depth: number, 
+    alpha: number, 
+    beta: number, 
+    isMaximizing: boolean, 
+    player: Player, 
+    lastMove: Point | null
 ): number => {
-    // 终局状态检查
+    // Check Terminal (Win/Loss)
     if (lastMove && checkGomokuWin(board, lastMove)) {
-        // 越快赢分越高，越晚输分越低
-        return isMaximizing ? -1000000000 + depth : 1000000000 - depth; 
+        // If the *current* player just moved and won, that's great for them.
+        // But minimax is called *after* the move.
+        // So if we are here, the previous mover (Opponent of current recursion) won.
+        // If isMaximizing=true, it means 'We' are about to move, but 'They' (Minimizer) just moved and won.
+        // So Score is -Infinity.
+        return isMaximizing ? -100000000 : 100000000;
     }
+    
     if (depth === 0) return 0;
 
     const size = board.length;
-    // 限制搜索范围：只搜索有棋子的邻域
-    let candidates = getCandidateMoves(board, size, 2); 
-    const opponent = player === 'black' ? 'white' : 'black';
+    const candidates = getCandidateMoves(board, size, 2);
+    if (candidates.length === 0) return 0;
 
-    // Move Ordering: 先算高分点，利于 Alpha-Beta 剪枝
-    const scoredCandidates = candidates.map(move => {
-         // 使用快速评估 (Strict=true)
-        const score = getGomokuScore(board, move.x, move.y, isMaximizing ? player : opponent, isMaximizing ? opponent : player, true);
-        return { move, score };
-    });
-
-    // 排序：高分在前
-    scoredCandidates.sort((a, b) => b.score - a.score);
+    const myColor = player;
+    const opColor = player === 'black' ? 'white' : 'black';
+    // Current Mover Color
+    const currentColor = isMaximizing ? player : opColor;
+    const nextColor    = isMaximizing ? opColor : player; // For next recursion
     
-    // 只取前 6 个最好的点进行深搜 (Width Pruning)
-    // 如果是第一层(最高层)，可以稍微多看几个，深层则少看
-    const beamWidth = depth > 2 ? 8 : 5;
-    const topCandidates = scoredCandidates.slice(0, beamWidth).map(sc => sc.move);
+    // Heuristic Sort (Move Ordering)
+    // We want to verify the BEST moves first.
+    // For the current player, we want moves that give high Shape Score.
+    const scoredMoves = candidates.map(pt => {
+        // Evaluate based on Current Player's View
+        // Is this move good for me?
+        // We use the combined Attack/Defense score.
+        const score = getGomokuScore(board, pt.x, pt.y, currentColor, isMaximizing ? opColor : player, false);
+        return { pt, score };
+    });
+    
+    scoredMoves.sort((a,b) => b.score - a.score);
+    
+    // Pruning: Only look at top K moves
+    // Deep search handles the rest.
+    const branching = depth > 2 ? 8 : 12; // Wider at shallow depths? No, typically Narrows deeper.
+    const movesToSearch = scoredMoves.slice(0, branching);
 
     if (isMaximizing) {
         let maxEval = -Infinity;
-        for (const move of topCandidates) {
-            board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'sim' };
+        for (const {pt} of movesToSearch) {
+            // Check immediate win to save time
+            // (checkGomokuWin handles logic, but this is pre-move optimization)
             
-            // 立即检查是否获胜，如果是，直接返回（不用递归了）
-            if (checkGomokuWin(board, move)) {
-                 board[move.y][move.x] = null;
-                 return 1000000000 - (10 - depth); // Prefer faster win
-            }
-
-            const val = minimaxGomoku(board, depth - 1, alpha, beta, false, player, move);
+            // Execute
+            board[pt.y][pt.x] = { color: player, x: pt.x, y: pt.y, id: 'sim' };
             
-            // 加上位置分作为微调，防止在必胜/必输之外的地方乱走
-            const positionalScore = getGomokuScore(board, move.x, move.y, player, opponent, false) * 0.01;
-            const totalVal = val + positionalScore;
+            const evalScore = minimaxGomoku(board, depth - 1, alpha, beta, false, player, pt);
+            
+            // Backtrack
+            board[pt.y][pt.x] = null;
+            
+            // Soft positional bonus to break ties
+            const bonus = pt.x === Math.floor(size/2) && pt.y === Math.floor(size/2) ? 10 : 0;
 
-            board[move.y][move.x] = null;
-            maxEval = Math.max(maxEval, totalVal);
-            alpha = Math.max(alpha, totalVal);
-            if (beta <= alpha) break;
+            const total = evalScore + bonus * 0.01;
+            
+            maxEval = Math.max(maxEval, total);
+            alpha = Math.max(alpha, total);
+            if (beta <= alpha) break; 
         }
         return maxEval;
     } else {
         let minEval = Infinity;
-        for (const move of topCandidates) {
-            board[move.y][move.x] = { color: opponent, x: move.x, y: move.y, id: 'sim' };
+        for (const {pt} of movesToSearch) {
+            board[pt.y][pt.x] = { color: opColor, x: pt.x, y: pt.y, id: 'sim' };
             
-            if (checkGomokuWin(board, move)) {
-                board[move.y][move.x] = null;
-                return -1000000000 + (10 - depth);
-            }
-
-            const val = minimaxGomoku(board, depth - 1, alpha, beta, true, player, move);
+            const evalScore = minimaxGomoku(board, depth - 1, alpha, beta, true, player, pt);
             
-            const positionalScore = getGomokuScore(board, move.x, move.y, opponent, player, false) * 0.01;
-            const totalVal = val - positionalScore;
-
-            board[move.y][move.x] = null;
-            minEval = Math.min(minEval, totalVal);
-            beta = Math.min(beta, totalVal);
+            board[pt.y][pt.x] = null;
+            
+            // Minus bonus? (Good for opponent is bad for us)
+            // But evalScore is already from maximizing perspective.
+            // If evalScore is high, it means MAX is winning.
+            // MIN wants to minimize that.
+            
+            minEval = Math.min(minEval, evalScore);
+            beta = Math.min(beta, evalScore);
             if (beta <= alpha) break;
         }
         return minEval;
     }
 };
 
-// --- Go Minimax (New) ---
-// 简单的 2层 Minimax，用于围棋局部战斗
-const evaluateGoBoard = (board: BoardState, player: Player, simResult: NonNullable<ReturnType<typeof attemptMove>>): number => {
-    let score = 0;
-    const size = board.length;
-    
-    // 1. 提子 (Huge value)
-    if (simResult.captured > 0) score += 5000 + simResult.captured * 200;
-
-    // 2. 气数变化
-    // （这里需要比较复杂的判断，简单处理：如果我的气非常少，扣分）
-    // （在 attemptMove 外面判断可能更准，但这里只能根据 newBoard 判）
-    // 暂时略过复杂的全盘气数计算，太慢
-    
-    return score;
-};
-
-// --- 主入口 ---
 export const getAIMove = (
   board: BoardState,
   player: Player,
@@ -638,83 +807,88 @@ export const getAIMove = (
   previousBoardHash: string | null
 ): Point | null | 'RESIGN' => {
   const size = board.length;
-  const opponent = player === 'black' ? 'white' : 'black';
-
-  // Use new config system
-  const config = getAIConfig(difficulty);
+  // const opponent = player === 'black' ? 'white' : 'black'; // Unused in this scope
   
-  // If rank is high enough (e.g. 9k+), we prefer WebAI (handled by App.tsx logic).
-  // But if App.tsx calls this function, it means WebAI is unavailable OR rank is low (Local).
-  // If we are here, we are running Local JS Logic.
-  
-  // Apply randomness based on rank
-  const randomFactor = config.randomness; // 0.8 for 18k, 0.05 for 9k
-
-  // === 五子棋 AI ===
+  // 1. Gomoku AI Logic
   if (gameType === 'Gomoku') {
-    const candidates = getCandidateMoves(board, size);
-    if (candidates.length === 0) return null;
+      const candidates = getCandidateMoves(board, size, 2);
+      if (candidates.length === 0) return { x: Math.floor(size/2), y: Math.floor(size/2) }; // Center start
 
-    // Easy & Medium 保持原来的逻辑，但使用新的 getGomokuScore 可能会变强一点点
-    if (difficulty === 'Easy') {
-      let bestScore = -Infinity;
-      let bestMoves: Point[] = [];
-      for (const move of candidates) {
-       let score = getGomokuScore(board, move.x, move.y, player, opponent, false);
-       score += Math.random() * 2000; // 增加随机性
-       if (score > bestScore) { bestScore = score; bestMoves = [move]; }
-       else if (Math.abs(score - bestScore) < 500) bestMoves.push(move);
+      // Difficulty Safe Mapping
+      // If user switches from Go (Rank) to Gomoku without changing difficulty, map roughly:
+      let safeDifficulty = difficulty;
+      if (!['Easy', 'Medium', 'Hard'].includes(difficulty)) {
+          // Heuristic mapping
+          if (difficulty.includes('k')) safeDifficulty = 'Easy';
+          else if (difficulty.includes('d')) safeDifficulty = 'Hard';
+          else safeDifficulty = 'Medium';
       }
-      return bestMoves[Math.floor(Math.random() * bestMoves.length)];
-    }
 
-    if (difficulty === 'Medium') {
-      let bestScore = -Infinity;
-      let bestMoves: Point[] = [];
-      for (const move of candidates) {
-       const score = getGomokuScore(board, move.x, move.y, player, opponent, true);
-       if (score > bestScore) { bestScore = score; bestMoves = [move]; }
-       else if (score === bestScore) bestMoves.push(move);
+      let depth = 2;
+      
+      if (safeDifficulty === 'Easy') {
+          depth = 2; 
+          // Easy: Reduced depth, slightly less aggressive evaluation weights?
+          // No, kept deterministic but shallow.
+      } else if (safeDifficulty === 'Medium') {
+          depth = 4;
+      } else if (safeDifficulty === 'Hard') {
+          depth = 6; 
       }
-      return bestMoves[Math.floor(Math.random() * bestMoves.length)];
-    }
-
-    if (difficulty === 'Hard') {
-      let bestScore = -Infinity;
-      let bestMoves: Point[] = [];
-      // 先用静态评分筛选出 Top 10
-      const sortedMoves = candidates.map(m => ({
-        move: m,
-        score: getGomokuScore(board, m.x, m.y, player, opponent, true)
-      })).sort((a, b) => b.score - a.score);
-      const topMoves = sortedMoves.slice(0, 10).map(i => i.move);
-
+      
+      let bestMove: Point | null = null;
+      let bestVal = -Infinity;
+      
+      const opColor = player === 'black' ? 'white' : 'black';
+      
+      // 1. Win Check (Depth 0)
+      for (const m of candidates) {
+          if (getGomokuShapeScore(board, m.x, m.y, player) >= GOMOKU_SCORES.WIN) return m;
+      }
+      // 2. Block Check (Depth 0)
+      for (const m of candidates) {
+          if (getGomokuShapeScore(board, m.x, m.y, opColor) >= GOMOKU_SCORES.WIN) return m;
+      }
+      
+      // 3. Search
+      const scoredCandidates = candidates.map(pt => ({
+          pt,
+          score: getGomokuScore(board, pt.x, pt.y, player, opColor, true)
+      })).sort((a,b) => b.score - a.score);
+      
+      const searchCount = safeDifficulty === 'Hard' ? 12 : 8;
+      const topMoves = scoredCandidates.slice(0, searchCount).map(s => s.pt);
+      
+      // Easy Mode Special Behavior: deterministically suboptimal?
+      // Or just shallow? 
+      // User asked: "Do not use random algorithm".
+      // So allow shallow search to pick best it sees.
+      
       for (const move of topMoves) {
-        // 模拟落子
-        board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'sim' };
-        
-        // 只有 Hard 模式才会搜索 4 层 (我方-敌方-我方-敌方)
-        // 这样可以看出双活三等杀招
-        const val = minimaxGomoku(board, 4, -Infinity, Infinity, false, player, move);
-        
-        // 加上基础分，倾向于即便搜索不到杀招，也要走好形
-        const baseScore = getGomokuScore(board, move.x, move.y, player, opponent, true) * 0.1;
-        const finalScore = val + baseScore;
-        
-        board[move.y][move.x] = null;
+          board[move.y][move.x] = { color: player, x: move.x, y: move.y, id: 'sim' };
+          
+          const val = minimaxGomoku(board, depth - 1, -Infinity, Infinity, false, player, move);
+          
+          board[move.y][move.x] = null;
+          
+           // Positional bias for center control (Deterministic tie-breaker)
+           const bias = (10 - (Math.abs(move.x - size/2) + Math.abs(move.y - size/2))) * 10;
+           const finalVal = val + bias;
 
-        if (finalScore > bestScore) {
-          bestScore = finalScore;
-          bestMoves = [move];
-        } else if (Math.abs(finalScore - bestScore) < 10) {
-          bestMoves.push(move);
-        }
+          if (finalVal > bestVal) {
+              bestVal = finalVal;
+              bestMove = move;
+          }
       }
-      return bestMoves.length > 0 ? bestMoves[0] : candidates[0];
-    }
+      
+      return bestMove || candidates[0];
   }
 
+
+
+
   // === 围棋 AI (本地) ===
+  const opponent = player === 'black' ? 'white' : 'black';
   const possibleMoves: { x: number; y: number; score: number }[] = [];
   const candidates = getCandidateMoves(board, size, 2); 
 

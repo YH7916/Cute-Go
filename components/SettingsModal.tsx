@@ -166,61 +166,90 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {/* Difficulty (Rank Selection) */}
                     {tempGameMode === 'PvAI' && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                            <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
-                                <div className="flex justify-between items-center px-1">
-                                    <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
-                                        <Cpu size={16} className="text-[#8c6b38]"/> AI 棋力
-                                    </span>
-                                    <span className="text-xs font-black text-[#fcf6ea] bg-[#8c6b38] px-2 py-0.5 rounded-md shadow-sm">
-                                        {tempDifficulty}
-                                    </span>
-                                </div>
-                                
-                                <div className="relative h-8 flex items-center px-2">
-                                     <input 
-                                        type="range" min="0" max="100" step="1"
-                                        value={(() => {
-                                            const idx = RANKS.indexOf(tempDifficulty);
-                                            const safeIdx = idx >= 0 ? idx : RANKS.indexOf('1d');
-                                            // Non-linear mapping: 0-18 (18k-1d) -> 0-50, 18-26 (1d-9d) -> 50-100
-                                            const splitIdx = RANKS.indexOf('1d');
-                                            if (safeIdx <= splitIdx) {
-                                                return (safeIdx / splitIdx) * 50;
-                                            } else {
-                                                return 50 + ((safeIdx - splitIdx) / (RANKS.length - 1 - splitIdx)) * 50;
-                                            }
-                                        })()} 
-                                        onChange={(e) => {
-                                            const val = parseInt(e.target.value);
-                                            const splitIdx = RANKS.indexOf('1d');
-                                            let targetIdx = 0;
-                                            if (val <= 50) {
-                                                targetIdx = Math.round((val / 50) * splitIdx);
-                                            } else {
-                                                targetIdx = splitIdx + Math.round(((val - 50) / 50) * (RANKS.length - 1 - splitIdx));
-                                            }
-                                            const rank = RANKS[targetIdx];
-                                            if (rank) setTempDifficulty(rank);
-                                        }}
-                                        className="cute-range w-full"
-                                        style={{ 
-                                            background: getSliderBackground((() => {
+                            {/* Go: Rank Slider */}
+                            {tempGameType === 'Go' && (
+                                <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
+                                    <div className="flex justify-between items-center px-1">
+                                        <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
+                                            <Cpu size={16} className="text-[#8c6b38]"/> AI 棋力
+                                        </span>
+                                        <span className="text-xs font-black text-[#fcf6ea] bg-[#8c6b38] px-2 py-0.5 rounded-md shadow-sm">
+                                            {tempDifficulty}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="relative h-8 flex items-center px-2">
+                                         <input 
+                                            type="range" min="0" max="100" step="1"
+                                            value={(() => {
                                                 const idx = RANKS.indexOf(tempDifficulty);
                                                 const safeIdx = idx >= 0 ? idx : RANKS.indexOf('1d');
+                                                // Non-linear mapping: 0-18 (18k-1d) -> 0-50, 18-26 (1d-9d) -> 50-100
                                                 const splitIdx = RANKS.indexOf('1d');
-                                                if (safeIdx <= splitIdx) return (safeIdx / splitIdx) * 50;
-                                                else return 50 + ((safeIdx - splitIdx) / (RANKS.length - 1 - splitIdx)) * 50;
-                                            })(), 0, 100),
-                                            touchAction: 'none'
-                                        }}
-                                    />
+                                                if (safeIdx <= splitIdx) {
+                                                    return (safeIdx / splitIdx) * 50;
+                                                } else {
+                                                    return 50 + ((safeIdx - splitIdx) / (RANKS.length - 1 - splitIdx)) * 50;
+                                                }
+                                            })()} 
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value);
+                                                const splitIdx = RANKS.indexOf('1d');
+                                                let targetIdx = 0;
+                                                if (val <= 50) {
+                                                    targetIdx = Math.round((val / 50) * splitIdx);
+                                                } else {
+                                                    targetIdx = splitIdx + Math.round(((val - 50) / 50) * (RANKS.length - 1 - splitIdx));
+                                                }
+                                                const rank = RANKS[targetIdx];
+                                                if (rank) setTempDifficulty(rank);
+                                            }}
+                                            className="cute-range w-full"
+                                            style={{ 
+                                                background: getSliderBackground((() => {
+                                                    const idx = RANKS.indexOf(tempDifficulty);
+                                                    const safeIdx = idx >= 0 ? idx : RANKS.indexOf('1d');
+                                                    const splitIdx = RANKS.indexOf('1d');
+                                                    if (safeIdx <= splitIdx) return (safeIdx / splitIdx) * 50;
+                                                    else return 50 + ((safeIdx - splitIdx) / (RANKS.length - 1 - splitIdx)) * 50;
+                                                })(), 0, 100),
+                                                touchAction: 'none'
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between px-1 relative">
+                                        <span className="text-[10px] text-[#8c6b38]/60 font-medium">18k</span>
+                                        <span className="text-[10px] text-[#8c6b38]/60 font-medium absolute left-1/2 -translate-x-1/2">1d</span>
+                                        <span className="text-[10px] text-[#8c6b38]/60 font-medium">9d</span>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between px-1 relative">
-                                    <span className="text-[10px] text-[#8c6b38]/60 font-medium">18k</span>
-                                    <span className="text-[10px] text-[#8c6b38]/60 font-medium absolute left-1/2 -translate-x-1/2">1d</span>
-                                    <span className="text-[10px] text-[#8c6b38]/60 font-medium">9d</span>
+                            )}
+
+                            {/* Gomoku: Discrete Options */}
+                            {tempGameType === 'Gomoku' && (
+                                <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
+                                    <div className="flex justify-between items-center px-1">
+                                        <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
+                                            <Cpu size={16} className="text-[#8c6b38]"/> 难度选择
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {(['Easy', 'Medium', 'Hard'] as const).map(diff => (
+                                            <button
+                                                key={diff}
+                                                onClick={() => handleDifficultySelect(diff)}
+                                                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border-2 ${
+                                                    tempDifficulty === diff 
+                                                    ? 'bg-[#8c6b38] text-[#fcf6ea] border-[#5c4033] shadow-inner' 
+                                                    : 'bg-[#fff] text-[#8c6b38] border-[#e3c086] hover:bg-[#fcf6ea]'
+                                                }`}
+                                            >
+                                                {diff === 'Easy' ? '简单' : diff === 'Medium' ? '中等' : '困难'}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
 
                             {/* Thinking Visits Slider (Only for PC Go & High Rank) */}

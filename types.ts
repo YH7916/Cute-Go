@@ -26,7 +26,7 @@ export interface Group {
 export type GameMode = 'PvP' | 'PvAI';
 export type GameType = 'Go' | 'Gomoku';
 export type BoardSize = number; 
-export type BoardSize = number; 
+
 export type Difficulty = string; // '18k'...'9d'
 
 export type AchievementCategory = 'milestone' | 'skill' | 'social' | 'fun';
