@@ -110,7 +110,7 @@ export class OnnxEngine {
                 // Fallback to WASM only
                 const wasmOptions: ort.InferenceSession.SessionOptions = {
                     executionProviders: ['wasm'],
-                    graphOptimizationLevel: 'all', // Enable for performance. If NaN occurs, change to 'disabled'
+                    graphOptimizationLevel: 'disabled', // Revert to disabled for multi-threading stability
                 };
                 if (this.config.numThreads) {
                     wasmOptions.intraOpNumThreads = this.config.numThreads;
@@ -120,8 +120,8 @@ export class OnnxEngine {
                 console.log('[OnnxEngine] Model loaded successfully (WASM Fallback)');
             }
 
-            // [New] Warm up the engine to JIT compile kernels
-            await this.prewarm();
+            // [New] Warm up the engine asycnronously to avoid blocking
+            this.prewarm().catch(e => console.warn('[OnnxEngine] Pre-warm skipped:', e));
         } catch (e) {
             console.error('[OnnxEngine] Failed to initialize:', e);
             throw e;

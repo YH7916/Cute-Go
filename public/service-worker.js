@@ -17,6 +17,9 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  
+  // 只缓存 GET 请求，避免 POST 请求导致 cache.put 报错
+  if (request.method !== 'GET') return;
 
   // HTML 文档使用网络优先，避免缓存旧 index.html
   if (request.mode === 'navigate' || request.destination === 'document') {
