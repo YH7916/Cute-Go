@@ -18,6 +18,11 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
+  // Ignore non-GET requests (POST, PUT, DELETE, etc. cannot be cached)
+  if (request.method !== 'GET') {
+    return; 
+  }
+
   // HTML 文档使用网络优先，避免缓存旧 index.html
   if (request.mode === 'navigate' || request.destination === 'document') {
     event.respondWith(
