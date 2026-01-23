@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://kaya-go.github.io/kaya/sitemap.xml
