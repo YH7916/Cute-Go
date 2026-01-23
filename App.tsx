@@ -31,6 +31,7 @@ import { supabase } from './utils/supabaseClient';
 import { SignalMessage } from './types';
 import { WORKER_URL, DEFAULT_DOWNLOAD_LINK, CURRENT_VERSION } from './utils/constants';
 import { compareVersions, calculateElo, calculateNewRating, getAiRating, getRankBadge } from './utils/helpers';
+import { logEvent } from './utils/logger';
 
 // Components
 import { ScoreBoard } from './components/ScoreBoard';
@@ -130,6 +131,9 @@ const App: React.FC = () => {
     };
 
     useEffect(() => {
+        // [New] 埋点：App 启动
+        logEvent('app_start');
+
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             if (session) fetchProfile(session.user.id);
@@ -325,7 +329,7 @@ const App: React.FC = () => {
             electronAiEngine.resetAI(newSettings.boardSize, 7.5);
              if (newSettings.gameMode === 'PvAI' && newSettings.userColor === 'white') {
                setTimeout(() => {
-                    electronAiEngine.requestAiMove('black', newSettings.difficulty, 1000, getResignThreshold(newSettings.difficulty)); 
+                    electronAiEngine.requestAiMove('black', newSettings.difficulty, newSettings.maxVisits, getResignThreshold(newSettings.difficulty)); 
                }, 500);
             }
         }
@@ -949,7 +953,7 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="h-full w-full bg-[#f7e7ce] flex flex-col lg:flex-row items-center relative select-none overflow-y-auto lg:overflow-hidden text-[#5c4033]">
+        <div className="h-full w-full bg-[#f7e7ce] flex flex-col landscape:flex-row items-center relative select-none overflow-y-auto landscape:overflow-hidden text-[#5c4033]">
            
            {toastMsg && (
                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[80] bg-[#5c4033] text-[#fcf6ea] px-4 py-2 rounded-full text-xs font-bold shadow-lg border-2 border-[#8c6b38] animate-in fade-in">
@@ -960,7 +964,7 @@ const App: React.FC = () => {
            <AchievementNotification newUnlocked={newUnlocked} clearNewUnlocked={clearNewUnlocked} />
 
            {/* --- BOARD AREA --- */}
-           <div className="relative flex-grow h-[60%] lg:h-full w-full lg:w-auto lg:flex-1 flex items-center justify-center p-2 order-2 lg:order-1 min-h-0 min-w-0">
+           <div className="relative flex-grow h-[60%] landscape:h-full w-full landscape:w-auto landscape:flex-1 flex items-center justify-center p-2 order-2 landscape:order-1 min-h-0 min-w-0">
                <div className="w-full h-full max-w-full max-h-full aspect-square flex items-center justify-center">
                    <div className="transform transition-transform w-full h-full">
                        <GameBoard 
@@ -994,7 +998,7 @@ const App: React.FC = () => {
            </div>
 
            {/* --- SIDEBAR --- */}
-           <div className="w-full lg:w-96 flex flex-col gap-4 p-4 z-20 shrink-0 bg-[#f7e7ce] lg:bg-[#f2e6d6] lg:h-full lg:border-l-4 lg:border-[#e3c086] order-1 lg:order-2 shadow-xl lg:shadow-none">
+           <div className="w-full landscape:w-96 flex flex-col gap-4 p-4 z-20 shrink-0 bg-[#f7e7ce] landscape:bg-[#f2e6d6] landscape:h-full landscape:border-l-4 landscape:border-[#e3c086] order-1 landscape:order-2 shadow-xl landscape:shadow-none">
                 <div className="flex justify-between items-center">
                     <div className="flex flex-col">
                         <span className="font-black text-[#5c4033] text-xl leading-tight flex items-center gap-2 tracking-wide">

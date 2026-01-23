@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BoardState, Player, BoardSize } from '../types';
+import { logEvent } from '../utils/logger';
 
 interface UseWebKataGoProps {
     boardSize: BoardSize;
@@ -104,6 +105,9 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         simulations: number = 45 // [New] Dynamic simulations
     ) => {
         if (!workerRef.current || isThinking) return;
+
+        // [New] 埋点：记录 AI 请求
+        logEvent('ai_request');
         
         setIsThinking(true);
         if (!isWorkerReady) {

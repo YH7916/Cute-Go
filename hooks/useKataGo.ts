@@ -15,15 +15,15 @@ export type ExtendedDifficulty = Difficulty | 'Custom';
 // --- 辅助计算函数 (导出给 UI 使用) ---
 export const sliderToVisits = (val: number): number => {
     // 0-50 映射到 1-100 (每格约2 visits)
-    // 50-100 映射到 100-2000 (每格约38 visits)
+    // 50-100 映射到 100-5000 (每格约98 visits)
     // 这是一个分段线性映射，让低 visits 区间更细腻
     if (val <= 50) return Math.round(1 + (val / 50) * 99);
-    else return Math.round(100 + ((val - 50) / 50) * 1900);
+    else return Math.round(100 + ((val - 50) / 50) * 4900);
 };
 
 export const visitsToSlider = (visits: number): number => {
-    if (visits <= 100) return ((visits - 1) / 99) * 50;
-    else return 50 + ((visits - 100) / 1900) * 50;
+    if (visits <= 100) return Math.min(50, Math.max(0, ((visits - 1) / 99) * 50));
+    else return Math.min(100, Math.max(50, 50 + ((visits - 100) / 4900) * 50));
 };
 
 // --- GTP 工具函数 (私有) ---
@@ -164,11 +164,15 @@ export const useKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseKata
     setIsThinking(true);
     
     // 计算 Visits
-    let visits = 100;
-    if (difficulty === 'Easy') visits = 10;
-    else if (difficulty === 'Medium') visits = 100;
-    else if (difficulty === 'Hard') visits = 1000;
-    else if (difficulty === 'Custom') visits = maxVisits;
+    // We prioritize the explicit maxVisits argument from UI
+    let visits = maxVisits;
+    if (!visits || visits <= 0) {
+        // Fallback defaults just in case
+        if (difficulty === 'Easy') visits = 10;
+        else if (difficulty === 'Medium') visits = 100;
+        else if (difficulty === 'Hard') visits = 1000;
+        else visits = 100;
+    }
 
     sendCommand(`kata-set-param maxVisits ${visits}`);
     if (typeof resignThreshold === 'number') {
