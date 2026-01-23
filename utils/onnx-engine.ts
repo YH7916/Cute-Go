@@ -65,13 +65,8 @@ export class OnnxEngine {
             };
 
             if (this.config.numThreads) {
-                // Force 1 thread for stability if detected
-                const threads = this.config.numThreads;
-                options.intraOpNumThreads = threads;
-                options.interOpNumThreads = threads;
-            } else {
-                 options.intraOpNumThreads = 1;
-                 options.interOpNumThreads = 1;
+                options.intraOpNumThreads = this.config.numThreads;
+                options.interOpNumThreads = this.config.numThreads;
             }
 
             console.log(`[OnnxEngine] Loading model...`);
