@@ -11,6 +11,7 @@ interface UseWebKataGoProps {
 
 export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseWebKataGoProps) => {
     const [isWorkerReady, setIsWorkerReady] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
     const [aiWinRate, setAiWinRate] = useState(50);
     const workerRef = useRef<Worker | null>(null);
@@ -20,6 +21,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     useEffect(() => {
         // Only run in non-Electron environment (or if specifically enabled for web mode in Electron)
         if (!(window as any).electronAPI) {
+            setIsLoading(true);
             
             // --- 1. Paths ---
             const pathName = window.location.pathname;
@@ -51,6 +53,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
             worker.onerror = (err) => {
                 console.error("CRITICAL: Web Worker Error", err);
                 setIsThinking(false);
+                setIsLoading(false);
             };
 
             worker.onmessage = (e) => {
@@ -58,6 +61,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 if (msg.type === 'init-complete') {
                     console.log('Web AI Ready (ONNX)');
                     setIsWorkerReady(true);
+                    setIsLoading(false);
                     
                     if (pendingRequestRef.current && workerRef.current) {
                         const pending = pendingRequestRef.current;
@@ -91,6 +95,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 } else if (msg.type === 'error') {
                     console.error('[WebAI Error]', msg.message);
                     setIsThinking(false);
+                    setIsLoading(false); // Also stop loading if error occurs during init
                     expectingResponseRef.current = false;
                     pendingRequestRef.current = null;
                 }
@@ -190,6 +195,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
 
     return {
         isWorkerReady,
+        isLoading,
         isThinking,
         aiWinRate,
         requestWebAiMove,

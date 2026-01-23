@@ -48,13 +48,37 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             const { board: boardState, history: gameHistory, color, size, komi, difficulty } = msg.data;
             const pla: Sign = color === 'black' ? 1 : -1;
 
-            // 1. Reconstruct MicroBoard
+            // 1. Reconstruct MicroBoard with Ko Detection
             const board = new MicroBoard(size);
-            for (let y = 0; y < size; y++) {
-                for (let x = 0; x < size; x++) {
-                    const cell = boardState[y][x];
-                    if (cell) {
-                        board.set(x, y, cell.color === 'black' ? 1 : -1);
+            
+            // Logic: To detect Ko, we need to replay the last move to derive the Ko point.
+            // History stores { board: S_prev, lastMove: M_prev }.
+            // So we load S_prev and play M_prev.
+            const len = gameHistory.length;
+            
+            if (len > 0) {
+                const lastItem = gameHistory[len - 1]; // This item contains the state BEFORE the last move, and the move itself.
+                
+                // 1. Load the board state BEFORE the last move
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const cell = lastItem.board[y][x];
+                        if (cell) board.set(x, y, cell.color === 'black' ? 1 : -1);
+                    }
+                }
+                
+                // 2. Play the last move to reach CURRENT state with calculated Ko
+                if (lastItem.lastMove) {
+                    // lastItem.currentPlayer is the player who MADE the move.
+                    const mover = lastItem.currentPlayer === 'black' ? 1 : -1; 
+                    board.play(lastItem.lastMove.x, lastItem.lastMove.y, mover);
+                }
+            } else {
+                // No history (Start of game). Just load current board state.
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const cell = boardState[y][x];
+                        if (cell) board.set(x, y, cell.color === 'black' ? 1 : -1);
                     }
                 }
             }

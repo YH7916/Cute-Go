@@ -16,7 +16,7 @@ import {
   getBoardHash
 } from './utils/goLogic';
 import { getAIConfig } from './utils/aiConfig';
-import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown } from 'lucide-react';
+import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown, Brain, Cpu } from 'lucide-react';
 
 // Hooks
 import { useKataGo, sliderToVisits, visitsToSlider } from './hooks/useKataGo';
@@ -231,10 +231,36 @@ const App: React.FC = () => {
         onAiPass: () => handlePass(false),
         onAiResign: () => endGame(settings.userColor, 'AI 认为胜率过低，投子认输')
     });
-    const { isWorkerReady, isThinking: isWebThinking, aiWinRate: webWinRate, stopThinking: stopWebThinking, requestWebAiMove } = webAiEngine;
+    const { isWorkerReady, isLoading: isWebLoading, isThinking: isWebThinking, aiWinRate: webWinRate, stopThinking: stopWebThinking, requestWebAiMove } = webAiEngine;
 
     const [isFirstRun] = useState(() => !localStorage.getItem('has_run_ai_before'));
+    const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
     const showThinkingStatus = isThinking || isElectronThinking || isWebThinking;
+
+    // --- Visibility Handler (App Level) ---
+    // Resets AI lock when going to background to prevent stuck state
+    useEffect(() => {
+        const handleAppVisibility = () => {
+             const visible = !document.hidden;
+             setIsPageVisible(visible);
+             if (!visible) {
+                 // Reset AI lock if we go to background
+                 if (aiTurnLock.current) {
+                     console.log("[App] App hidden, resetting AI lock");
+                     aiTurnLock.current = false;
+                     setIsThinking(false);
+                     // Note: We don't stop electron/web engine here explicitly as they have their own handlers, 
+                     // but we must unlock the App-level coordinator.
+                 }
+                 if (aiTimerRef.current) {
+                     clearTimeout(aiTimerRef.current);
+                     aiTimerRef.current = null;
+                 }
+             }
+        };
+        document.addEventListener("visibilitychange", handleAppVisibility);
+        return () => document.removeEventListener("visibilitychange", handleAppVisibility);
+    }, []);
 
     // --- Cleanup ---
     useEffect(() => {
@@ -601,6 +627,7 @@ const App: React.FC = () => {
 
     // --- AI Turn Trigger ---
     useEffect(() => {
+        if (!isPageVisible) return;
         if (gameState.appMode !== 'playing' || gameState.gameOver || showPassModal || settings.gameMode !== 'PvAI') return;
         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
         
@@ -656,7 +683,11 @@ const App: React.FC = () => {
                           // Pass history logic for AI
                           let prevHash = null;
                           const currentHistory = gameState.historyRef.current;
-                          if (currentHistory && currentHistory.length > 0) {
+                          // Ko Check logic:
+                          // We check if the NEW board (after AI moves) is identical to a previous state.
+                          // Specifically for Simple Ko, we forbid returning to the state immediately before the opponent's move.
+                          // currentHistory[last] = State_Before_Opponent_Move.
+                          if (currentHistory && currentHistory.length >= 1) {
                               prevHash = getBoardHash(currentHistory[currentHistory.length - 1].board);
                           }
 
@@ -688,7 +719,7 @@ const App: React.FC = () => {
             // User turn, ensure lock is free
             if (gameState.currentPlayer === settings.userColor) aiTurnLock.current = false;
         }
-    }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable]);
+    }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable, isPageVisible]);
 
     /*
     // --- Web AI Turn (Worker) - REDUNDANT / MERGED ABOVE ---
@@ -1304,6 +1335,26 @@ const App: React.FC = () => {
                onCheckUpdate={handleCheckUpdate}
                vibrate={vibrate}
            />
+
+           {/* Web AI Loading Modal - Optimized UI */}
+           {isWebLoading && !isElectronAvailable && (
+             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+                 <div className="bg-[#fcf6ea] p-8 rounded-3xl shadow-2xl border-2 border-[#e3c086] flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-300 min-w-[280px]">
+                      <div className="relative">
+                          <div className="absolute inset-0 bg-[#e3c086]/30 rounded-full animate-ping duration-1000"></div>
+                          <div className="w-16 h-16 bg-[#e3c086]/20 rounded-full flex items-center justify-center relative border border-[#e3c086]/50">
+                               <Cpu size={32} className="text-[#8c6b38]" />
+                          </div>
+                      </div>
+                      <div className="text-center space-y-2">
+                          <h3 className="text-[#5c4033] font-bold text-xl tracking-wide">正在加载AI权重</h3>
+                          <div className="flex flex-col gap-1">
+                               <p className="text-[#8c6b38] text-sm font-medium">首次加载约 5-10 秒</p>
+                          </div>
+                      </div>
+                 </div>
+             </div>
+           )}
 
         </div>
     );
