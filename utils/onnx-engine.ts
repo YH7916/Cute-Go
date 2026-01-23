@@ -143,13 +143,14 @@ export class OnnxEngine {
 
         // 1. Prepare Input Tensors (NCHW)
         // [Batch, Channels, Height, Width] -> [1, 22, 19, 19]
-        const binInputData = new Float32Array(22 * size * size);
+        const tensorSize = 19; // KataGo is fixed 19x19
+        const binInputData = new Float32Array(22 * tensorSize * tensorSize);
         const globalInputData = new Float32Array(19);
 
-        this.fillBinInput(board, color, komi, history, binInputData, size);
+        this.fillBinInput(board, color, komi, history, binInputData, tensorSize);
         this.fillGlobalInput(history, komi, color, globalInputData);
 
-        const binInputTensor = new ort.Tensor('float32', binInputData, [1, 22, size, size]);
+        const binInputTensor = new ort.Tensor('float32', binInputData, [1, 22, tensorSize, tensorSize]);
         const globalInputTensor = new ort.Tensor('float32', globalInputData, [1, 19]);
 
         // 2. Run Inference
@@ -162,27 +163,26 @@ export class OnnxEngine {
             console.timeEnd('[OnnxEngine] Inference');
 
             // 3. Process Results
-            // Support both long names (policy) and short names (p)
-            const policyOutput = results.policy || results.p;
-            const valueOutput = results.value || results.v;
-            const miscOutput = results.miscvalue || results.m;
-
-            const policy = policyOutput ? policyOutput.data as Float32Array : null;
-            const value = valueOutput ? valueOutput.data as Float32Array : null;
-            const misc = miscOutput ? miscOutput.data as Float32Array : null;
+            // [Revert] Back to standard names as requested, but with defensive check
+            const policy = results.policy ? results.policy.data as Float32Array : null;
+            const value = results.value ? results.value.data as Float32Array : null;
+            const misc = results.miscvalue ? results.miscvalue.data as Float32Array : null;
 
             if (!policy || !value || !misc) {
-                console.error('[OnnxEngine] Available output keys:', Object.keys(results));
-                throw new Error('Model output missing policy(p), value(v), or miscvalue(m)');
+                console.error('[OnnxEngine] Model output naming mismatch!');
+                console.log('[OnnxEngine] Expected: policy, value, miscvalue');
+                console.log('[OnnxEngine] Actual keys found:', Object.keys(results));
+                throw new Error(`Model output missing expected keys. Found: ${Object.keys(results).join(', ')}`);
             }
 
             // Handle multi-channel policy (e.g. [1, 6, 82])
             // We only need the first channel (Move Probabilities)
-            const numMoves = size * size + 1;
+            // Handle multi-channel policy (e.g. [1, 6, 362])
+            const numMoves = 19 * 19 + 1; // Standard KataGo size
             let finalPolicy = policy;
             
-            if (policyOutput.dims && policyOutput.dims.length > 2 && policyOutput.dims[1] > 1) {
-                 // Assuming format [Batch, Channels, Moves]
+            const policyDims = results.policy.dims;
+            if (policyDims && policyDims.length > 2 && policyDims[1] > 1) {
                  // Take the first channel
                  finalPolicy = policy.subarray(0, numMoves);
             }
@@ -245,25 +245,22 @@ export class OnnxEngine {
         komi: number,
         history: { color: Sign; x: number; y: number }[],
         data: Float32Array,
-        size: number
+        tensorSize: number
     ) {
+        const size = board.size;
         const opp: Sign = pla === 1 ? -1 : 1;
         
-        // Reference Implementation (Kaya) Layout:
-        // 0: Ones
-        // 1: Pla
-        // 2: Opp
+        // Feature 0: Ones (Fixed 1.0 for whole tensor? Usually just the board area)
+        // KataGo padding: the rest of the 19x19 input should be 0.
         
-        // Helper to set NCHW: Channel, Y, X
         const set = (c: number, y: number, x: number, val: number) => {
-             data[c * size * size + y * size + x] = val;
+             data[c * tensorSize * tensorSize + y * tensorSize + x] = val;
         };
 
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                // Feature 0: Ones
-                set(0, y, x, 1.0);
-
+                set(0, y, x, 1.0); // Feature 0: Ones (Board Mask)
+                
                 const c = board.get(x, y);
                 if (c === pla) set(1, y, x, 1.0);
                 else if (c === opp) set(2, y, x, 1.0);
@@ -361,10 +358,11 @@ export class OnnxEngine {
         return (e0 / sum) * 100; // Return percentage
     }
 
-    private extractMoves(policy: Float32Array, size: number, board: MicroBoard, color: Sign, difficulty: string = 'Hard') {
-        // Policy is just a flat array of logits?
+    private extractMoves(policy: Float32Array, boardSize: number, board: MicroBoard, color: Sign, difficulty: string = 'Hard') {
+        // policy: Float32Array(362)
+        const tensorSize = 19;
         
-        // Find max for stability
+        // 1. Calculate probabilities for the 362 moves
         let maxLogit = -Infinity;
         for (let i = 0; i < policy.length; i++) {
             if (policy[i] > maxLogit) maxLogit = policy[i];
@@ -376,39 +374,34 @@ export class OnnxEngine {
             probs[i] = Math.exp(policy[i] - maxLogit);
             sumProbs += probs[i];
         }
-        // Normalize
         for (let i = 0; i < policy.length; i++) {
             probs[i] /= sumProbs;
         }
 
         const moves: any[] = [];
-        for (let y = 0; y < size; y++) {
-            for (let x = 0; x < size; x++) {
-                const idx = y * size + x;
+        // Only look at the boardSize x boardSize area in the top-left of the 19x19 policy
+        for (let y = 0; y < boardSize; y++) {
+            for (let x = 0; x < boardSize; x++) {
+                const idx = y * tensorSize + x;
                 const p = probs[idx];
                 
-                // Only return legal moves with some probability
-                if (p > 0.0001) { // Lower threshold to allow checking more moves
-                     if (board.isValid(x, y) && board.get(x, y) === 0) { 
-                          moves.push({
-                             x, y,
-                             prior: p,
-                             winrate: 0,
-                             vists: 0,
-                             u: 0, scoreMean: 0, scoreStdev: 0, lead: 0
-                          });
-                     }
+                if (board.isValid(x, y) && board.get(x, y) === 0) { 
+                      moves.push({
+                         x, y,
+                         prior: p,
+                         winrate: 0,
+                         vists: 0,
+                         u: 0, scoreMean: 0, scoreStdev: 0, lead: 0
+                      });
                  }
             }
         }
         
-        // Pass move
-        const passIdx = size * size;
+        // Pass move (KataGo pass is at index 361)
+        const passIdx = 361;
         if (probs.length > passIdx) {
              const passProb = probs[passIdx];
-             if (passProb > 0.001) {
-                 moves.push({ x: -1, y: -1, prior: passProb, winrate: 0, lead: 0, vists: 0, u: 0, scoreMean: 0, scoreStdev: 0 });
-             }
+             moves.push({ x: -1, y: -1, prior: passProb, winrate: 0, lead: 0, vists: 0, u: 0, scoreMean: 0, scoreStdev: 0 });
         }
 
         // Sort by prob
