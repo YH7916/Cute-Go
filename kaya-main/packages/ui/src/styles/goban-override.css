@@ -1,0 +1,8 @@
+/**
+ * Goban CSS override for @kaya/ui
+ * Adds the board texture image (will be inlined as base64 by Rsbuild)
+ */
+
+.shudan-goban {
+  background-image: url('../assets/board.png');
+}

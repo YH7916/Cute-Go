@@ -1,0 +1,180 @@
+.score-estimator {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  width: 100%;
+}
+
+.score-estimator-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.score-section {
+  display: flex;
+  gap: 8px;
+}
+
+.score-player {
+  flex: 1;
+  padding: 12px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+}
+
+.score-player.black {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: #333;
+}
+
+.score-player.white {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: #ddd;
+}
+
+[data-theme='dark'] .score-player.black {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: #666;
+}
+
+[data-theme='dark'] .score-player.white {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #888;
+}
+
+.score-player-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.score-player-rank {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.score-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.score-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.score-label {
+  font-weight: 500;
+}
+
+.score-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.score-total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.score-result {
+  text-align: center;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  border: 2px solid var(--accent);
+}
+
+.score-winner {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.score-info {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.score-info p {
+  margin: 4px 0;
+}
+
+.score-dead-count {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Mobile Compact Mode */
+@media (max-width: 1440px) {
+  .score-estimator {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  .score-estimator-content {
+    gap: 4px;
+  }
+
+  .score-player {
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+  }
+
+  [data-theme='dark'] .score-player.black,
+  [data-theme='dark'] .score-player.white {
+    background: var(--bg-secondary);
+    border-color: var(--border);
+  }
+
+  .score-player-name {
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+
+  .score-breakdown {
+    gap: 2px;
+    margin-bottom: 6px;
+  }
+
+  .score-item {
+    font-size: 11px;
+  }
+
+  .score-total {
+    padding-top: 4px;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+
+  .score-result {
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .score-winner {
+    font-size: 14px;
+  }
+
+  .score-info {
+    display: none;
+  }
+}

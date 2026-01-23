@@ -1,0 +1,71 @@
+/* ConfirmationDialog Styles */
+
+.confirmation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001; /* Higher than other dialogs if needed */
+  backdrop-filter: blur(4px);
+}
+
+.confirmation-dialog {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  min-width: 300px;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.confirmation-dialog h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.confirmation-dialog p {
+  margin: 0 0 1.5rem 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.confirmation-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirmation-actions .cancel-button {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.confirmation-actions .cancel-button:hover {
+  background-color: var(--bg-secondary);
+}
+
+.confirmation-actions .confirm-button {
+  background-color: var(--accent-color);
+  border: 1px solid var(--accent-color);
+  color: white;
+}
+
+.confirmation-actions .confirm-button:hover {
+  background-color: var(--accent-hover);
+}

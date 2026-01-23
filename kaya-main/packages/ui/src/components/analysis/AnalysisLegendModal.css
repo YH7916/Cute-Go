@@ -1,0 +1,170 @@
+/* Analysis Legend Modal Styles */
+.move-strength-info-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  /* High z-index to sit on top of everything */
+  padding: 1rem;
+}
+
+.move-strength-info-modal {
+  background: var(--bg-primary, #fff);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 420px;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.move-strength-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.move-strength-info-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.move-strength-info-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+}
+
+.move-strength-info-close:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.move-strength-info-content {
+  padding: 1.25rem;
+  /* Allow scrolling if content is too tall */
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.move-strength-info-description {
+  margin: 0 0 1.25rem 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.move-strength-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.move-strength-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.move-strength-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.move-strength-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.move-strength-text strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.move-strength-text span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.move-strength-info-note {
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.move-strength-info-note strong {
+  color: var(--text-primary);
+}
+
+/* Heatmap Legend Section */
+.heatmap-legend {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.heatmap-legend h4 {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+.heatmap-legend p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.heatmap-legend-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.heatmap-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.heatmap-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.heatmap-swatch.black-area {
+  background-color: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.heatmap-swatch.white-area {
+  background-color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}

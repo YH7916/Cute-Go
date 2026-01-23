@@ -1,0 +1,23 @@
+{
+  "name": "@kaya/shudan",
+  "version": "0.2.5-dev",
+  "description": "Go board rendering component (adapted from Sabaki Shudan)",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build --force && cp src/*.css src/*.png src/*.svg dist/ 2>/dev/null || true",
+    "dev": "tsc --build --force --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^19.2.3"
+  },
+  "dependencies": {
+    "@kaya/goboard": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "typescript": "^5.6.0"
+  }
+}

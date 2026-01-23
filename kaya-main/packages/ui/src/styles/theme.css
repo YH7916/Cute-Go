@@ -1,0 +1,180 @@
+/* Kaya Theme Variables */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* =========================
+   * Responsive Breakpoints
+   * ========================= */
+  --breakpoint-mobile: 768px;
+  --breakpoint-tablet: 1024px;
+
+  /* Touch-friendly sizing */
+  --touch-target-min: 44px;
+  --mobile-nav-height: 56px;
+  --mobile-nav-height-landscape: 48px;
+  --mobile-header-height: 48px;
+
+  /* Dark theme (default) */
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+  --bg-hover: #2a2d2e;
+  --bg-active: #37373d;
+
+  --border-color: #3e3e42;
+  --divider-color: #454545;
+
+  --text-primary: #cccccc;
+  --text-secondary: #9d9d9d;
+  --text-disabled: #656565;
+
+  --accent-primary: #007acc;
+  --accent-color: #007acc;
+  --accent-hover: #1c8ad6;
+  --accent-active: #0062a3;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.6);
+
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+}
+
+[data-theme='light'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f3f3;
+  --bg-tertiary: #e8e8e8;
+  --bg-hover: #e4e6f1;
+  --bg-active: #d7dae0;
+
+  --border-color: #d4d4d4;
+  --divider-color: #cccccc;
+
+  --text-primary: #333333;
+  --text-secondary: #616161;
+  --text-disabled: #a0a0a0;
+
+  --accent-primary: #0078d4;
+  --accent-color: #0078d4;
+  --accent-hover: #106ebe;
+  --accent-active: #005a9e;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.2);
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition:
+    background-color var(--transition-normal),
+    color var(--transition-normal);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-active);
+}
+
+/* App layout */
+.app {
+  /* Use dvh for mobile browsers that have dynamic viewport (accounts for browser chrome)
+     Falls back to vh for older browsers */
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* =========================
+ * Mobile-Specific Styles
+ * ========================= */
+
+/* Prevent pull-to-refresh and overscroll bouncing */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+/* Prevent text selection on interactive elements (touch-friendly) */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Ensure touch targets are large enough */
+@media (max-width: 767px) {
+  /* Mobile-specific adjustments */
+  button,
+  .btn,
+  [role='button'] {
+    min-height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+  }
+
+  /* Prevent zoom on double-tap for buttons */
+  button,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* Smaller scrollbars on mobile */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+}
+
+/* Tablet adjustments */
+@media (min-width: 768px) and (max-width: 1024px) {
+  button,
+  .btn,
+  [role='button'] {
+    min-height: 40px;
+    min-width: 40px;
+  }
+
+  /* Toggle switches should keep their standard iOS-style dimensions */
+  .toggle-switch {
+    min-height: 31px;
+    min-width: 51px;
+    height: 31px;
+    width: 51px;
+  }
+}

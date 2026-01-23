@@ -1,0 +1,125 @@
+/**
+ * MobileTabBar Styles
+ *
+ * Bottom navigation for mobile layouts
+ * Follows iOS/Android bottom navigation patterns
+ */
+
+.mobile-tab-bar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  height: var(--mobile-nav-height, 56px);
+  padding: 0 8px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+.mobile-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 100%;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  /* Minimum touch target */
+  min-width: var(--touch-target-min, 44px);
+  min-height: var(--touch-target-min, 44px);
+}
+
+.mobile-tab:hover {
+  color: var(--text-primary);
+}
+
+.mobile-tab.active {
+  color: var(--accent-primary);
+}
+
+.mobile-tab-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+}
+
+.mobile-tab-label {
+  font-size: 10px;
+  font-weight: 500;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Badge for notifications/comments */
+.mobile-tab-badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  background-color: var(--accent-primary);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Add padding to main content to account for fixed tab bar */
+.mobile-layout-content {
+  padding-bottom: calc(var(--mobile-nav-height, 56px) + env(safe-area-inset-bottom, 0));
+}
+
+/* Hide on desktop */
+@media (min-width: 1025px) {
+  .mobile-tab-bar {
+    display: none;
+  }
+
+  .mobile-layout-content {
+    padding-bottom: 0;
+  }
+}
+
+/* Landscape phone adjustments */
+@media (max-height: 500px) and (orientation: landscape) {
+  .mobile-tab-bar {
+    height: 44px;
+    padding-bottom: 0;
+    /* Less bottom padding in landscape */
+  }
+
+  .mobile-tab-label {
+    display: none;
+  }
+
+  .mobile-tab-icon {
+    height: 28px;
+  }
+
+  .mobile-tab-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .mobile-layout-content {
+    padding-bottom: calc(44px + env(safe-area-inset-bottom, 0));
+  }
+}

@@ -1,0 +1,172 @@
+/**
+ * @kaya/shudan - Go board rendering component
+ * 
+ * Beautiful theme inspired by traditional Go boards
+ * Architecture: Extensible with CSS custom properties for future theming
+ */
+
+:root {
+  /* Board colors - warm wood tones */
+  --shudan-board-border-width: 0.15em;
+  --shudan-board-border-color: #ca933a;
+  --shudan-board-background-color: #f1b458;
+  --shudan-board-foreground-color: #5e2e0c;
+
+  /* Stone colors */
+  --shudan-black-background-color: #222;
+  --shudan-black-foreground-color: #eee;
+  --shudan-white-background-color: #eee;
+  --shudan-white-foreground-color: #222;
+
+  /* Coordinate colors */
+  --shudan-coord-color: rgba(94, 46, 12, 0.8);
+}
+
+/* Main Goban container */
+.shudan-goban {
+  position: relative;
+  background: var(--shudan-board-background-color);
+  background-size: cover;
+  border: var(--shudan-board-border-width) solid var(--shudan-board-border-color);
+  color: var(--shudan-board-foreground-color);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 0.25em;
+}
+
+/* Board gradient overlay for depth */
+.shudan-goban::after {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--shudan-board-border-width));
+  left: calc(-1 * var(--shudan-board-border-width));
+  bottom: calc(-1 * var(--shudan-board-border-width));
+  right: calc(-1 * var(--shudan-board-border-width));
+  background:
+    linear-gradient(to bottom, rgba(234, 220, 192, 0.1), transparent),
+    linear-gradient(to bottom, transparent, rgba(23, 10, 2, 0.05));
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Grid SVG */
+.shudan-grid {
+  pointer-events: none;
+}
+
+.shudan-gridline,
+.shudan-hoshi {
+  fill: var(--shudan-board-foreground-color);
+}
+
+/* Vertex container */
+.shudan-vertex {
+  box-sizing: border-box;
+  transition: opacity 0.1s;
+  position: relative;
+  z-index: 1;
+}
+
+.shudan-vertex:hover {
+  opacity: 0.95;
+}
+
+/* Stone styles with Sabaki SVG stones */
+.shudan-stone {
+  box-sizing: border-box;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.shudan-stone_black {
+  background-image: url('../stone-black.svg');
+  filter: drop-shadow(0 0.12em 0.25em rgba(0, 0, 0, 0.6));
+}
+
+.shudan-stone_white {
+  background-image: url('../stone-white.svg');
+  filter: drop-shadow(0 0.12em 0.25em rgba(0, 0, 0, 0.4));
+}
+
+/* Coordinates */
+.shudan-coord-x,
+.shudan-coord-y {
+  color: var(--shudan-coord-color);
+  font-weight: 500;
+  font-size: 0.6em;
+}
+
+/* Fuzzy stone placement - slight random offsets */
+.shudan-vertex:not(.shudan-sign_0).shudan-shift_1 .shudan-stone {
+  transform: translate(-50%, -50%) translate(-0.1em, 0);
+}
+.shudan-vertex:not(.shudan-sign_0).shudan-shift_2 .shudan-stone {
+  transform: translate(-50%, -50%) translate(0, -0.1em);
+}
+.shudan-vertex:not(.shudan-sign_0).shudan-shift_3 .shudan-stone {
+  transform: translate(-50%, -50%) translate(0.1em, 0);
+}
+.shudan-vertex:not(.shudan-sign_0).shudan-shift_4 .shudan-stone {
+  transform: translate(-50%, -50%) translate(0, 0.1em);
+}
+.shudan-vertex:not(.shudan-sign_0).shudan-shift_5 .shudan-stone {
+  transform: translate(-50%, -50%) translate(-0.06em, -0.06em);
+}
+.shudan-vertex:not(.shudan-sign_0).shudan-shift_6 .shudan-stone {
+  transform: translate(-50%, -50%) translate(0.06em, -0.06em);
+}
+.shudan-vertex:not(.shudan-sign_0).shudan-shift_7 .shudan-stone {
+  transform: translate(-50%, -50%) translate(0.06em, 0.06em);
+}
+.shudan-vertex:not(.shudan-sign_0).shudan-shift_8 .shudan-stone {
+  transform: translate(-50%, -50%) translate(-0.06em, 0.06em);
+}
+
+/* Last move marker - filled circle in center of stone */
+.shudan-last-move-marker {
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.9;
+}
+
+/* Next move marker (square) - shows the next move in history */
+.shudan-next-move-marker {
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.7;
+}
+
+/* Next move preview on empty intersection */
+.shudan-next-move-preview {
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Ghost stone for next move preview */
+.shudan-ghost-stone {
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Player color classes for ghost stones */
+.shudan-sign_1 .shudan-ghost-stone {
+  color: #000;
+}
+
+.shudan-sign_-1 .shudan-ghost-stone {
+  color: #fff;
+}
+
+.shudan-sign_0 .shudan-ghost-stone {
+  color: #000; /* Default to black */
+}
+
+/* Future expansion: Reserved classes for upcoming features
+ * - .shudan-marker: For markers (circle, square, triangle, label, etc.)
+ * - .shudan-paint: For territory/paint overlay
+ * - .shudan-heat: For heat map visualization
+ * - .shudan-dimmed: For dimmed/faded stones
+ * - .shudan-selected: For highlighted vertices
+ */

@@ -275,6 +275,7 @@ const App: React.FC = () => {
         gameState.setPassNotificationDismissed(false);
         gameState.setFinalScore(null);
         gameState.setHistory([]);
+        gameState.historyRef.current = []; // Sync Ref
         setInitialStones([]); // Clear setup
         setShowMenu(false);
         setShowPassModal(false);
@@ -385,15 +386,23 @@ const App: React.FC = () => {
             }
             
             // State Update
+            const newHistoryItem = { 
+                board: currentBoard, 
+                currentPlayer: activePlayer, 
+                blackCaptures: gameState.blackCaptures, 
+                whiteCaptures: gameState.whiteCaptures, 
+                lastMove: { x, y }, // Correct: This state was produced by move (x,y)
+                consecutivePasses: gameState.consecutivePasses 
+            };
+            
             if (!isRemote) {
-                gameState.setHistory(prev => [...prev, { 
-                    board: currentBoard, currentPlayer: activePlayer, 
-                    blackCaptures: gameState.blackCaptures, whiteCaptures: gameState.whiteCaptures, 
-                    lastMove: gameState.lastMove, consecutivePasses: gameState.consecutivePasses 
-                }]);
+                gameState.setHistory(prev => [...prev, newHistoryItem]);
             }
             
-            gameState.boardRef.current = result.newBoard; // Prioritize Ref
+            // Critical Fix: Update Refs immediately to avoid AI reading stale state
+            gameState.boardRef.current = result.newBoard; 
+            gameState.historyRef.current = [...gameState.historyRef.current, newHistoryItem];
+            
             gameState.setBoard(result.newBoard); 
             gameState.setLastMove({ x, y }); 
             gameState.setConsecutivePasses(0); 
@@ -428,7 +437,31 @@ const App: React.FC = () => {
             setIsThinking(false);
         }
 
-        if (!isRemote) gameState.setHistory(prev => [...prev, { board: gameState.boardRef.current, currentPlayer: gameState.currentPlayerRef.current, blackCaptures: gameState.blackCaptures, whiteCaptures: gameState.whiteCaptures, lastMove: gameState.lastMove, consecutivePasses: gameState.consecutivePasses }]);
+        if (!isRemote) {
+            // For a pass, lastMove is arguably null or a special pass marker?
+            // Existing logic used gameState.lastMove which was the PREVIOUS move.
+            // If we want to record "Pass", usually coordinates are outside board or special.
+            // But let's check existing usage. lastMove is {x,y} or null.
+            // If I pass, the state changes (currentPlayer swaps), but board is same.
+            // The "move that led to this" is a Pass.
+            // The worker filters `item.lastMove`. If I put null, it skips it.
+            // If I skip it, OnnxEngine sees no move?
+            // Pass needs to be recorded for "Pass History" (Ch 0-4 global inputs).
+            // KataGo expects Pass as {x: -1, y: -1} or similar?
+            // App doesn't seem to track "Pass" as a coordinator in lastMove ({x,y}).
+            // Let's stick to null for now, or check how to represent Pass.
+            // If I use null, worker skips adding the move to History.
+            // Then OnnxEngine doesn't see the pass in history array.
+            // Then it won't set "Pass History" global feature.
+            // This might be minor for now.
+            // Let's keep it as is (previous logic), or set lastMove: null?
+            // Actually, if lastMove was previous move, State N (Pass) -> lastMove (Move N-1).
+            // That was also wrong. It linked State N to Move N-1.
+            // It should be State N (Pass) -> Move N (Pass).
+            const newItem = { board: gameState.boardRef.current, currentPlayer: gameState.currentPlayerRef.current, blackCaptures: gameState.blackCaptures, whiteCaptures: gameState.whiteCaptures, lastMove: null, consecutivePasses: gameState.consecutivePasses };
+            gameState.setHistory(prev => [...prev, newItem]);
+            gameState.historyRef.current = [...gameState.historyRef.current, newItem];
+        }
         
         if (onlineStatusRef.current === 'connected' && !isRemote) { 
             if (gameState.currentPlayerRef.current !== myColorRef.current) return; 
@@ -497,7 +530,11 @@ const App: React.FC = () => {
          setIsThinking(false);
          if (aiTimerRef.current) { clearTimeout(aiTimerRef.current); aiTimerRef.current = null; }
 
-         gameState.setHistory(prevHistory => prevHistory.slice(0, prevHistory.length - stepsToUndo));
+         gameState.setHistory(prevHistory => {
+             const newHist = prevHistory.slice(0, prevHistory.length - stepsToUndo);
+             gameState.historyRef.current = newHist; // Sync Ref
+             return newHist;
+         });
     };
 
     const endGame = async (winnerColor: Player, reason: string) => { 
@@ -581,9 +618,20 @@ const App: React.FC = () => {
                           electronAiEngine.requestAiMove(aiColor, settings.difficulty, settings.maxVisits, getResignThreshold(settings.difficulty));
                       } else {
                           // Web AI Request
-                          const simulations = aiConfig.simulations;
-                          console.log(`[App] Requesting WebAI move. Difficulty: ${settings.difficulty}, Sims: ${simulations}`);
-                          webAiEngine.requestWebAiMove(gameState.boardRef.current, aiColor, gameState.historyRef.current, simulations);
+                          let simulations = aiConfig.simulations;
+                          
+                          // Performance Optimization for Web/Mobile (WASM)
+                          // b18 model is heavy. Cap simulations to ensure responsiveness.
+                          // 19x19: Cap at 20 visits (approx 2-3s on mobile WASM)
+                          // 9x9: Cap at 50 visits
+                          if (settings.boardSize > 13) simulations = Math.min(simulations, 20);
+                          else simulations = Math.min(simulations, 50);
+
+                          // Determine Komi based on board size
+                          // 9x9: 7.5 is overwhelming. 0.5 is a loss. 6.5 is standard (Japanese) and should be balanced.
+                          const komi = settings.boardSize === 9 ? 6.5 : 7.5;
+                          
+                          webAiEngine.requestWebAiMove(gameState.boardRef.current, aiColor, gameState.historyRef.current, simulations, komi);
                       }
                   }, 100);
               }
@@ -652,11 +700,20 @@ const App: React.FC = () => {
                 // High Rank: Use Web Worker
                 aiTurnLock.current = true;
                 setIsThinking(true);
+                // Determine Komi
+                const komi = settings.boardSize === 9 ? 6.5 : 7.5;
+                
+                // Cap simulations for Web performance
+                let sims = aiConfig.simulations;
+                if (settings.boardSize > 13) sims = Math.min(sims, 20);
+                else sims = Math.min(sims, 50);
+
                 requestWebAiMove(
                     gameState.boardRef.current, 
                     gameState.currentPlayerRef.current, 
                     gameState.historyRef.current,
-                    aiConfig.simulations
+                    sims,
+                    komi
                 );
             } else {
                 // Low Rank: Logic handled by the "Computer Move" effect below

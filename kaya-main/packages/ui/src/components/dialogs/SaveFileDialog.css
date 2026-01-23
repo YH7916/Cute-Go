@@ -1,0 +1,192 @@
+/* SaveFileDialog - Styling for save dialog */
+
+.save-file-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.save-file-dialog {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  padding: 24px;
+  min-width: 400px;
+  max-width: 90vw;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+}
+
+.save-file-dialog h2 {
+  margin: 0 0 20px 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.save-file-dialog-content {
+  margin-bottom: 24px;
+}
+
+.save-file-dialog-content label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.save-file-dialog-content input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+  box-sizing: border-box;
+}
+
+.save-file-dialog-content input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.save-file-dialog-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-height: 16px;
+}
+
+.save-file-dialog-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.save-file-dialog-buttons button {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.button-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.button-secondary:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.button-primary {
+  background: var(--accent-color);
+  color: white;
+}
+
+.button-primary:hover {
+  background: var(--accent-hover);
+}
+
+.button-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button-primary:disabled:hover {
+  background: var(--accent-color);
+}
+
+/* SaveToLibraryDialog specific styles */
+.save-to-library-dialog {
+  min-width: 450px;
+}
+
+.folder-selector {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.folder-item:hover {
+  background: var(--bg-hover);
+}
+
+.folder-item.selected {
+  background: var(--accent-color);
+  color: white;
+}
+
+.folder-item.selected:hover {
+  background: var(--accent-hover);
+}
+
+.folder-item.root-folder {
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 500;
+}
+
+.folder-expand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+}
+
+.folder-item.selected .folder-expand-icon {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.folder-expand-placeholder {
+  width: 16px;
+  height: 16px;
+}
+
+.folder-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+.folder-item.selected .folder-icon {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.folder-name {
+  flex: 1;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

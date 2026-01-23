@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# Tauri
+**/target/
+**/src-tauri/target/
+
+# Generated files
+*.d.ts
+
+# Package manager
+pnpm-lock.yaml
+bun.lockb
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+
+# Documentation that might have specific formatting
+CHANGELOG.md
+
+# Markdown files are handled by markdownlint
+# But still format them with prettier for consistency
+
+# WASM and library files
+**/public/wasm/
+**/public/vendor/

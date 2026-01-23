@@ -1,0 +1,113 @@
+import { OnnxEngine, type AnalysisResult } from '../utils/onnx-engine';
+import { MicroBoard, type Sign } from '../utils/micro-board';
+
+// Define message types
+type WorkerMessage = 
+    | { type: 'init'; payload: { modelPath: string; wasmPath?: string; numThreads?: number } }
+    | { type: 'compute'; data: { 
+            board: any[][]; // BoardState
+            history: any[]; // HistoryItem[]
+            color: 'black' | 'white';
+            size: number;
+            simulations?: number;
+            komi?: number;
+      } }
+    | { type: 'stop' };
+
+let engine: OnnxEngine | null = null;
+
+const ctx: Worker = self as any;
+
+ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
+    const msg = e.data;
+
+    try {
+        if (msg.type === 'init') {
+            const { modelPath, wasmPath, numThreads } = msg.payload;
+            
+            // Dispose existing engine if any
+            if (engine) engine.dispose();
+
+            engine = new OnnxEngine({
+                modelPath: modelPath,
+                wasmPath: wasmPath,
+                numThreads: numThreads,
+                debug: true // Enable debug for now
+            });
+
+            await engine.initialize();
+            ctx.postMessage({ type: 'init-complete' });
+
+        } else if (msg.type === 'compute') {
+            if (!engine) {
+                throw new Error('Engine not initialized');
+            }
+
+            const { board: boardState, history: gameHistory, color, size, komi } = msg.data;
+            const pla: Sign = color === 'black' ? 1 : -1;
+
+            // 1. Reconstruct MicroBoard
+            const board = new MicroBoard(size);
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const cell = boardState[y][x];
+                    if (cell) {
+                        board.set(x, y, cell.color === 'black' ? 1 : -1);
+                    }
+                }
+            }
+
+            // 2. Reconstruct History
+            // HistoryItem[] -> { color, x, y }[]
+            // Note: gameHistory contains states. We need the moves that led to these states.
+            // gameHistory[i].lastMove is the move that produced gameHistory[i].
+            // And gameHistory[i].currentPlayer is the player *after* that move (next to play).
+            // So the move was made by the *previous* player? 
+            // Actually, if lastMove exists, it was made by the color opposite to currentPlayer?
+            // Let's verify standard logic or just deduce.
+            // If currentPlayer is 'white', then 'black' just moved.
+            // So the move 'lastMove' was made by 'black'.
+            const historyMoves: { color: Sign; x: number; y: number }[] = [];
+            
+            for (const item of gameHistory) {
+                if (item.lastMove) {
+                    const moveColor = item.currentPlayer === 'white' ? 1 : -1; // If White to play, Black just moved
+                    historyMoves.push({
+                         color: moveColor,
+                         x: item.lastMove.x,
+                         y: item.lastMove.y
+                    });
+                }
+            }
+            
+            // 3. Run Analysis
+            const result = await engine.analyze(board, pla, {
+                history: historyMoves,
+                komi: komi ?? 7.5 // Default komi if missing
+            });
+
+            // 4. Send Response
+            // Select best move
+            if (result.moves.length > 0) {
+                 const best = result.moves[0];
+                 // If best is pass (-1, -1)
+                 if (best.x === -1) {
+                      ctx.postMessage({ type: 'ai-response', data: { move: null, winRate: result.rootInfo.winrate } });
+                 } else {
+                      ctx.postMessage({ type: 'ai-response', data: { move: { x: best.x, y: best.y }, winRate: result.rootInfo.winrate } });
+                 }
+            } else {
+                 // No moves? Pass.
+                 ctx.postMessage({ type: 'ai-response', data: { move: null, winRate: 50 } });
+            }
+        } else if (msg.type === 'stop') {
+            // No-op for now as ONNX run is atomicish. 
+            // We could set a flag if we had a loop.
+        }
+    } catch (err: any) {
+        console.error('[AI Worker] Error:', err);
+        ctx.postMessage({ type: 'error', message: err.message });
+    }
+};
+
+export {};

@@ -1,0 +1,330 @@
+/* Analysis Chart Styles */
+
+.analysis-chart-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  position: relative;
+}
+
+.analysis-chart-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: var(--text-secondary);
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.analysis-chart-empty p {
+  margin: 0;
+}
+
+.analysis-chart-empty p:first-child {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.analysis-chart-hint {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+/* Toggle buttons */
+.analysis-chart-toggles {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.analysis-chart-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.analysis-chart-toggle:hover {
+  background: var(--bg-tertiary);
+}
+
+.analysis-chart-toggle.active {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--accent-color);
+}
+
+.toggle-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.toggle-winrate {
+  background: var(--chart-winrate-line);
+}
+
+.toggle-score {
+  background: var(--chart-score);
+}
+
+/* Current position info - below chart */
+.analysis-chart-current-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.current-move {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.current-winrate {
+  color: var(--chart-winrate-line);
+  font-weight: 600;
+}
+
+.current-score {
+  font-weight: 600;
+}
+
+.current-no-data {
+  color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Chart wrapper - fills available width, fixed height */
+.analysis-chart-wrapper {
+  flex: 0 0 auto;
+  display: flex;
+  padding: 0.25rem 0.5rem;
+  height: 150px;
+  width: 100%;
+}
+
+/* SVG Chart - uses actual pixel dimensions set via width/height attributes */
+.analysis-chart-svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.chart-background {
+  fill: var(--chart-bg);
+}
+
+.chart-midline,
+.chart-zeroline {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  stroke-dasharray: 4 2;
+}
+
+/* Win rate area fills */
+.winrate-area-black {
+  fill: var(--chart-black);
+  opacity: 0.25;
+}
+
+.winrate-area-white {
+  fill: var(--chart-white);
+  opacity: 0.25;
+}
+
+/* Lines */
+.chart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.winrate-line {
+  stroke: var(--chart-winrate-line);
+}
+
+.score-line {
+  stroke: var(--chart-score);
+}
+
+/* Current position line - uses theme-aware color (black in light, white in dark) */
+.chart-current-line {
+  stroke: var(--chart-current-position);
+  stroke-width: 2;
+  opacity: 0.9;
+}
+
+/* Hover line */
+.chart-hover-line {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  opacity: 0.5;
+}
+
+/* Axes */
+.axis-line {
+  stroke: var(--border-color);
+  stroke-width: 1;
+}
+
+.axis-tick {
+  stroke: var(--border-color);
+  stroke-width: 1;
+}
+
+.axis-label {
+  font-size: 12px;
+  fill: var(--text-secondary);
+}
+
+.axis-label-small {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.axis-left .axis-label {
+  text-anchor: end;
+}
+
+.axis-right .axis-label {
+  text-anchor: start;
+}
+
+.axis-label-bottom {
+  text-anchor: middle;
+}
+
+/* Win rate axis labels - use winrate line color */
+.winrate-label-top,
+.winrate-label-mid,
+.winrate-label-bottom {
+  fill: var(--chart-winrate-line);
+  font-weight: 500;
+}
+
+/* Score axis labels - use score color */
+.score-label-value {
+  fill: var(--chart-score);
+  font-weight: 500;
+}
+
+/* Axis titles */
+.axis-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.winrate-axis-title {
+  fill: var(--chart-winrate-line);
+}
+
+.score-axis-title {
+  fill: var(--chart-score);
+}
+
+/* Tooltip */
+.analysis-chart-tooltip {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  pointer-events: none;
+  min-width: 140px;
+}
+
+.tooltip-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
+  text-align: center;
+}
+
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.7rem;
+}
+
+.tooltip-label {
+  color: var(--text-secondary);
+}
+
+.tooltip-value {
+  font-weight: 500;
+}
+
+.winrate-value {
+  color: var(--text-primary);
+}
+
+.score-positive {
+  color: var(--chart-black);
+}
+
+.score-negative {
+  color: var(--chart-white);
+}
+
+/* Perspective note */
+.analysis-chart-perspective-note {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--chart-white);
+  margin-top: 4px;
+  padding: 0 8px;
+}
+
+.analysis-chart-perspective-note em {
+  font-style: italic;
+}
+
+/* CSS Variables for chart colors */
+:root {
+  --chart-bg: rgba(0, 0, 0, 0.02);
+  --chart-grid: rgba(128, 128, 128, 0.3);
+  --chart-black: #1a1a1a;
+  --chart-white: #a0a0a0;
+  --chart-score: #2196f3;
+  --chart-winrate-line: #9c27b0;
+  --chart-current-position: #1a1a1a;
+}
+
+[data-theme='dark'] {
+  --chart-bg: rgba(255, 255, 255, 0.02);
+  --chart-grid: rgba(128, 128, 128, 0.2);
+  --chart-black: #f5f5f5;
+  --chart-white: #707070;
+  --chart-score: #64b5f6;
+  --chart-winrate-line: #ce93d8;
+  --chart-current-position: #ffffff;
+}

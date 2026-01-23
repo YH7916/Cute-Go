@@ -14,34 +14,35 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const [isThinking, setIsThinking] = useState(false);
     const [aiWinRate, setAiWinRate] = useState(50);
     const workerRef = useRef<Worker | null>(null);
-    const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[] } | null>(null);
+    const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[]; simulations: number; komi?: number } | null>(null);
 
     useEffect(() => {
-        // 仅在非 Electron 环境下运行
+        // Only run in non-Electron environment (or if specifically enabled for web mode in Electron)
         if (!(window as any).electronAPI) {
             
-            // --- 1. 计算基础目录 (兼容 H5 子目录 / index.html) ---
+            // --- 1. Paths ---
             const pathName = window.location.pathname;
-            // 去掉 index.html，只保留目录路径 (例如 "/game/" 或 "/")
             const directory = pathName.substring(0, pathName.lastIndexOf('/') + 1);
             const baseUrl = `${window.location.origin}${directory}`;
+            
+            // Using the specific quantized model provided by the user
+            const modelUrl = `${baseUrl}models/kata1-b18c384nbt-s9996604416-d4316597426.uint8.onnx`;
+            // Calculate WASM path
+            const wasmUrl = `${baseUrl}wasm/`;
 
-            // --- 2. 计算 Worker 和 Model 的绝对路径 ---
-            // 这样无论你在哪里，都能找到 public 下的文件
-            const ts = Date.now();
-            const workerUrl = `${baseUrl}worker/ai-worker.js?v=${ts}`;
-            const modelUrl = `${baseUrl}models/model.json?v=${ts}`; // <--- 这里定义了 modelUrl
+            console.log("WebAI Model URL:", modelUrl);
+            console.log("WebAI WASM URL:", wasmUrl);
 
-            console.log("Worker URL:", workerUrl);
-            console.log("Model URL:", modelUrl);
-
+            // --- 2. Worker Initialization ---
+            // Use Vite's recommended syntax for module workers
             let worker: Worker;
             try {
-                worker = new Worker(workerUrl);
+                worker = new Worker(new URL('../worker/ai.worker.ts', import.meta.url), { 
+                    type: 'module'
+                });
             } catch (e) {
                 console.error("Worker Init Failed:", e);
-                // 兜底尝试
-                worker = new Worker('worker/ai-worker.js');
+                return;
             }
             
             workerRef.current = worker;
@@ -54,7 +55,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
             worker.onmessage = (e) => {
                 const msg = e.data;
                 if (msg.type === 'init-complete') {
-                    console.log('Web AI Ready');
+                    console.log('Web AI Ready (ONNX)');
                     setIsWorkerReady(true);
                     
                     if (pendingRequestRef.current && workerRef.current) {
@@ -66,9 +67,12 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                                 board: pending.board,
                                 history: pending.history,
                                 color: pending.playerColor,
-                                size: boardSize
+                                size: boardSize,
+                                simulations: pending.simulations,
+                                komi: pending.komi ?? 7.5
                             }
                         });
+                        setIsThinking(true);
                     }
                 } else if (msg.type === 'ai-response') {
                     setIsThinking(false);
@@ -76,9 +80,6 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                     setAiWinRate(winRate);
                     if (move) onAiMove(move.x, move.y);
                     else onAiPass();
-                } else if (msg.type === 'ai-resign') {
-                    setIsThinking(false);
-                    onAiResign();
                 } else if (msg.type === 'error') {
                     console.error('[WebAI Error]', msg.message);
                     setIsThinking(false);
@@ -86,10 +87,20 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 }
             };
 
-            // --- 3. 发送初始化消息 (带上 modelUrl) ---
+            // --- 3. Hardware Concurrency ---
+            // WASM multithreading helps, but too many threads can block the UI or have diminishing returns.
+            // Cap at 4 or physical cores.
+            const cores = navigator.hardwareConcurrency || 2;
+            const numThreads = Math.min(4, cores); 
+
+            // --- 4. Send Init Message ---
             worker.postMessage({ 
                 type: 'init',
-                payload: { modelPath: modelUrl } // <--- 现在这里不会报错了
+                payload: { 
+                    modelPath: modelUrl,
+                    wasmPath: wasmUrl,
+                    numThreads: numThreads
+                }
             });
 
             return () => {
@@ -102,29 +113,30 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         board: BoardState,
         playerColor: Player,
         history: any[],
-        simulations: number = 45 // [New] Dynamic simulations
+        simulations: number = 45,
+        komi: number = 7.5 // Default komi
     ) => {
         if (!workerRef.current || isThinking) return;
 
-        // [New] 埋点：记录 AI 请求
         logEvent('ai_request');
         
-        setIsThinking(true);
         if (!isWorkerReady) {
-            // 模型还未加载完成，先缓存请求，等 init-complete 后补发
-            pendingRequestRef.current = { board, playerColor, history }; // Note: pending logic needs update too if strictly needed, but simple fallback is ok
+            console.log("Worker not ready, queuing request...");
+            pendingRequestRef.current = { board, playerColor, history, simulations, komi }; // Add komi to pending
+            setIsThinking(true); // Set thinking to show UI state
             return;
         }
 
-        // 发送完整数据到 Worker，让 Worker 负责繁重的计算
+        setIsThinking(true);
         workerRef.current.postMessage({
             type: 'compute',
             data: {
-                board, // 原始棋盘数据
-                history, // 原始历史数据
+                board, 
+                history, 
                 color: playerColor,
                 size: boardSize,
-                simulations
+                simulations,
+                komi
             }
         });
     }, [boardSize, isThinking, isWorkerReady]);

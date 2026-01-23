@@ -1,0 +1,169 @@
+/**
+ * LanguageSwitcher Styles
+ * 
+ * Compact language selector with dropdown menu.
+ * Responsive design for desktop, tablet, and mobile.
+ */
+
+.language-switcher {
+  position: relative;
+  z-index: 1000;
+}
+
+.language-switcher-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary, #999);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  height: 32px;
+  /* Override .header-toggles button width constraint */
+  width: auto !important;
+}
+
+.language-switcher-button:hover:not(:disabled) {
+  background: var(--bg-tertiary, #2a2a2a);
+  color: var(--text-primary, #fff);
+}
+
+.language-switcher-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.language-switcher-code {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.language-switcher-chevron {
+  transition: transform 0.2s ease;
+  opacity: 0.6;
+}
+
+.language-switcher-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Dropdown menu */
+.language-switcher-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  width: max-content;
+  max-width: 280px;
+  background: var(--bg-primary, #0a0a0a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 12px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 10px 15px -3px rgba(0, 0, 0, 0.2),
+    0 20px 25px -5px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  overflow: hidden;
+  animation: languageDropdownFadeIn 0.15s ease-out;
+}
+
+@keyframes languageDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.language-switcher-dropdown-header {
+  padding: 10px 14px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.language-switcher-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100% !important;
+  height: auto !important;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary, #fff);
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+  transition: background 0.1s ease;
+  justify-content: flex-start;
+  border-radius: 0;
+}
+
+.language-switcher-option:hover {
+  background: var(--bg-tertiary, #1a1a1a);
+}
+
+.language-switcher-option.active {
+  background: var(--accent-color-alpha, rgba(59, 130, 246, 0.1));
+}
+
+.language-flag {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  min-width: 24px;
+  text-align: center;
+  font-family:
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Android Emoji', 'EmojiSymbols',
+    sans-serif;
+}
+
+.language-name {
+  flex: 1;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.language-code-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary, #666);
+  background: var(--bg-tertiary, #1a1a1a);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.language-check {
+  color: var(--accent-color, #3b82f6);
+  flex-shrink: 0;
+}
+
+/* Tablet responsive (768px - 1024px) */
+@media (max-width: 1024px) {
+  .language-switcher-dropdown {
+    min-width: 180px;
+  }
+}
+
+/* Mobile responsive (< 768px) */
+@media (max-width: 768px) {
+  /* Hide from header on mobile - use MobileMenu instead */
+  .language-switcher {
+    display: none;
+  }
+}

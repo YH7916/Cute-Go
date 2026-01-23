@@ -1,0 +1,70 @@
+/**
+ * AIAnalysisOverlay Styles
+ */
+
+.ai-analysis-overlay {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.ai-analysis-status {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  pointer-events: all;
+}
+
+.ai-status-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.ai-status-message.ai-initializing {
+  color: var(--text-secondary);
+}
+
+.ai-status-message.ai-analyzing {
+  color: #4886d5; /* Blue */
+}
+
+.ai-status-message.ai-success {
+  color: #59a80f; /* Green */
+}
+
+.ai-status-message.ai-error {
+  color: #f02311; /* Red */
+}
+
+.ai-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-left-color: currentColor;
+  border-radius: 50%;
+  animation: ai-spin 0.8s linear infinite;
+}
+
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dark theme adjustments */
+[data-theme='dark'] .ai-analysis-status {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .ai-spinner {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-left-color: currentColor;
+}

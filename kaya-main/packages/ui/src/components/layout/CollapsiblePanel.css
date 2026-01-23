@@ -1,0 +1,78 @@
+/* CollapsiblePanel Styles */
+
+.collapsible-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.panel-header:hover {
+  background: var(--muted);
+}
+
+.panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.panel-collapse-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  transition: transform 0.2s;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.panel-header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Allow panel to fill available space when expanded */
+.collapsible-panel:not(.collapsed) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Collapsed state */
+.collapsible-panel.collapsed {
+  flex-shrink: 0;
+}
+
+.collapsible-panel.collapsed .panel-header {
+  border-bottom: none;
+}

@@ -1,0 +1,273 @@
+/* GameInfoEditor Styles - Inline editing */
+
+.game-info-editor {
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  flex: 1;
+  overflow: hidden;
+}
+
+.info-edit-button {
+  padding: 0.35rem;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-edit-button:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.info-edit-button.active {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.info-save-button,
+.info-cancel-button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--foreground);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.info-save-button {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border-color: var(--accent);
+  margin-right: 0.5rem;
+}
+
+.info-save-button:hover {
+  opacity: 0.9;
+}
+
+.info-cancel-button:hover {
+  background: var(--muted);
+  border-color: var(--border);
+}
+
+.info-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.game-info-display {
+  padding: 0.5rem;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.game-info-row {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.game-info-row strong {
+  color: var(--foreground);
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+}
+
+.game-info-row em {
+  color: var(--muted-foreground);
+}
+
+/* Editable field styles */
+.editable-field {
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  border-radius: 3px;
+  transition: background-color 0.15s ease;
+}
+
+.editable-field:hover {
+  background-color: var(--bg-hover, rgba(0, 0, 0, 0.05));
+}
+
+.editable-field.edit-mode {
+  background-color: var(--bg-hover, rgba(0, 0, 0, 0.03));
+  border: 1px dashed var(--border);
+  padding: 0.05rem 0.2rem;
+}
+
+.editable-field.edit-mode:hover {
+  background-color: var(--accent-light, rgba(74, 144, 226, 0.1));
+  border-color: var(--accent);
+}
+
+.editable-rank {
+  font-size: 0.85em;
+}
+
+.empty-placeholder {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+/* Inline edit input */
+.inline-edit-input {
+  font-size: 0.9rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg-secondary, var(--background));
+  color: var(--foreground);
+  outline: none;
+  min-width: 80px;
+  max-width: 150px;
+}
+
+.inline-edit-input:focus {
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+.inline-edit-input-small {
+  min-width: 50px;
+  max-width: 80px;
+}
+
+/* Number inputs */
+.inline-edit-input[type='number'] {
+  min-width: 60px;
+  max-width: 80px;
+}
+
+.game-info-form {
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.form-row {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-row label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 0.25rem;
+}
+
+.form-row input {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.9rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.form-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}
+
+.info-hint {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--muted);
+  border-radius: 3px;
+}
+
+/* Dark mode support */
+[data-theme='dark'] .form-row input {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+[data-theme='dark'] .game-info-display:hover {
+  background: var(--muted);
+}
+
+[data-theme='dark'] .editable-field:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='dark'] .editable-field.edit-mode {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme='dark'] .editable-field.edit-mode:hover {
+  background-color: rgba(74, 144, 226, 0.15);
+}
+
+[data-theme='dark'] .inline-edit-input {
+  background: var(--bg-tertiary, #1a1a1a);
+  color: var(--foreground);
+}
+
+.save-button:hover {
+  background: var(--success-hover, #4cae4c);
+}
+
+.cancel-button {
+  background: var(--button-secondary, #e0e0e0);
+  color: var(--text-primary, #333);
+}
+
+.cancel-button:hover {
+  background: var(--button-secondary-hover, #d0d0d0);
+}
+
+/* Dark theme support */
+[data-theme='dark'] .game-info-display,
+[data-theme='dark'] .game-info-editor {
+  background: var(--bg-secondary, #2a2a2a);
+}
+
+[data-theme='dark'] .game-info-row strong,
+[data-theme='dark'] .form-row label {
+  color: var(--text-primary, #e0e0e0);
+}
+
+[data-theme='dark'] .form-row input {
+  background: var(--bg-tertiary, #1a1a1a);
+  color: var(--text-primary, #e0e0e0);
+  border-color: var(--border, #444);
+}
+
+[data-theme='dark'] .cancel-button {
+  background: var(--button-secondary, #444);
+  color: var(--text-primary, #e0e0e0);
+}
+
+[data-theme='dark'] .cancel-button:hover {
+  background: var(--button-secondary-hover, #555);
+}
+
+/* Clickable links in game info */
+.game-info-link {
+  color: var(--accent, #4a9eff);
+  text-decoration: none;
+  transition: all 0.2s;
+  word-break: break-all;
+}
+
+.game-info-link:hover {
+  color: var(--accent-foreground, #6bb6ff);
+  text-decoration: underline;
+}

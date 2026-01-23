@@ -1,0 +1,183 @@
+/* NewGameDialog Styles */
+
+.new-game-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+  opacity: 1;
+  pointer-events: all;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.new-game-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.new-game-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.new-game-dialog {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  min-width: 400px;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.new-game-dialog h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.new-game-dialog h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.form-section {
+  margin-bottom: 1.5rem;
+}
+
+.form-section:last-of-type {
+  margin-bottom: 1rem;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.player-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.player-row .form-row {
+  flex: 1;
+  min-width: 180px;
+  margin-bottom: 0;
+}
+
+.player-row .form-row label {
+  min-width: 60px;
+}
+
+.form-row label {
+  min-width: 100px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.form-row input[type='text'],
+.form-row input[type='number'] {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.form-row input[type='text']:focus,
+.form-row input[type='number']:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.board-size-options {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.size-button {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.size-button:hover {
+  background-color: var(--bg-hover);
+}
+
+.size-button.active {
+  background-color: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.dialog-buttons button {
+  padding: 0.5rem 1.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.cancel-button {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.cancel-button:hover {
+  background-color: var(--bg-hover);
+}
+
+.confirm-button {
+  background-color: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.confirm-button:hover {
+  opacity: 0.9;
+}
+
+/* Dark theme adjustments */
+[data-theme='dark'] .new-game-dialog {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}

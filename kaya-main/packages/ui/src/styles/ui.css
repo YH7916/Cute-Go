@@ -1,0 +1,19 @@
+/* Kaya UI - All component styles bundled together */
+@import './theme.css';
+@import '../components/layout/Header.css';
+@import '../components/layout/ResizableLayout.css';
+@import '../components/gametree/GameTreeGraph.css';
+@import '../components/gametree/GameTreeLayoutToggle.css';
+@import '../components/board/BoardControls.css';
+@import '../components/file/AppDropZone.css';
+@import '../components/editors/GameInfoEditor.css';
+@import '../components/dialogs/NewGameDialog.css';
+@import '../components/dialogs/SaveFileDialog.css';
+@import '../components/editors/CommentEditor.css';
+@import '../components/ui/SaveStatus.css';
+@import '../components/board/ScoreEstimator.css';
+@import '../components/ui/Toast.css';
+@import '../components/layout/StatusBar.css';
+@import '../components/library/LibraryPanel.css';
+@import './goban-shudan.css';
+@import './goban-override.css';

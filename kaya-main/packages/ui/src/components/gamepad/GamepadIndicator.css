@@ -1,0 +1,71 @@
+.gamepad-indicator {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-right: 0.5rem;
+}
+
+.gamepad-icon {
+  /* Reset button styles */
+  border: none;
+  background: none;
+  padding: 0.25rem;
+  margin: 0;
+  font: inherit;
+
+  /* Icon styling */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease,
+    transform 0.1s ease;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.gamepad-icon:hover {
+  opacity: 0.8;
+  transform: scale(1.1);
+}
+
+.gamepad-icon.active {
+  color: var(--accent-color, #4a9eff);
+  opacity: 1;
+}
+
+.gamepad-icon.active:hover {
+  opacity: 1;
+}
+
+.gamepad-icon.inactive {
+  color: var(--text-secondary);
+  opacity: 0.4;
+}
+
+.gamepad-icon:focus-visible {
+  outline: 2px solid var(--accent-color, #4a9eff);
+  outline-offset: 2px;
+}
+
+/* Animation for newly connected gamepads */
+@keyframes gamepad-connect {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+}
+
+.gamepad-icon {
+  animation: gamepad-connect 0.3s ease;
+}

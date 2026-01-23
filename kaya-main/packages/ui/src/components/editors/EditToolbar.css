@@ -1,0 +1,149 @@
+/**
+ * EditToolbar Styles
+ * Vertical toolbar on the right side of the board
+ */
+
+.edit-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 6px;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-color);
+  min-width: 96px;
+  max-width: 96px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.edit-toolbar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.edit-toolbar-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 2px;
+  letter-spacing: 0.5px;
+  width: 100%;
+}
+
+.edit-toolbar-buttons {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.edit-toolbar-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-primary);
+}
+
+.edit-toolbar-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent-color);
+  transform: scale(1.05);
+}
+
+.edit-toolbar-button.active {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.edit-toolbar-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.edit-toolbar-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 0;
+}
+
+/* Stone icons */
+.stone-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.stone-icon.black-stone {
+  background: radial-gradient(circle at 30% 30%, #666, #000);
+}
+
+.stone-icon.white-stone {
+  background: radial-gradient(circle at 30% 30%, #fff, #ddd);
+  border: 1px solid #999;
+}
+
+/* Active state for stone buttons */
+.edit-toolbar-button.active .stone-icon.black-stone {
+  background: radial-gradient(circle at 30% 30%, #888, #222);
+  box-shadow: 0 0 0 2px white;
+}
+
+.edit-toolbar-button.active .stone-icon.white-stone {
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+/* Mobile Edit Toolbar */
+@media (max-width: 1440px) {
+  .edit-toolbar {
+    flex-direction: row;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 8px;
+    gap: 12px;
+  }
+
+  .edit-toolbar-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .edit-toolbar-divider {
+    width: 1px;
+    height: 24px;
+    margin: 0 4px;
+  }
+
+  /* Hide labels on mobile to save space if needed, or keep them small */
+  .edit-toolbar-group-label {
+    display: none;
+  }
+
+  .edit-toolbar-buttons {
+    flex-wrap: nowrap;
+  }
+
+  .edit-toolbar-button {
+    flex-shrink: 0;
+  }
+}

@@ -1,0 +1,130 @@
+/**
+ * LoadingOverlay Component Styles
+ */
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(2px);
+}
+
+.loading-modal {
+  background: var(--bg-primary, #ffffff);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  min-width: 300px;
+  max-width: 400px;
+  overflow: hidden;
+}
+
+.loading-header {
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.loading-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  text-align: center;
+}
+
+.loading-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color, #e0e0e0);
+  border-top: 3px solid var(--accent-primary, #007acc);
+  border-radius: 50%;
+  animation: loading-spin 1s linear infinite;
+}
+
+@keyframes loading-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-progress-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loading-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-tertiary, #f0f0f0);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.loading-progress-fill {
+  height: 100%;
+  background: var(--accent-primary, #007acc);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.loading-progress-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  min-width: 40px;
+  text-align: right;
+}
+
+.loading-message {
+  font-size: 0.9rem;
+  color: var(--text-secondary, #666);
+  text-align: center;
+  min-height: 1.2rem;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .loading-overlay {
+    background: rgba(0, 0, 0, 0.8);
+  }
+
+  .loading-modal {
+    background: var(--bg-primary, #1e1e1e);
+    border: 1px solid var(--border-color, #3e3e3e);
+  }
+
+  .loading-header h3 {
+    color: var(--text-primary, #ffffff);
+  }
+
+  .loading-progress-bar {
+    background: var(--bg-tertiary, #3e3e3e);
+  }
+
+  .loading-progress-text {
+    color: var(--text-primary, #ffffff);
+  }
+
+  .loading-message {
+    color: var(--text-secondary, #cccccc);
+  }
+}
