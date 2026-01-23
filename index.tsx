@@ -15,6 +15,18 @@ root.render(
   </React.StrictMode>
 );
 
+// EMERGENCY FIX: FORCE UNREGISTER BAD SERVICE WORKER
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    for(let registration of registrations) {
+      console.warn('Force Unregistering Service Worker to fix POST error:', registration);
+      registration.unregister();
+    }
+  });
+}
+
+/* 
+// Temporarily disable registration to ensure cleanup
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
@@ -26,3 +38,4 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
+*/
