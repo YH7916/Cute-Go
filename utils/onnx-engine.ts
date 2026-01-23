@@ -56,14 +56,12 @@ export class OnnxEngine {
 
             // Configure simple session options
             // Note: WASM files must be served correctly.
+            // Configure session options
             // Try WebGPU first if available (much faster for B18 model)
             // Note: WebGPU requires HTTPS or localhost
-            if (this.config.numThreads) {
-                (ort.env.wasm as any).numThreads = this.config.numThreads;
-            }
             const options: ort.InferenceSession.SessionOptions = {
                 executionProviders: ['webgpu', 'wasm'], 
-                graphOptimizationLevel: 'all', 
+                graphOptimizationLevel: 'all', // Re-enable optimization for WebGPU efficiency
             };
 
             if (this.config.numThreads) {
@@ -112,7 +110,7 @@ export class OnnxEngine {
                 // Fallback to WASM only
                 const wasmOptions: ort.InferenceSession.SessionOptions = {
                     executionProviders: ['wasm'],
-                    graphOptimizationLevel: 'disabled', // Revert to disabled for multi-threading stability
+                    graphOptimizationLevel: 'disabled', // Keep disabled for WASM stability based on previous NaN issues
                 };
                 if (this.config.numThreads) {
                     wasmOptions.intraOpNumThreads = this.config.numThreads;
@@ -121,9 +119,6 @@ export class OnnxEngine {
                 this.session = await ort.InferenceSession.create(this.config.modelPath, wasmOptions);
                 console.log('[OnnxEngine] Model loaded successfully (WASM Fallback)');
             }
-
-            // [New] Warm up the engine asycnronously to avoid blocking
-            this.prewarm().catch(e => console.warn('[OnnxEngine] Pre-warm skipped:', e));
         } catch (e) {
             console.error('[OnnxEngine] Failed to initialize:', e);
             throw e;
@@ -143,14 +138,13 @@ export class OnnxEngine {
 
         // 1. Prepare Input Tensors (NCHW)
         // [Batch, Channels, Height, Width] -> [1, 22, 19, 19]
-        const tensorSize = 19; // KataGo is fixed 19x19
-        const binInputData = new Float32Array(22 * tensorSize * tensorSize);
+        const binInputData = new Float32Array(22 * size * size);
         const globalInputData = new Float32Array(19);
 
-        this.fillBinInput(board, color, komi, history, binInputData, tensorSize);
+        this.fillBinInput(board, color, komi, history, binInputData, size);
         this.fillGlobalInput(history, komi, color, globalInputData);
 
-        const binInputTensor = new ort.Tensor('float32', binInputData, [1, 22, tensorSize, tensorSize]);
+        const binInputTensor = new ort.Tensor('float32', binInputData, [1, 22, size, size]);
         const globalInputTensor = new ort.Tensor('float32', globalInputData, [1, 19]);
 
         // 2. Run Inference
@@ -163,26 +157,21 @@ export class OnnxEngine {
             console.timeEnd('[OnnxEngine] Inference');
 
             // 3. Process Results
-            // [Revert] Back to standard names as requested, but with defensive check
             const policy = results.policy ? results.policy.data as Float32Array : null;
             const value = results.value ? results.value.data as Float32Array : null;
             const misc = results.miscvalue ? results.miscvalue.data as Float32Array : null;
 
             if (!policy || !value || !misc) {
-                console.error('[OnnxEngine] Model output naming mismatch!');
-                console.log('[OnnxEngine] Expected: policy, value, miscvalue');
-                console.log('[OnnxEngine] Actual keys found:', Object.keys(results));
-                throw new Error(`Model output missing expected keys. Found: ${Object.keys(results).join(', ')}`);
+                throw new Error('Model output missing policy, value, or miscvalue');
             }
 
             // Handle multi-channel policy (e.g. [1, 6, 82])
             // We only need the first channel (Move Probabilities)
-            // Handle multi-channel policy (e.g. [1, 6, 362])
-            const numMoves = 19 * 19 + 1; // Standard KataGo size
+            const numMoves = size * size + 1;
             let finalPolicy = policy;
             
-            const policyDims = results.policy.dims;
-            if (policyDims && policyDims.length > 2 && policyDims[1] > 1) {
+            if (results.policy.dims && results.policy.dims.length > 2 && results.policy.dims[1] > 1) {
+                 // Assuming format [Batch, Channels, Moves]
                  // Take the first channel
                  finalPolicy = policy.subarray(0, numMoves);
             }
@@ -217,50 +206,31 @@ export class OnnxEngine {
         }
     }
 
-    /**
-     * Runs a dummy inference to warm up WASM/WebGPU kernels.
-     * This makes the first real move much faster.
-     */
-    async prewarm() {
-        if (!this.session) return;
-        try {
-            console.log('[OnnxEngine] Pre-warming engine...');
-            const size = 19;
-            const binInputData = new Float32Array(22 * size * size);
-            const globalInputData = new Float32Array(19);
-            const feeds: Record<string, ort.Tensor> = {
-                'bin_input': new ort.Tensor('float32', binInputData, [1, 22, size, size]),
-                'global_input': new ort.Tensor('float32', globalInputData, [1, 19])
-            };
-            await this.session.run(feeds);
-            console.log('[OnnxEngine] Pre-warm complete.');
-        } catch (e) {
-            console.warn('[OnnxEngine] Pre-warm failed:', e);
-        }
-    }
-
     private fillBinInput(
         board: MicroBoard,
         pla: Sign,
         komi: number,
         history: { color: Sign; x: number; y: number }[],
         data: Float32Array,
-        tensorSize: number
+        size: number
     ) {
-        const size = board.size;
         const opp: Sign = pla === 1 ? -1 : 1;
         
-        // Feature 0: Ones (Fixed 1.0 for whole tensor? Usually just the board area)
-        // KataGo padding: the rest of the 19x19 input should be 0.
+        // Reference Implementation (Kaya) Layout:
+        // 0: Ones
+        // 1: Pla
+        // 2: Opp
         
+        // Helper to set NCHW: Channel, Y, X
         const set = (c: number, y: number, x: number, val: number) => {
-             data[c * tensorSize * tensorSize + y * tensorSize + x] = val;
+             data[c * size * size + y * size + x] = val;
         };
 
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                set(0, y, x, 1.0); // Feature 0: Ones (Board Mask)
-                
+                // Feature 0: Ones
+                set(0, y, x, 1.0);
+
                 const c = board.get(x, y);
                 if (c === pla) set(1, y, x, 1.0);
                 else if (c === opp) set(2, y, x, 1.0);
@@ -358,11 +328,10 @@ export class OnnxEngine {
         return (e0 / sum) * 100; // Return percentage
     }
 
-    private extractMoves(policy: Float32Array, boardSize: number, board: MicroBoard, color: Sign, difficulty: string = 'Hard') {
-        // policy: Float32Array(362)
-        const tensorSize = 19;
+    private extractMoves(policy: Float32Array, size: number, board: MicroBoard, color: Sign, difficulty: string = 'Hard') {
+        // Policy is just a flat array of logits?
         
-        // 1. Calculate probabilities for the 362 moves
+        // Find max for stability
         let maxLogit = -Infinity;
         for (let i = 0; i < policy.length; i++) {
             if (policy[i] > maxLogit) maxLogit = policy[i];
@@ -374,34 +343,39 @@ export class OnnxEngine {
             probs[i] = Math.exp(policy[i] - maxLogit);
             sumProbs += probs[i];
         }
+        // Normalize
         for (let i = 0; i < policy.length; i++) {
             probs[i] /= sumProbs;
         }
 
         const moves: any[] = [];
-        // Only look at the boardSize x boardSize area in the top-left of the 19x19 policy
-        for (let y = 0; y < boardSize; y++) {
-            for (let x = 0; x < boardSize; x++) {
-                const idx = y * tensorSize + x;
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const idx = y * size + x;
                 const p = probs[idx];
                 
-                if (board.isValid(x, y) && board.get(x, y) === 0) { 
-                      moves.push({
-                         x, y,
-                         prior: p,
-                         winrate: 0,
-                         vists: 0,
-                         u: 0, scoreMean: 0, scoreStdev: 0, lead: 0
-                      });
+                // Only return legal moves with some probability
+                if (p > 0.0001) { // Lower threshold to allow checking more moves
+                     if (board.isValid(x, y) && board.get(x, y) === 0) { 
+                          moves.push({
+                             x, y,
+                             prior: p,
+                             winrate: 0,
+                             vists: 0,
+                             u: 0, scoreMean: 0, scoreStdev: 0, lead: 0
+                          });
+                     }
                  }
             }
         }
         
-        // Pass move (KataGo pass is at index 361)
-        const passIdx = 361;
+        // Pass move
+        const passIdx = size * size;
         if (probs.length > passIdx) {
              const passProb = probs[passIdx];
-             moves.push({ x: -1, y: -1, prior: passProb, winrate: 0, lead: 0, vists: 0, u: 0, scoreMean: 0, scoreStdev: 0 });
+             if (passProb > 0.001) {
+                 moves.push({ x: -1, y: -1, prior: passProb, winrate: 0, lead: 0, vists: 0, u: 0, scoreMean: 0, scoreStdev: 0 });
+             }
         }
 
         // Sort by prob
