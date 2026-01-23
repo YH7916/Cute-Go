@@ -162,12 +162,18 @@ export class OnnxEngine {
             console.timeEnd('[OnnxEngine] Inference');
 
             // 3. Process Results
-            const policy = results.policy ? results.policy.data as Float32Array : null;
-            const value = results.value ? results.value.data as Float32Array : null;
-            const misc = results.miscvalue ? results.miscvalue.data as Float32Array : null;
+            // Support both long names (policy) and short names (p)
+            const policyOutput = results.policy || results.p;
+            const valueOutput = results.value || results.v;
+            const miscOutput = results.miscvalue || results.m;
+
+            const policy = policyOutput ? policyOutput.data as Float32Array : null;
+            const value = valueOutput ? valueOutput.data as Float32Array : null;
+            const misc = miscOutput ? miscOutput.data as Float32Array : null;
 
             if (!policy || !value || !misc) {
-                throw new Error('Model output missing policy, value, or miscvalue');
+                console.error('[OnnxEngine] Available output keys:', Object.keys(results));
+                throw new Error('Model output missing policy(p), value(v), or miscvalue(m)');
             }
 
             // Handle multi-channel policy (e.g. [1, 6, 82])
@@ -175,7 +181,7 @@ export class OnnxEngine {
             const numMoves = size * size + 1;
             let finalPolicy = policy;
             
-            if (results.policy.dims && results.policy.dims.length > 2 && results.policy.dims[1] > 1) {
+            if (policyOutput.dims && policyOutput.dims.length > 2 && policyOutput.dims[1] > 1) {
                  // Assuming format [Batch, Channels, Moves]
                  // Take the first channel
                  finalPolicy = policy.subarray(0, numMoves);
