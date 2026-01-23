@@ -56,9 +56,11 @@ export class OnnxEngine {
 
             // Configure simple session options
             // Note: WASM files must be served correctly.
-            // Configure session options
             // Try WebGPU first if available (much faster for B18 model)
             // Note: WebGPU requires HTTPS or localhost
+            if (this.config.numThreads) {
+                (ort.env.wasm as any).numThreads = this.config.numThreads;
+            }
             const options: ort.InferenceSession.SessionOptions = {
                 executionProviders: ['webgpu', 'wasm'], 
                 graphOptimizationLevel: 'all', 

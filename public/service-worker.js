@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cute-go-v2';
+const CACHE_NAME = 'cute-go-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
