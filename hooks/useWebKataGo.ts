@@ -97,10 +97,9 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
             };
 
             // --- 3. Hardware Concurrency ---
-            // WASM multithreading helps, but too many threads can block the UI or have diminishing returns.
-            // Cap at 4 or physical cores.
-            const cores = navigator.hardwareConcurrency || 2;
-            const numThreads = Math.min(4, cores); 
+            // WASM multithreading helps, but extremely unstable on Cloudflare/Mobile without strict headers.
+            // Force 1 thread (Single Threaded Mode) to ensure STABILITY.
+            const numThreads = 1; 
 
             // --- 4. Send Init Message ---
             // Cloudflare Pages 25MB Limit Workaround:
