@@ -3,6 +3,7 @@ import { MicroBoard, type Sign, type Point } from './micro-board';
 
 export interface OnnxEngineConfig {
     modelPath: string;
+    modelParts?: string[]; // [New] Optional split parts for large models
     wasmPath?: string; // [New] Path to directory containing WASM files
     numThreads?: number;
     debug?: boolean;
@@ -67,9 +68,41 @@ export class OnnxEngine {
                 options.interOpNumThreads = this.config.numThreads;
             }
 
-            console.log(`[OnnxEngine] Loading model from ${this.config.modelPath}...`);
+            console.log(`[OnnxEngine] Loading model...`);
+            
+            let modelData: string | Uint8Array = this.config.modelPath;
+
+            // Handle Split Models (Cloudflare Pages 25MB limit workaround)
+            if (this.config.modelParts && this.config.modelParts.length > 0) {
+                console.log(`[OnnxEngine] Loading model from ${this.config.modelParts.length} parts...`);
+                try {
+                    const buffers = await Promise.all(this.config.modelParts.map(async (partUrl) => {
+                        const res = await fetch(partUrl);
+                        if (!res.ok) throw new Error(`Failed to fetch part: ${partUrl}`);
+                        return await res.arrayBuffer();
+                    }));
+                    
+                    // Merge buffers
+                    const totalLength = buffers.reduce((acc, buf) => acc + buf.byteLength, 0);
+                    const merged = new Uint8Array(totalLength);
+                    let offset = 0;
+                    for (const buf of buffers) {
+                        merged.set(new Uint8Array(buf), offset);
+                        offset += buf.byteLength;
+                    }
+                    console.log(`[OnnxEngine] Merged model parts. Total size: ${(totalLength / 1024 / 1024).toFixed(2)} MB`);
+                    modelData = merged;
+                } catch (e) {
+                    console.error('[OnnxEngine] Failed to load model parts:', e);
+                    throw e;
+                }
+            } else {
+                 console.log(`[OnnxEngine] Loading model from ${this.config.modelPath}...`);
+            }
+
             try {
-                this.session = await ort.InferenceSession.create(this.config.modelPath, options);
+                // @ts-ignore - Overload resolution issue with union type
+                this.session = await ort.InferenceSession.create(modelData, options);
                 console.log('[OnnxEngine] Model loaded successfully (WebGPU/WASM)');
             } catch (e) {
                 console.warn('[OnnxEngine] WebGPU failed or not available, falling back to WASM...', e);

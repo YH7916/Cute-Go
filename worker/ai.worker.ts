@@ -3,7 +3,7 @@ import { MicroBoard, type Sign } from '../utils/micro-board';
 
 // Define message types
 type WorkerMessage = 
-    | { type: 'init'; payload: { modelPath: string; wasmPath?: string; numThreads?: number } }
+    | { type: 'init'; payload: { modelPath: string; modelParts?: string[]; wasmPath?: string; numThreads?: number } }
     | { type: 'compute'; data: { 
             board: any[][]; // BoardState
             history: any[]; // HistoryItem[]
@@ -23,13 +23,14 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
     try {
         if (msg.type === 'init') {
-            const { modelPath, wasmPath, numThreads } = msg.payload;
+            const { modelPath, modelParts, wasmPath, numThreads } = msg.payload;
             
             // Dispose existing engine if any
             if (engine) engine.dispose();
 
             engine = new OnnxEngine({
                 modelPath: modelPath,
+                modelParts: modelParts, // Pass split parts
                 wasmPath: wasmPath,
                 numThreads: numThreads,
                 debug: true // Enable debug for now

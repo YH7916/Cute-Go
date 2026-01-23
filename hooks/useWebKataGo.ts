@@ -94,10 +94,20 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
             const numThreads = Math.min(4, cores); 
 
             // --- 4. Send Init Message ---
+            // Cloudflare Pages 25MB Limit Workaround:
+            // We load the model from split parts (part1, part2, etc)
+            const modelParts = [
+                modelUrl + '.part1',
+                modelUrl + '.part2',
+                modelUrl + '.part3',
+                modelUrl + '.part4'
+            ];
+
             worker.postMessage({ 
                 type: 'init',
                 payload: { 
                     modelPath: modelUrl,
+                    modelParts: modelParts,
                     wasmPath: wasmUrl,
                     numThreads: numThreads
                 }
