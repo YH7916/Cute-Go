@@ -32,11 +32,12 @@ export function getAIConfig(rank: string): AIConfig {
         }
         
         // 5k -> 1k: Start using WebAI (Neural Network)
-        // 5k: 5 sims (Quick intuition)
-        // 1k: 25 sims
+        // Extreme Speed Optimization:
+        // KataGo b18 is so strong that 1 simulation is already ~1d level intuition.
+        // We set 5k-1k to just 1-3 simulations.
         return {
             useModel: true,
-            simulations: Math.round(5 + (5 - k) * 5), // 5, 10, 15, 20, 25
+            simulations: Math.round(1 + (5 - k) * 0.5), // 5k=1, 4k=1.5(2), ... 1k=3
             randomness: 0,
             heuristicFactor: 1.0
         };
@@ -45,16 +46,17 @@ export function getAIConfig(rank: string): AIConfig {
     if (danMatch) {
         const d = parseInt(danMatch[1]);
         // 1d -> 9d
-        // 1d: 30 sims
-        // 9d: 150 sims (High depth)
+        // Extreme Speed: 
+        // 1d: 5 sims
+        // 9d: 13 sims (Still almost instant, very strong)
         return {
             useModel: true,
-            simulations: Math.round(30 + (d - 1) * 15),
+            simulations: Math.round(5 + (d - 1) * 1), // 1d=5 ... 9d=13
             randomness: 0,
             heuristicFactor: 1.0 
         };
     }
 
     // Default to 1d
-    return { useModel: true, simulations: 35, randomness: 0, heuristicFactor: 1.0 };
+    return { useModel: true, simulations: 5, randomness: 0, heuristicFactor: 1.0 };
 }

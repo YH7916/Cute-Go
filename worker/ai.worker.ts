@@ -11,6 +11,7 @@ type WorkerMessage =
             size: number;
             simulations?: number;
             komi?: number;
+            difficulty?: 'Easy' | 'Medium' | 'Hard';
       } }
     | { type: 'stop' };
 
@@ -44,7 +45,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 throw new Error('Engine not initialized');
             }
 
-            const { board: boardState, history: gameHistory, color, size, komi } = msg.data;
+            const { board: boardState, history: gameHistory, color, size, komi, difficulty } = msg.data;
             const pla: Sign = color === 'black' ? 1 : -1;
 
             // 1. Reconstruct MicroBoard
@@ -60,19 +61,11 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
             // 2. Reconstruct History
             // HistoryItem[] -> { color, x, y }[]
-            // Note: gameHistory contains states. We need the moves that led to these states.
-            // gameHistory[i].lastMove is the move that produced gameHistory[i].
-            // And gameHistory[i].currentPlayer is the player *after* that move (next to play).
-            // So the move was made by the *previous* player? 
-            // Actually, if lastMove exists, it was made by the color opposite to currentPlayer?
-            // Let's verify standard logic or just deduce.
-            // If currentPlayer is 'white', then 'black' just moved.
-            // So the move 'lastMove' was made by 'black'.
             const historyMoves: { color: Sign; x: number; y: number }[] = [];
             
             for (const item of gameHistory) {
                 if (item.lastMove) {
-                    const moveColor = item.currentPlayer === 'white' ? 1 : -1; // If White to play, Black just moved
+                    const moveColor = item.currentPlayer === 'white' ? 1 : -1; 
                     historyMoves.push({
                          color: moveColor,
                          x: item.lastMove.x,
@@ -84,7 +77,8 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             // 3. Run Analysis
             const result = await engine.analyze(board, pla, {
                 history: historyMoves,
-                komi: komi ?? 7.5 // Default komi if missing
+                komi: komi ?? 7.5,
+                difficulty: difficulty 
             });
 
             // 4. Send Response

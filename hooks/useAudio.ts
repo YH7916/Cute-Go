@@ -157,6 +157,32 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
     }
   }, [musicVolume, isAudioUnlocked, bgmLoaded]); 
 
+  // Page Visibility Handler (Save Battery)
+  useEffect(() => {
+      const handleVisibilityChange = () => {
+          const ctx = audioContextRef.current;
+          if (!ctx) return;
+
+          if (document.hidden) {
+              if (ctx.state === 'running') {
+                  console.log("[PowerSave] Suspending Audio Context");
+                  ctx.suspend();
+              }
+          } else {
+              // Only resume if audio was previously unlocked and we want to play
+              if (isAudioUnlocked && ctx.state === 'suspended') {
+                  console.log("[PowerSave] Resuming Audio Context");
+                  ctx.resume();
+              }
+          }
+      };
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      return () => {
+          document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
+  }, [isAudioUnlocked]);
+
   // Vibrate Safer
   const vibrate = useCallback((pattern: number | number[]) => {
       if (!hapticEnabled) return;

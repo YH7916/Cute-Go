@@ -613,27 +613,31 @@ const App: React.FC = () => {
           if (shouldUseHighLevelAI) {
               if (!aiTurnLock.current) {
                   aiTurnLock.current = true; 
-                  setTimeout(() => {
-                      if (isElectronAvailable) {
-                          electronAiEngine.requestAiMove(aiColor, settings.difficulty, settings.maxVisits, getResignThreshold(settings.difficulty));
+                  if (isElectronAvailable) {
+                      electronAiEngine.requestAiMove(aiColor, settings.difficulty, settings.maxVisits, getResignThreshold(settings.difficulty));
+                  } else {
+                      // Web AI Request
+                      // Precise Rank Mode (18k-9d) Support & Speed Optimization
+                      // "Easy" = 1 sim (Instant, pure intuition)
+                      // "Medium" = 3 sims
+                      // "Hard" = 10 sims
+                      // 5k-1k = 1-3 sims
+                      // 1d-9d = 5-13 sims
+                      let sims = aiConfig.simulations;
+                      
+                      if (settings.difficulty === 'Easy' || settings.difficulty === 'Medium' || settings.difficulty === 'Hard') {
+                          sims = settings.difficulty === 'Easy' ? 1 : (settings.difficulty === 'Medium' ? 3 : 10);
                       } else {
-                          // Web AI Request
-                          let simulations = aiConfig.simulations;
-                          
-                          // Performance Optimization for Web/Mobile (WASM)
-                          // b18 model is heavy. Cap simulations to ensure responsiveness.
-                          // 19x19: Cap at 20 visits (approx 2-3s on mobile WASM)
-                          // 9x9: Cap at 50 visits
-                          if (settings.boardSize > 13) simulations = Math.min(simulations, 20);
-                          else simulations = Math.min(simulations, 50);
-
-                          // Determine Komi based on board size
-                          // 9x9: 7.5 is overwhelming. 0.5 is a loss. 6.5 is standard (Japanese) and should be balanced.
-                          const komi = settings.boardSize === 9 ? 6.5 : 7.5;
-                          
-                          webAiEngine.requestWebAiMove(gameState.boardRef.current, aiColor, gameState.historyRef.current, simulations, komi);
+                          // Precise Rank Mode
+                          sims = aiConfig.simulations;
+                          if (sims < 1) sims = 1;
                       }
-                  }, 100);
+
+                       // Determine Komi based on board size
+                      const komi = settings.boardSize === 9 ? 6.5 : 7.5;
+                      
+                      webAiEngine.requestWebAiMove(gameState.boardRef.current, aiColor, gameState.historyRef.current, sims, komi, settings.difficulty);
+                  }
               }
           }
           else {
@@ -686,7 +690,9 @@ const App: React.FC = () => {
         }
     }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable]);
 
-    // --- Web AI Turn (Worker) ---
+    /*
+    // --- Web AI Turn (Worker) - REDUNDANT / MERGED ABOVE ---
+    // Merged into the main AI Trigger effect to avoid race conditions and double-firing.
     useEffect(() => {
         if (gameState.appMode !== 'playing' || gameState.gameOver || showPassModal || settings.gameMode !== 'PvAI') return;
         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
@@ -703,17 +709,30 @@ const App: React.FC = () => {
                 // Determine Komi
                 const komi = settings.boardSize === 9 ? 6.5 : 7.5;
                 
-                // Cap simulations for Web performance
+                // Cap simulations for Web performance & Weaken for lower levels
+                // b18 model with 1 sim is already strong (Dan level intuition).
+                // To support "Easy" on H5, we must limit calculation to minimum.
                 let sims = aiConfig.simulations;
-                if (settings.boardSize > 13) sims = Math.min(sims, 20);
-                else sims = Math.min(sims, 50);
+                
+                if (settings.difficulty === 'Easy' || settings.difficulty === 'Medium' || settings.difficulty === 'Hard') {
+                    // Fallback for old settings values
+                    sims = settings.difficulty === 'Easy' ? 1 : (settings.difficulty === 'Medium' ? 3 : 10);
+                } else {
+                    // Precise Rank Mode (18k-9d)
+                    // We now use the aggressive low values from aiConfig directly.
+                    // 5k=1 sim, 1d=5 sims, 9d=13 sims.
+                    // This ensures "Instant Play" feel on mobile.
+                    sims = aiConfig.simulations;
+                    if (sims < 1) sims = 1;
+                }
 
                 requestWebAiMove(
                     gameState.boardRef.current, 
                     gameState.currentPlayerRef.current, 
                     gameState.historyRef.current,
                     sims,
-                    komi
+                    komi,
+                    settings.difficulty 
                 );
             } else {
                 // Low Rank: Logic handled by the "Computer Move" effect below
@@ -721,6 +740,7 @@ const App: React.FC = () => {
             }
         }
     }, [gameState.currentPlayer, settings.gameMode, isElectronAvailable, isWorkerReady, isThinking, requestWebAiMove, settings.difficulty, showPassModal, gameState.appMode, settings.userColor, gameState.gameOver]);
+    */
 
 
     // --- Online Logic (Simplified & kept in App) ---

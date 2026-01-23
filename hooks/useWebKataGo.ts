@@ -14,7 +14,8 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const [isThinking, setIsThinking] = useState(false);
     const [aiWinRate, setAiWinRate] = useState(50);
     const workerRef = useRef<Worker | null>(null);
-    const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[]; simulations: number; komi?: number } | null>(null);
+    const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[]; simulations: number; komi?: number; difficulty?: string } | null>(null);
+    const expectingResponseRef = useRef(false);
 
     useEffect(() => {
         // Only run in non-Electron environment (or if specifically enabled for web mode in Electron)
@@ -69,13 +70,20 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                                 color: pending.playerColor,
                                 size: boardSize,
                                 simulations: pending.simulations,
-                                komi: pending.komi ?? 7.5
+                                komi: pending.komi ?? 7.5,
+                                difficulty: pending.difficulty
                             }
                         });
                         setIsThinking(true);
+                        expectingResponseRef.current = true;
                     }
                 } else if (msg.type === 'ai-response') {
+                    if (!expectingResponseRef.current) {
+                        console.log("[WebAI] Response ignored (cancelled/stopped)");
+                        return;
+                    }
                     setIsThinking(false);
+                    expectingResponseRef.current = false;
                     const { move, winRate } = msg.data;
                     setAiWinRate(winRate);
                     if (move) onAiMove(move.x, move.y);
@@ -83,6 +91,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 } else if (msg.type === 'error') {
                     console.error('[WebAI Error]', msg.message);
                     setIsThinking(false);
+                    expectingResponseRef.current = false;
                     pendingRequestRef.current = null;
                 }
             };
@@ -124,7 +133,8 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         playerColor: Player,
         history: any[],
         simulations: number = 45,
-        komi: number = 7.5 // Default komi
+        komi: number = 7.5, // Default komi
+        difficulty: 'Easy' | 'Medium' | 'Hard' = 'Hard'
     ) => {
         if (!workerRef.current || isThinking) return;
 
@@ -132,12 +142,14 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         
         if (!isWorkerReady) {
             console.log("Worker not ready, queuing request...");
-            pendingRequestRef.current = { board, playerColor, history, simulations, komi }; // Add komi to pending
-            setIsThinking(true); // Set thinking to show UI state
+            pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty }; // Add difficulty
+            setIsThinking(true); 
+            expectingResponseRef.current = true;
             return;
         }
 
         setIsThinking(true);
+        expectingResponseRef.current = true;
         workerRef.current.postMessage({
             type: 'compute',
             data: {
@@ -146,7 +158,8 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 color: playerColor,
                 size: boardSize,
                 simulations,
-                komi
+                komi,
+                difficulty
             }
         });
     }, [boardSize, isThinking, isWorkerReady]);
@@ -154,10 +167,26 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const stopThinking = useCallback(() => {
         setIsThinking(false);
         pendingRequestRef.current = null;
+        expectingResponseRef.current = false;
         if (workerRef.current) {
             workerRef.current.postMessage({ type: 'stop' });
         }
     }, []);
+
+    // --- Page Visibility Handler (Save Battery) ---
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                console.log("[PowerSave] App sent to background, stopping AI...");
+                stopThinking();
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [stopThinking]);
 
     return {
         isWorkerReady,

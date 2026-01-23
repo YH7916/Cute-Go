@@ -13,6 +13,7 @@ export interface EngineAnalysisOptions {
     komi?: number;
     history?: { color: Sign; x: number; y: number }[];
     parent?: { color: Sign; x: number; y: number }[]; // For specialized checks if needed
+    difficulty?: 'Easy' | 'Medium' | 'Hard';
 }
 
 export interface AnalysisResult {
@@ -176,7 +177,7 @@ export class OnnxEngine {
             }
 
             // Parse outputs
-            const moveInfos = this.extractMoves(finalPolicy, size, board, color);
+            const moveInfos = this.extractMoves(finalPolicy, size, board, color, options.difficulty);
             const winrate = this.processWinrate(value);
             const lead = misc[0] * 20;
 
@@ -327,9 +328,8 @@ export class OnnxEngine {
         return (e0 / sum) * 100; // Return percentage
     }
 
-    private extractMoves(policy: Float32Array, size: number, board: MicroBoard, color: Sign) {
+    private extractMoves(policy: Float32Array, size: number, board: MicroBoard, color: Sign, difficulty: string = 'Hard') {
         // Policy is just a flat array of logits?
-        // Reference: "softmax" it first.
         
         // Find max for stability
         let maxLogit = -Infinity;
@@ -348,69 +348,43 @@ export class OnnxEngine {
             probs[i] /= sumProbs;
         }
 
-        // Normalize
-        for (let i = 0; i < policy.length; i++) {
-            probs[i] /= sumProbs;
-        }
-
-        const moves = [];
+        const moves: any[] = [];
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
                 const idx = y * size + x;
                 const p = probs[idx];
                 
                 // Only return legal moves with some probability
-                if (p > 0.001) {
-                     if (board.isValid(x, y) && board.get(x, y) === 0) { // simple check, plus detailed play check if needed
-                         // Should perform isLegal check
-                         if (board.play(x, y, color)) {
-                              // It was legal (and board changed, so we undo?)
-                              // MicroBoard.play modifies state. We should clone or undo.
-                              // Since play returns true/false and handles logic, we really should use a clone for check
-                              // OR rely on the fact that the Engine only SUGGESTS moves, the Game logic validates them.
-                              // But we want to filter out illegal moves from AI suggestions.
-                              // To be efficient, we might rely on the AI's probability being low for illegal moves usually,
-                              // but KataGo can output illegal moves if features are wrong.
-                              // Let's assume high prob moves are mostly legal or check properly.
-                              // Reverting the board state is hard with current MicroBoard API without `undo`
-                              // So we should clone only for high-candidate check or add `isLegal` to MicroBoard that doesn't play.
-                              // I added `play` but not `isLegal` separate in my MicroBoard implementation above? 
-                              // Wait, I implemented `play` which does modification.
-                              // I should have implemented `isLegal`.
-                              // I'll trust the AI prob for now to keep it fast, or (better) I'll verify legality for top moves only.
-                         }
-                         moves.push({
-                            x, y,
-                            prior: p,
-                            winrate: 0, // Placeholder
-                            vists: 0,
-                            u: 0, scoreMean: 0, scoreStdev: 0, lead: 0
-                         });
-                         // Revert board modification? 
-                         // "board.play" modifies it.
-                         // Actually, I should refrain from modifying 'board' passed to analyze.
-                         // So I cannot use 'board.play' here.
-                         // I will just return all high prob moves.
+                if (p > 0.0001) { // Lower threshold to allow checking more moves
+                     if (board.isValid(x, y) && board.get(x, y) === 0) { 
+                          moves.push({
+                             x, y,
+                             prior: p,
+                             winrate: 0,
+                             vists: 0,
+                             u: 0, scoreMean: 0, scoreStdev: 0, lead: 0
+                          });
                      }
                  }
             }
         }
         
-        // Sort by prob
-        moves.sort((a, b) => b.prior - a.prior);
-        
-        // Pass move is usually at the end of policy array?
-        // KataGo policy size is (Size * Size + 1).
-        // The last one is pass.
+        // Pass move
         const passIdx = size * size;
         if (probs.length > passIdx) {
              const passProb = probs[passIdx];
-             if (passProb > 0.01) {
-                 // Add pass move (x=-1, y=-1)
+             if (passProb > 0.001) {
                  moves.push({ x: -1, y: -1, prior: passProb, winrate: 0, lead: 0, vists: 0, u: 0, scoreMean: 0, scoreStdev: 0 });
-                 moves.sort((a, b) => b.prior - a.prior);
              }
         }
+
+        // Sort by prob
+        moves.sort((a, b) => b.prior - a.prior);
+
+        // --- Difficulty Logic Removed ---
+        // User requested AI to always play its best within the simulation capabilities (speed limits).
+        // No artificial weakening (swapping moves). Since we limit simulations heavily on Easy/Medium,
+        // that naturally limits its reading depth without needing to sabotage its move choice.
 
         return moves;
     }
