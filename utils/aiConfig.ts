@@ -57,6 +57,6 @@ export function getAIConfig(rank: string): AIConfig {
         };
     }
 
-    // Default to 1d
-    return { useModel: true, simulations: 5, randomness: 0, heuristicFactor: 1.0 };
+    // Default to 5k
+    return { useModel: true, simulations: 1, randomness: 0, heuristicFactor: 1.0 };
 }

@@ -15,10 +15,10 @@ export const useAppSettings = () => {
   const [boardSize, setBoardSize] = useState<BoardSize>(() => loadState('boardSize', 9));
   const [gameType, setGameType] = useState<GameType>(() => loadState('gameType', 'Go'));
   const [gameMode, setGameMode] = useState<GameMode>(() => loadState('gameMode', 'PvP'));
-  const [difficulty, setDifficulty] = useState<ExtendedDifficulty>(() => loadState('difficulty', '1d'));
+  const [difficulty, setDifficulty] = useState<ExtendedDifficulty>(() => loadState('difficulty', '5k'));
   
-  // 思考量状态 (默认 5)
-  const [maxVisits, setMaxVisits] = useState<number>(() => loadState('maxVisits', 5));
+  // 思考量状态 (默认 1)
+  const [maxVisits, setMaxVisits] = useState<number>(() => loadState('maxVisits', 1));
 
   // Player Color Preference (vs AI)
   const [userColor, setUserColor] = useState<Player>(() => loadState('userColor', 'black'));

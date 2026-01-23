@@ -61,7 +61,7 @@ export class OnnxEngine {
             // Note: WebGPU requires HTTPS or localhost
             const options: ort.InferenceSession.SessionOptions = {
                 executionProviders: ['webgpu', 'wasm'], 
-                graphOptimizationLevel: 'all', // Re-enable optimization for WebGPU efficiency
+                graphOptimizationLevel: 'all', 
             };
 
             if (this.config.numThreads) {
@@ -110,7 +110,7 @@ export class OnnxEngine {
                 // Fallback to WASM only
                 const wasmOptions: ort.InferenceSession.SessionOptions = {
                     executionProviders: ['wasm'],
-                    graphOptimizationLevel: 'disabled', // Keep disabled for WASM stability based on previous NaN issues
+                    graphOptimizationLevel: 'all', // Enable for performance. If NaN occurs, change to 'disabled'
                 };
                 if (this.config.numThreads) {
                     wasmOptions.intraOpNumThreads = this.config.numThreads;
@@ -119,6 +119,9 @@ export class OnnxEngine {
                 this.session = await ort.InferenceSession.create(this.config.modelPath, wasmOptions);
                 console.log('[OnnxEngine] Model loaded successfully (WASM Fallback)');
             }
+
+            // [New] Warm up the engine to JIT compile kernels
+            await this.prewarm();
         } catch (e) {
             console.error('[OnnxEngine] Failed to initialize:', e);
             throw e;
@@ -203,6 +206,28 @@ export class OnnxEngine {
             console.timeEnd('[OnnxEngine] Inference');
             console.error('[OnnxEngine] Inference Failed:', e);
             throw e;
+        }
+    }
+
+    /**
+     * Runs a dummy inference to warm up WASM/WebGPU kernels.
+     * This makes the first real move much faster.
+     */
+    async prewarm() {
+        if (!this.session) return;
+        try {
+            console.log('[OnnxEngine] Pre-warming engine...');
+            const size = 19;
+            const binInputData = new Float32Array(22 * size * size);
+            const globalInputData = new Float32Array(19);
+            const feeds: Record<string, ort.Tensor> = {
+                'bin_input': new ort.Tensor('float32', binInputData, [1, 22, size, size]),
+                'global_input': new ort.Tensor('float32', globalInputData, [1, 19])
+            };
+            await this.session.run(feeds);
+            console.log('[OnnxEngine] Pre-warm complete.');
+        } catch (e) {
+            console.warn('[OnnxEngine] Pre-warm failed:', e);
         }
     }
 

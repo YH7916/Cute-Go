@@ -234,7 +234,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                                     type="range" min="0" max="100" step="1"
                                                     value={(() => {
                                                         const idx = RANKS.indexOf(tempDifficulty);
-                                                        const safeIdx = idx >= 0 ? idx : RANKS.indexOf('1d');
+                                                        const safeIdx = idx >= 0 ? idx : RANKS.indexOf('5k');
                                                         const splitIdx = RANKS.indexOf('1d');
                                                         if (safeIdx <= splitIdx) {
                                                             return (safeIdx / splitIdx) * 50;
@@ -258,7 +258,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                                     style={{ 
                                                         background: getSliderBackground((() => {
                                                             const idx = RANKS.indexOf(tempDifficulty);
-                                                            const safeIdx = idx >= 0 ? idx : RANKS.indexOf('1d');
+                                                            const safeIdx = idx >= 0 ? idx : RANKS.indexOf('5k');
                                                             const splitIdx = RANKS.indexOf('1d');
                                                             if (safeIdx <= splitIdx) return (safeIdx / splitIdx) * 50;
                                                             else return 50 + ((safeIdx - splitIdx) / (RANKS.length - 1 - splitIdx)) * 50;
