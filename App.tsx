@@ -432,19 +432,16 @@ const App: React.FC = () => {
         // So we check history[length - 1].
         // Wait, array is 0-indexed. length is N. last is index N-1. 
         // We want index N-2. 
-        if (gameState.history && gameState.history.length >= 1) {
-             // For standard Ko (retake immediately), checking N-1 (previous state) is redundant (impossible to encompass same space).
-             // But actually, checking against 'current board' is useless.
-             // We need to check against the board state 'before the last move resulted in current state'. 
-             // Yes, history[len - 2].
-             // If history has 1 element (Open -> B1), White moves. len=1. index -1 is invalid.
-             // If history has 2 elements (B1 -> W1), Black moves. 
-             // If Black captures and causes Ko, board looks like B1.
-             // B1 is history[0]. length=2. We want index 0 -> len-2.
-             if (gameState.history.length >= 2) {
-                 prevHash = getBoardHash(gameState.history[gameState.history.length - 2].board);
+             // Ko Rule Fix: We must check against the state *before* the opponent's last move.
+             // History contains: [Move1, Move2, ... MoveN(Opponent)].
+             // We are making Move N+1. State after our move cannot be same as State after Move N-1.
+             // Actually, history is 0-indexed.
+             // history[N-1] is the item for Move N. it contains the board BEFORE Move N.
+             // So history[length-1].board is the State Before Opponent Move.
+             // This is what we want to check against (Simple Ko).
+             if (gameState.history.length >= 1) {
+                 prevHash = getBoardHash(gameState.history[gameState.history.length - 1].board);
              }
-        }
         
         const result = attemptMove(currentBoard, x, y, activePlayer, currentType, prevHash);
         
@@ -512,36 +509,19 @@ const App: React.FC = () => {
     };
 
     const handlePass = useCallback((isRemote: boolean = false) => {
+        console.log(`[App] handlePass Triggered. Remote: ${isRemote}, GameOver: ${gameState.gameOver}, Consecutive: ${gameState.consecutivePasses}, Current: ${gameState.currentPlayerRef.current}`);
+
         if (gameState.gameOver) return;
         vibrate(10);
         
         // Fix: Reset AI state if it passed
         if (isRemote) {
+            console.log("[App] AI Passed. Unlocking...");
             aiTurnLock.current = false;
             setIsThinking(false);
         }
 
         if (!isRemote) {
-            // For a pass, lastMove is arguably null or a special pass marker?
-            // Existing logic used gameState.lastMove which was the PREVIOUS move.
-            // If we want to record "Pass", usually coordinates are outside board or special.
-            // But let's check existing usage. lastMove is {x,y} or null.
-            // If I pass, the state changes (currentPlayer swaps), but board is same.
-            // The "move that led to this" is a Pass.
-            // The worker filters `item.lastMove`. If I put null, it skips it.
-            // If I skip it, OnnxEngine sees no move?
-            // Pass needs to be recorded for "Pass History" (Ch 0-4 global inputs).
-            // KataGo expects Pass as {x: -1, y: -1} or similar?
-            // App doesn't seem to track "Pass" as a coordinator in lastMove ({x,y}).
-            // Let's stick to null for now, or check how to represent Pass.
-            // If I use null, worker skips adding the move to History.
-            // Then OnnxEngine doesn't see the pass in history array.
-            // Then it won't set "Pass History" global feature.
-            // This might be minor for now.
-            // Let's keep it as is (previous logic), or set lastMove: null?
-            // Actually, if lastMove was previous move, State N (Pass) -> lastMove (Move N-1).
-            // That was also wrong. It linked State N to Move N-1.
-            // It should be State N (Pass) -> Move N (Pass).
             const newItem = { board: gameState.boardRef.current, currentPlayer: gameState.currentPlayerRef.current, blackCaptures: gameState.blackCaptures, whiteCaptures: gameState.whiteCaptures, lastMove: null, consecutivePasses: gameState.consecutivePasses };
             gameState.setHistory(prev => [...prev, newItem]);
             gameState.historyRef.current = [...gameState.historyRef.current, newItem];
@@ -561,16 +541,13 @@ const App: React.FC = () => {
             if (isElectronAvailable && isElectronThinking) electronAiEngine.stopThinking();
             setIsThinking(false);
             aiTurnLock.current = false;
-            
-            // Allow flow to fall through to increment counters below.
-            // If AI passes, we just let it be a pass.
-            // If User passes, same.
-            // Game ends when consecutive passes >= 2 (handled below).
         }
 
         gameState.setConsecutivePasses(prev => {
             const newPasses = prev + 1;
+            console.log(`[App] Consecutive Passes: ${prev} -> ${newPasses}`);
             if (newPasses >= 2) { 
+                console.log("[App] Game End via 2 passes.");
                 setTimeout(() => { 
                     const score = calculateScore(gameState.boardRef.current); 
                     gameState.setFinalScore(score); 
@@ -582,13 +559,23 @@ const App: React.FC = () => {
             return newPasses;
         });
         gameState.setPassNotificationDismissed(false); 
+        
+        // Check using CURRENT state value, not the one just scheduled to update.
+        // If consecutivePasses was 0, it means the OTHER player (or previous turn) wasn't a pass.
+        // So this is the 1st pass. We should switch turn.
+        // If consecutivePasses was 1, it means the previous turn WAS a pass. 
+        // This is the 2nd pass. Game ends (handled above).
         if (gameState.consecutivePasses < 1) { 
-             const next = gameState.currentPlayer === 'black' ? 'white' : 'black';
+             // [Fix] Use Ref to ensure we switch from the ACTUAL current player. 
+             // (Or just use the closure variable if added to deps, but Ref is safer in async callbacks)
+             const current = gameState.currentPlayerRef.current;
+             const next = current === 'black' ? 'white' : 'black';
+             console.log(`[App] Switching Player: ${current} -> ${next}`);
              gameState.setCurrentPlayer(next);
              gameState.currentPlayerRef.current = next;
              gameState.setLastMove(null); 
         }
-    }, [gameState.gameOver, settings.gameMode, settings.gameType, gameState.consecutivePasses, settings.userColor, isElectronAvailable, isElectronThinking]);
+    }, [gameState.gameOver, settings.gameMode, settings.gameType, gameState.consecutivePasses, settings.userColor, isElectronAvailable, isElectronThinking, gameState.currentPlayer]);
 
     const handleUndo = () => {
          if (gameState.history.length === 0 || isThinking || gameState.gameOver || onlineStatus === 'connected') return;
@@ -689,6 +676,7 @@ const App: React.FC = () => {
           if (aiTurnLock.current) return;
           // [Fix] Correctly check if we should use the Neural Network (WebAI or Electron)
           const aiConfig = getAIConfig(settings.difficulty);
+          // Now ALL ranks use Model for Go (except Gomoku)
           const shouldUseHighLevelAI = settings.gameType === 'Go' && (aiConfig.useModel || isElectronAvailable); 
     
           if (shouldUseHighLevelAI) {
@@ -698,30 +686,32 @@ const App: React.FC = () => {
                       electronAiEngine.requestAiMove(aiColor, settings.difficulty, settings.maxVisits, getResignThreshold(settings.difficulty));
                   } else {
                       // Web AI Request
-                      // Precise Rank Mode (18k-9d) Support & Speed Optimization
-                      // "Easy" = 1 sim (Instant, pure intuition)
-                      // "Medium" = 3 sims
-                      // "Hard" = 10 sims
-                      // 5k-1k = 1-3 sims
-                      // 1d-9d = 5-13 sims
+                      // Precise Rank Mode (18k-9d) Support 
+                      // 18k-6k: 1 sim + Temperature
                       let sims = aiConfig.simulations;
                       
-                      if (settings.difficulty === 'Easy' || settings.difficulty === 'Medium' || settings.difficulty === 'Hard') {
-                          sims = settings.difficulty === 'Easy' ? 1 : (settings.difficulty === 'Medium' ? 3 : 10);
-                      } else {
-                          // Precise Rank Mode
-                          sims = aiConfig.simulations;
-                          if (sims < 1) sims = 1;
-                      }
+                      // Safety Check for Mobile? (Already handled in aiConfig)
+                      if (sims < 1) sims = 1;
 
                        // Determine Komi based on board size
                       const komi = settings.boardSize === 9 ? 6.5 : 7.5;
                       
-                      webAiEngine.requestWebAiMove(gameState.boardRef.current, aiColor, gameState.historyRef.current, sims, komi, settings.difficulty);
+                      const t = aiConfig.temperature ?? 0;
+
+                      webAiEngine.requestWebAiMove(
+                          gameState.boardRef.current, 
+                          aiColor, 
+                          gameState.historyRef.current, 
+                          sims, 
+                          komi, 
+                          settings.difficulty,
+                          t // Pass Temperature
+                      );
                   }
               }
           }
           else {
+              // Local AI (Gomoku Only or Failsafe)
               if (!aiTurnLock.current) {
                   aiTurnLock.current = true;
                   setIsThinking(true);
@@ -737,12 +727,10 @@ const App: React.FC = () => {
                           // Pass history logic for AI
                           let prevHash = null;
                           const currentHistory = gameState.historyRef.current;
-                          // Ko Check logic:
-                          // We check if the NEW board (after AI moves) is identical to a previous state.
-                          // Specifically for Simple Ko, we forbid returning to the state immediately before the opponent's move.
-                          // currentHistory[last] = State_Before_Opponent_Move.
                           if (currentHistory && currentHistory.length >= 1) {
                               prevHash = getBoardHash(currentHistory[currentHistory.length - 1].board);
+                          } else {
+                              prevHash = null;
                           }
 
                           const move = getAIMove(currentRealBoard, aiColor, settings.gameType, settings.difficulty, prevHash);
@@ -757,13 +745,6 @@ const App: React.FC = () => {
                           setToastMsg(`AI 出错: ${error?.message || '未知错误'}`);
                           setTimeout(() => setToastMsg(null), 5000);
                       } finally {
-                          if (gameState.currentPlayerRef.current === aiColor && !gameState.gameOver) {
-                               // If AI move failed or finished, unlock.
-                               // Note: executeMove unlocks logic by switching player, but we ensure it here.
-                               // Actually executeMove switches player, so the useEffect dependency 'currentPlayer' will change, 
-                               // triggering this effect again (but failing the if check), which is correct.
-                               // However, if AI passed (handlePass), we need to ensure lock is freed.
-                          }
                           aiTurnLock.current = false; aiTimerRef.current = null;
                       }
                   }, 500); 
@@ -1073,6 +1054,9 @@ const App: React.FC = () => {
 
     // --- UI Interactions ---
     const handleIntersectionClick = useCallback((x: number, y: number) => {
+        // [Debug] Click Logging
+        console.log(`[Click] (${x}, ${y}) Mode: ${gameState.appMode}, Current: ${gameState.currentPlayer}, User: ${settings.userColor}, Lock: ${aiTurnLock.current}, Thinking: ${isThinking}`);
+
         if (gameState.appMode === 'review') return; 
         if (gameState.appMode === 'setup') {
             const newBoard = gameState.board.map(row => row.map(s => s));
@@ -1080,10 +1064,17 @@ const App: React.FC = () => {
             else { newBoard[y][x] = { color: gameState.setupTool, x, y, id: `setup-${gameState.setupTool}-${Date.now()}` }; playSfx('move'); vibrate(15); }
             gameState.setBoard(newBoard); return;
         }
-        if (gameState.gameOver || isThinking) return;
+        
+        if (gameState.gameOver) { console.log("Click ignored: Game Over"); return; }
+        if (isThinking) { console.log("Click ignored: AI Thinking"); return; }
         
         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
-        if (onlineStatus !== 'connected' && settings.gameMode === 'PvAI' && gameState.currentPlayer === aiColor) return;
+        
+        if (onlineStatus !== 'connected' && settings.gameMode === 'PvAI' && gameState.currentPlayer === aiColor) {
+             console.log("Click ignored: AI Turn", gameState.currentPlayer, aiColor);
+             return;
+        }
+
         if (onlineStatus === 'connected') { if (gameState.currentPlayer !== myColor) return; sendData({ type: 'MOVE', x, y }); }
         if (isElectronAvailable && settings.gameType === 'Go') electronAiEngine.syncHumanMove(gameState.currentPlayer, x, y);
         executeMove(x, y, false);
@@ -1160,6 +1151,7 @@ const App: React.FC = () => {
                        gameState.setPassNotificationDismissed(true);
                        // Force unlock state in case AI logic didn't clear it correctly
                        setIsThinking(false);
+                       stopWebThinking(); // [Fix] Ensure WebAI is also stopped
                        aiTurnLock.current = false;
                    }}
                    onPass={() => handlePass(false)}

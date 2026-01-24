@@ -7,13 +7,15 @@ export interface OnnxEngineConfig {
     wasmPath?: string; // [New] Path to directory containing WASM files
     numThreads?: number;
     debug?: boolean;
+    gpuBackend?: 'webgpu' | 'wasm'; // [New] Force backend
 }
 
 export interface EngineAnalysisOptions {
     komi?: number;
     history?: { color: Sign; x: number; y: number }[];
-    parent?: { color: Sign; x: number; y: number }[]; // For specialized checks if needed
-    difficulty?: 'Easy' | 'Medium' | 'Hard';
+    parent?: { color: Sign; x: number; y: number }[]; 
+    difficulty?: 'Easy' | 'Medium' | 'Hard'; // kept for logging
+    temperature?: number; // [New] Softmax scaling
 }
 
 export interface AnalysisResult {
@@ -57,11 +59,13 @@ export class OnnxEngine {
             // Configure simple session options
             // Note: WASM files must be served correctly.
             // Configure session options
-            // Try WebGPU first if available (much faster for B18 model)
-            // Note: WebGPU requires HTTPS or localhost
+            // Detect Mobile to avoid WebGPU crashes if not explicitly requested
+            const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+            const preferredBackend = this.config.gpuBackend || (isMobile ? 'wasm' : 'webgpu');
+
             const options: ort.InferenceSession.SessionOptions = {
-                executionProviders: ['webgpu', 'wasm'], 
-                graphOptimizationLevel: 'all', // Re-enable optimization for WebGPU efficiency
+                executionProviders: [preferredBackend, 'wasm'], 
+                graphOptimizationLevel: 'all', 
             };
 
             if (this.config.numThreads) {
@@ -83,9 +87,9 @@ export class OnnxEngine {
                     onProgress?.(`正在下载模型 (${completed}/${total})...`);
 
                     const buffers = await Promise.all(this.config.modelParts.map(async (partUrl, idx) => {
-                        // [Fix] Cache Busting to bypass faulty Service Worker
-                        const safeUrl = `${partUrl}?t=${Date.now()}`;
-                        const res = await fetch(safeUrl);
+                        // [Optimization] Cache Enabled (Removed timestamp busting)
+                        // This allows the 25MB model to be cached by the browser/CDN
+                        const res = await fetch(partUrl);
                         if (!res.ok) throw new Error(`Failed to fetch part: ${partUrl}`);
                         const buf = await res.arrayBuffer();
                         completed++;
@@ -114,11 +118,11 @@ export class OnnxEngine {
             }
 
             try {
-                // @ts-ignore - Overload resolution issue with union type
+                // @ts-ignore
                 this.session = await ort.InferenceSession.create(modelData, options);
-                console.log('[OnnxEngine] Model loaded successfully (WebGPU/WASM)');
+                console.log(`[OnnxEngine] Model loaded successfully (${preferredBackend})`);
             } catch (e) {
-                console.warn('[OnnxEngine] WebGPU failed or not available, falling back to WASM...', e);
+                console.warn(`[OnnxEngine] ${preferredBackend} failed, falling back to WASM...`, e);
                 // Fallback to WASM only
                 const wasmOptions: ort.InferenceSession.SessionOptions = {
                     executionProviders: ['wasm'],
@@ -156,16 +160,26 @@ export class OnnxEngine {
         this.fillBinInput(board, color, komi, history, binInputData, size);
         this.fillGlobalInput(history, komi, color, globalInputData);
 
-        const binInputTensor = new ort.Tensor('float32', binInputData, [1, 22, size, size]);
-        const globalInputTensor = new ort.Tensor('float32', globalInputData, [1, 19]);
+        // Keep track of tensors to dispose
+        const tensorsToDispose: ort.Tensor[] = [];
 
-        // 2. Run Inference
-        const feeds: Record<string, ort.Tensor> = {};
-        feeds['bin_input'] = binInputTensor;
-        feeds['global_input'] = globalInputTensor;
+        let binInputTensor: ort.Tensor | null = null;
+        let globalInputTensor: ort.Tensor | null = null;
+        let results: ort.InferenceSession.OnnxValueMapType | null = null;
 
         try {
-            const results = await this.session.run(feeds);
+            binInputTensor = new ort.Tensor('float32', binInputData, [1, 22, size, size]);
+            globalInputTensor = new ort.Tensor('float32', globalInputData, [1, 19]);
+            
+            tensorsToDispose.push(binInputTensor);
+            tensorsToDispose.push(globalInputTensor);
+
+            // 2. Run Inference
+            const feeds: Record<string, ort.Tensor> = {};
+            feeds['bin_input'] = binInputTensor;
+            feeds['global_input'] = globalInputTensor;
+
+            results = await this.session.run(feeds);
             console.timeEnd('[OnnxEngine] Inference');
 
             // 3. Process Results
@@ -189,12 +203,12 @@ export class OnnxEngine {
             }
 
             // Parse outputs
-            const moveInfos = this.extractMoves(finalPolicy, size, board, color, options.difficulty);
+            const moveInfos = this.extractMoves(finalPolicy, size, board, color, options.temperature ?? 0);
             const winrate = this.processWinrate(value);
             const lead = misc[0] * 20;
 
             // Log detailed results
-            console.log(`[OnnxEngine] Analysis Complete.`);
+            console.log(`[OnnxEngine] Analysis Complete. (Temp: ${options.temperature ?? 0})`);
             console.log(`  - Win Rate: ${winrate.toFixed(1)}%`);
             console.log(`  - Score Lead: ${lead.toFixed(1)}`);
             console.log(`  - Top 3 Moves:`);
@@ -215,6 +229,23 @@ export class OnnxEngine {
             console.timeEnd('[OnnxEngine] Inference');
             console.error('[OnnxEngine] Inference Failed:', e);
             throw e;
+        } finally {
+            // [Cleanup] Explicitly dispose input tensors
+            for (const t of tensorsToDispose) {
+                if(t && typeof (t as any).dispose === 'function') {
+                    (t as any).dispose();
+                }
+            }
+            
+            // [Cleanup] Explicitly dispose output tensors
+            if (results) {
+                for (const key in results) {
+                    const val = results[key];
+                    if (val && typeof (val as any).dispose === 'function') {
+                        (val as any).dispose();
+                    }
+                }
+            }
         }
     }
 
@@ -340,7 +371,7 @@ export class OnnxEngine {
         return (e0 / sum) * 100; // Return percentage
     }
 
-    private extractMoves(policy: Float32Array, size: number, board: MicroBoard, color: Sign, difficulty: string = 'Hard') {
+    private extractMoves(policy: Float32Array, size: number, board: MicroBoard, color: Sign, temperature: number) {
         // Policy is just a flat array of logits?
         
         // Find max for stability
@@ -368,10 +399,12 @@ export class OnnxEngine {
                 
                 // Only return legal moves with some probability
                 if (p > 0.0001) { // Lower threshold to allow checking more moves
-                     if (board.isValid(x, y) && board.get(x, y) === 0) { 
+                     // Use isLegal to check for Suicides and Ko
+                     if (board.isLegal(x, y, color)) { 
                           moves.push({
                              x, y,
                              prior: p,
+                             logit: policy[idx], // Save Logit for temperature
                              winrate: 0,
                              vists: 0,
                              u: 0, scoreMean: 0, scoreStdev: 0, lead: 0
@@ -390,13 +423,44 @@ export class OnnxEngine {
              }
         }
 
-        // Sort by prob
+        // Sort by prob (Argmax)
         moves.sort((a, b) => b.prior - a.prior);
 
-        // --- Difficulty Logic Removed ---
-        // User requested AI to always play its best within the simulation capabilities (speed limits).
-        // No artificial weakening (swapping moves). Since we limit simulations heavily on Easy/Medium,
-        // that naturally limits its reading depth without needing to sabotage its move choice.
+        // [Fix] Force Pass if it's the best move
+        // If the AI thinks Passing is the best move (highest probability), 
+        // we should respect it immediately and not let Temperature sample a stupid move (like filling own territory).
+        // Refusing to pass when the game is done is "Broken", not "Weak".
+        if (moves.length > 0 && moves[0].x === -1) {
+            return [moves[0]];
+        }
+
+        // Temperature Sampling
+        if (temperature > 0) {
+            // Re-calculate probabilities using softmax with temperature
+            // P = exp(logit / T) / Sum
+            
+            // 1. Find max (for numerical stability)
+            let maxL = -Infinity;
+            for (const m of moves) maxL = Math.max(maxL, m.logit);
+            
+            // 2. Sum Exponentials
+            let sumExp = 0;
+            const weightedMoves = moves.map(m => {
+                const w = Math.exp((m.logit - maxL) / temperature);
+                sumExp += w;
+                return { ...m, weight: w };
+            });
+
+            // 3. Sample
+            let r = Math.random() * sumExp;
+            for (const m of weightedMoves) {
+                r -= m.weight;
+                if (r <= 0) {
+                    return [m];
+                }
+            }
+            return [weightedMoves[weightedMoves.length - 1]]; // Fallback
+        }
 
         return moves;
     }

@@ -17,9 +17,11 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const [initStatus, setInitStatus] = useState<string>(''); // [Lazy Load]
     const [aiWinRate, setAiWinRate] = useState(50);
     const workerRef = useRef<Worker | null>(null);
-    const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[]; simulations: number; komi?: number; difficulty?: string } | null>(null);
+    const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[]; simulations: number; komi?: number; difficulty?: string; temperature?: number } | null>(null);
     const expectingResponseRef = useRef(false);
     const initializingRef = useRef(false); // [Fix] Lock to prevent double-init
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null); // [New] Watchdog
+
 
     // [Lazy Load] Initialization Function
     const initializeAI = useCallback(() => {
@@ -94,15 +96,30 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                             size: boardSize,
                             simulations: pending.simulations,
                             komi: pending.komi ?? 7.5,
-                            difficulty: pending.difficulty
+                            difficulty: pending.difficulty,
+                            temperature: pending.temperature
                         }
                     });
+                    
+                    // Start Timeout Watchdog
+                    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                    timeoutRef.current = setTimeout(() => {
+                        if (expectingResponseRef.current) {
+                            console.warn('[WebAI] Timeout! Resetting...');
+                            setInitStatus('AI 响应超时');
+                            setIsThinking(false);
+                            expectingResponseRef.current = false;
+                        }
+                    }, 20000); // 20s
+
                     setIsThinking(true);
                     expectingResponseRef.current = true;
                 }
             } else if (msg.type === 'ai-response') {
                 // ... (Existing logic)
                 if (!expectingResponseRef.current) return;
+                if (timeoutRef.current) clearTimeout(timeoutRef.current); // Clear watchdog
+                
                 setIsThinking(false);
                 expectingResponseRef.current = false;
                 const { move, winRate } = msg.data;
@@ -126,11 +143,15 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
 
         // --- 3. Hardware Concurrency ---
         // Optimization for Mobile: Cap at 2 threads to prevent overheating
+        // iOS: Force 1 thread (Safari SharedArrayBuffer issues + Jetsam)
         const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+        const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
         const cores = navigator.hardwareConcurrency || 2;
-        // Desktop: Max 4. Mobile: Max 2.
-        const numThreads = isMobile ? Math.min(2, cores) : Math.min(4, cores);
-        console.log(`[WebAI] Configured Threads: ${numThreads} (Mobile: ${isMobile})`); 
+        
+        let numThreads = isMobile ? Math.min(2, cores) : Math.min(4, cores);
+        if (isIOS) numThreads = 1; // Strict safety for iOS
+
+        console.log(`[WebAI] Configured Threads: ${numThreads} (Mobile: ${isMobile}, iOS: ${isIOS})`); 
 
         // --- 4. Send Init Message ---
         const modelParts = [
@@ -190,7 +211,8 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         history: any[],
         simulations: number = 45,
         komi: number = 7.5, 
-        difficulty: 'Easy' | 'Medium' | 'Hard' = 'Hard'
+        difficulty: 'Easy' | 'Medium' | 'Hard' = 'Hard',
+        temperature: number = 0 // Default Argmax
     ) => {
         // [Lazy Load Warning]
         if (!isWorkerReady) {
@@ -204,7 +226,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         
         if (!isWorkerReady) {
             console.log("Worker not ready, queuing request...");
-            pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty }; // Add difficulty
+            pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature }; // Add temperature
             setIsThinking(true); 
             expectingResponseRef.current = true;
             return;
@@ -221,15 +243,29 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                 size: boardSize,
                 simulations,
                 komi,
-                difficulty
+                difficulty,
+                temperature
             }
         });
+        
+        // Start Timeout Watchdog
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
+            if (expectingResponseRef.current) {
+                console.warn('[WebAI] Timeout! Resetting...');
+                setInitStatus('AI 响应超时');
+                setIsThinking(false);
+                expectingResponseRef.current = false;
+            }
+        }, 20000); // 20s
+
     }, [boardSize, isThinking, isWorkerReady]);
 
     const stopThinking = useCallback(() => {
         setIsThinking(false);
         pendingRequestRef.current = null;
         expectingResponseRef.current = false;
+        if (timeoutRef.current) clearTimeout(timeoutRef.current); // Clear
         if (workerRef.current) {
             workerRef.current.postMessage({ type: 'stop' });
         }

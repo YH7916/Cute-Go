@@ -279,9 +279,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                                     </div>
                                                 </div>
                                             )}
-                                            <p className="text-[10px] text-[#8c6b38]/70 font-medium px-2 pt-1 text-center">
-                                                * 5k及以上难度调用本地大模型，在旧机型上可能存在发热、反应慢的问题
-                                            </p>
+                        
                                         </>
                                     )}
                                     

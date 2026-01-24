@@ -12,6 +12,7 @@ type WorkerMessage =
             simulations?: number;
             komi?: number;
             difficulty?: 'Easy' | 'Medium' | 'Hard';
+            temperature?: number; // [New]
       } }
     | { type: 'stop' };
 
@@ -56,15 +57,16 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 throw new Error('Engine not initialized');
             }
 
-            const { board: boardState, history: gameHistory, color, size, komi, difficulty } = msg.data;
+            const { board: boardState, history: gameHistory, color, size, komi, difficulty, temperature } = msg.data;
             const pla: Sign = color === 'black' ? 1 : -1;
 
             // 1. Reconstruct MicroBoard with Ko Detection
             const board = new MicroBoard(size);
             
-            // Logic: To detect Ko, we need to replay the last move to derive the Ko point.
-            // History stores { board: S_prev, lastMove: M_prev }.
-            // So we load S_prev and play M_prev.
+            // Logic: To detect Ko, we need to replay the last move to set the 'ko' property on the board.
+            // If we just load the current board state, 'ko' will be -1 (unknown).
+            // So we go back one step (State Before Last Move) and replay the Last Move.
+            
             const len = gameHistory.length;
             
             if (len > 0) {
@@ -80,9 +82,9 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 
                 // 2. Play the last move to reach CURRENT state with calculated Ko
                 if (lastItem.lastMove) {
-                    // lastItem.currentPlayer is the player who MADE the move.
-                    const mover = lastItem.currentPlayer === 'black' ? 1 : -1; 
-                    board.play(lastItem.lastMove.x, lastItem.lastMove.y, mover);
+                     // App.tsx stores the MOVER in `currentPlayer`.
+                     const moverColor = lastItem.currentPlayer === 'black' ? 1 : -1;
+                     board.play(lastItem.lastMove.x, lastItem.lastMove.y, moverColor);
                 }
             } else {
                 // No history (Start of game). Just load current board state.
@@ -100,7 +102,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             
             for (const item of gameHistory) {
                 if (item.lastMove) {
-                    const moveColor = item.currentPlayer === 'white' ? 1 : -1; 
+                    const moveColor = item.currentPlayer === 'black' ? 1 : -1; 
                     historyMoves.push({
                          color: moveColor,
                          x: item.lastMove.x,
@@ -113,7 +115,8 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             const result = await engine.analyze(board, pla, {
                 history: historyMoves,
                 komi: komi ?? 7.5,
-                difficulty: difficulty 
+                difficulty: difficulty,
+                temperature: temperature
             });
 
             // 4. Send Response
