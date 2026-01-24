@@ -13,17 +13,17 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const [isWorkerReady, setIsWorkerReady] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
-    const [isInitializing, setIsInitializing] = useState(false); // [Lazy Load]
-    const [initStatus, setInitStatus] = useState<string>(''); // [Lazy Load]
+    const [isInitializing, setIsInitializing] = useState(false);
+    const [initStatus, setInitStatus] = useState<string>('');
     const [aiWinRate, setAiWinRate] = useState(50);
+    
     const workerRef = useRef<Worker | null>(null);
     const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[]; simulations: number; komi?: number; difficulty?: string; temperature?: number } | null>(null);
     const expectingResponseRef = useRef(false);
-    const initializingRef = useRef(false); // [Fix] Lock to prevent double-init
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null); // [New] Watchdog
+    const initializingRef = useRef(false); 
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-
-    // [Lazy Load] Initialization Function
+    // Initialization Function
     const initializeAI = useCallback(() => {
         if (isWorkerReady || isInitializing || workerRef.current || initializingRef.current) return;
         
@@ -37,163 +37,132 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         setInitStatus('正在启动 AI 引擎...');
 
         // --- 1. Paths ---
-        const pathName = window.location.pathname;
-        const directory = pathName.substring(0, pathName.lastIndexOf('/') + 1);
-        const baseUrl = `${window.location.origin}${directory}`;
-        
-        const modelUrl = `${baseUrl}models/kata1-b18c384nbt-s9996604416-d4316597426.uint8.onnx`;
-        const wasmUrl = `${baseUrl}wasm/`;
-
-        console.log("WebAI Model URL:", modelUrl);
-
-        // --- 2. Worker Initialization ---
-        let worker: Worker;
-        try {
-            worker = new Worker(new URL('../worker/ai.worker.ts', import.meta.url), { 
-                type: 'module'
-            });
-        } catch (e) {
-            console.error("Worker Init Failed:", e);
-            setInitStatus('Worker 启动失败');
-            setIsLoading(false);
-            setIsInitializing(false);
-            initializingRef.current = false; // Unlock
-            return;
+        let baseUrl = window.location.origin + window.location.pathname;
+        if (!baseUrl.endsWith('/')) {
+            baseUrl = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
         }
-        
-        workerRef.current = worker;
 
-        worker.onerror = (err) => {
-            console.error("CRITICAL: Web Worker Error", err);
-            setIsThinking(false);
+        const modelUrl = new URL('models/kata1-b18c384nbt-s9996604416-d4316597426.uint8.onnx', baseUrl).href;
+        const wasmUrl = new URL('wasm/', baseUrl).href;
+
+        // --- 2. Worker config ---
+        const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+        const numThreads = isMobile ? 1 : Math.min(2, navigator.hardwareConcurrency || 2);
+        
+        console.log(`[WebAI] Worker Config: Threads=${numThreads} Mobile=${isMobile}`);
+        console.log(`[WebAI] Resolved Paths:`, { modelUrl, wasmUrl });
+
+        try {
+            const worker = new Worker(new URL('../worker/ai.worker.ts', import.meta.url), { type: 'module' });
+            workerRef.current = worker;
+
+            // Watchdog for Init
+            const initWatchdog = setTimeout(() => {
+                if (initializingRef.current && !isWorkerReady) {
+                    console.warn("[WebAI] Worker Init Timeout!");
+                    setInitStatus("AI 启动超时 (请尝试刷新)");
+                    setIsInitializing(false);
+                }
+            }, 20000); // 20s watchdog
+
+            worker.onerror = (err) => {
+                console.error("Worker Error:", err);
+                setInitStatus('AI 出错');
+                setIsThinking(false);
+                setIsLoading(false);
+                setIsInitializing(false);
+                initializingRef.current = false;
+                expectingResponseRef.current = false;
+                clearTimeout(initWatchdog);
+            };
+
+            worker.onmessage = (e) => {
+                const msg = e.data;
+                if (msg.type === 'init-complete') {
+                    console.log('[WebAI] Worker Ready.');
+                    clearTimeout(initWatchdog);
+                    setIsWorkerReady(true);
+                    setIsLoading(false);
+                    setIsInitializing(false);
+                    setInitStatus('AI 就绪');
+                    initializingRef.current = false;
+                    
+                    // Execute Pending
+                    if (pendingRequestRef.current) {
+                        const pending = pendingRequestRef.current;
+                        pendingRequestRef.current = null; // Clear
+                        
+                        // Send compute
+                        worker.postMessage({
+                            type: 'compute',
+                            data: {
+                                board: pending.board,
+                                history: pending.history,
+                                color: pending.playerColor,
+                                size: boardSize,
+                                simulations: pending.simulations,
+                                komi: pending.komi ?? 7.5,
+                                difficulty: pending.difficulty,
+                                temperature: pending.temperature
+                            }
+                        });
+                        
+                        setIsThinking(true);
+                        expectingResponseRef.current = true;
+                    }
+                } else if (msg.type === 'ai-response') {
+                    if (!expectingResponseRef.current) return;
+                    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                    
+                    const { move, winRate } = msg.data;
+                    setAiWinRate(winRate);
+                    setIsThinking(false);
+                    expectingResponseRef.current = false;
+
+                    if (move) onAiMove(move.x, move.y);
+                    else onAiPass();
+
+                } else if (msg.type === 'status') {
+                    setInitStatus(msg.message);
+                } else if (msg.type === 'error') {
+                    setInitStatus(`错误: ${msg.message}`);
+                    setIsThinking(false);
+                    setIsLoading(false);
+                    setIsInitializing(false);
+                    initializingRef.current = false; // Reset lock
+                    expectingResponseRef.current = false;
+                }
+            };
+
+            // Send Init
+            const modelParts = [
+                modelUrl + '.part1',
+                modelUrl + '.part2',
+                modelUrl + '.part3',
+                modelUrl + '.part4'
+            ];
+
+            worker.postMessage({ 
+                type: 'init',
+                payload: { 
+                    modelPath: modelUrl,
+                    modelParts: modelParts,
+                    wasmPath: wasmUrl,
+                    numThreads: numThreads
+                }
+            });
+
+        } catch (e) {
+            console.error("Failed to crate worker", e);
+            setInitStatus("启动失败");
             setIsLoading(false);
             setIsInitializing(false);
-            initializingRef.current = false; // Unlock
-            setInitStatus('AI 引擎发生错误');
-        };
-
-        worker.onmessage = (e) => {
-            const msg = e.data;
-            if (msg.type === 'init-complete') {
-                console.log('Web AI Ready (ONNX)');
-                setIsWorkerReady(true);
-                setIsLoading(false);
-                setIsInitializing(false);
-                setInitStatus('AI 准备就绪');
-                initializingRef.current = false; // Unlock (Done)
-                
-                // Process pending if any (rare case for lazy load but possible)
-                if (pendingRequestRef.current && workerRef.current) {
-                   // ... (Existing pending logic below)
-                   const pending = pendingRequestRef.current;
-                    pendingRequestRef.current = null;
-                    workerRef.current.postMessage({
-                        type: 'compute',
-                        data: {
-                            board: pending.board,
-                            history: pending.history,
-                            color: pending.playerColor,
-                            size: boardSize,
-                            simulations: pending.simulations,
-                            komi: pending.komi ?? 7.5,
-                            difficulty: pending.difficulty,
-                            temperature: pending.temperature
-                        }
-                    });
-                    
-                    // Start Timeout Watchdog
-                    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-                    timeoutRef.current = setTimeout(() => {
-                        if (expectingResponseRef.current) {
-                            console.warn('[WebAI] Timeout! Resetting...');
-                            setInitStatus('AI 响应超时');
-                            setIsThinking(false);
-                            expectingResponseRef.current = false;
-                        }
-                    }, 20000); // 20s
-
-                    setIsThinking(true);
-                    expectingResponseRef.current = true;
-                }
-            } else if (msg.type === 'ai-response') {
-                // ... (Existing logic)
-                if (!expectingResponseRef.current) return;
-                if (timeoutRef.current) clearTimeout(timeoutRef.current); // Clear watchdog
-                
-                setIsThinking(false);
-                expectingResponseRef.current = false;
-                const { move, winRate } = msg.data;
-                setAiWinRate(winRate);
-                if (move) onAiMove(move.x, move.y);
-                else onAiPass();
-            } else if (msg.type === 'status') {
-                // [Optional] Support worker sending detailed status updates
-                setInitStatus(msg.message);
-            } else if (msg.type === 'error') {
-                console.error('[WebAI Error]', msg.message);
-                setIsThinking(false);
-                setIsLoading(false);
-                setIsInitializing(false);
-                initializingRef.current = false; // Unlock
-                setInitStatus(`错误: ${msg.message}`);
-                expectingResponseRef.current = false;
-                pendingRequestRef.current = null;
-            }
-        };
-
-        // --- 3. Hardware Concurrency ---
-        // Optimization for Mobile: Cap at 2 threads to prevent overheating
-        // iOS: Force 1 thread (Safari SharedArrayBuffer issues + Jetsam)
-        const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
-        const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
-        const cores = navigator.hardwareConcurrency || 2;
-        
-        let numThreads = isMobile ? Math.min(2, cores) : Math.min(4, cores);
-        if (isIOS) numThreads = 1; // Strict safety for iOS
-
-        console.log(`[WebAI] Configured Threads: ${numThreads} (Mobile: ${isMobile}, iOS: ${isIOS})`); 
-
-        // --- 4. Send Init Message ---
-        const modelParts = [
-            modelUrl + '.part1',
-            modelUrl + '.part2',
-            modelUrl + '.part3',
-            modelUrl + '.part4'
-        ];
-
-
-
-        setInitStatus('正在下载 AI 模型 (20MB)...');
-        
-        // Timeout Watchdog
-        const watchdog = setTimeout(() => {
-            if (initializingRef.current && !isWorkerReady) {
-                 setInitStatus(prev => {
-                     // Check if we passed the "Worker Alive" stage
-                     if (prev.includes('启动 AI 引擎') && !prev.includes('Worker 线程')) {
-                         return 'AI 引擎响应超时 (可能脚本加载失败，请刷新)';
-                     }
-                     if (prev.includes('下载')) {
-                         return prev + ' (如果长时间无响应，请尝试刷新)';
-                     }
-                     return prev;
-                 });
-            }
-        }, 8000); // 8s warning
-
-        worker.postMessage({ 
-            type: 'init',
-            payload: { 
-                modelPath: modelUrl,
-                modelParts: modelParts,
-                wasmPath: wasmUrl,
-                numThreads: numThreads
-            }
-        });
+            initializingRef.current = false;
+        }
 
     }, [boardSize, onAiMove, onAiPass, isWorkerReady, isInitializing]);
 
-    // Cleanup Effect
+    // Cleanup
     useEffect(() => {
         return () => {
             console.log("[WebAI] Cleaning up worker...");
@@ -212,11 +181,21 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         simulations: number = 45,
         komi: number = 7.5, 
         difficulty: 'Easy' | 'Medium' | 'Hard' = 'Hard',
-        temperature: number = 0 // Default Argmax
+        temperature: number = 0
     ) => {
         // [Lazy Load Warning]
         if (!isWorkerReady) {
             console.warn("AI requested but not ready. Call initializeAI() first.");
+            // If not initialized, try initializing?
+            if (!isInitializing && !workerRef.current) {
+                 // Initialize and Queue
+                 console.log("Auto-initializing for request...");
+                 pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature };
+                 initializeAI();
+            } else if (isInitializing) {
+                 // Just Queue
+                 pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature };
+            }
             return;
         }
 
@@ -224,16 +203,9 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
 
         logEvent('ai_request');
         
-        if (!isWorkerReady) {
-            console.log("Worker not ready, queuing request...");
-            pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature }; // Add temperature
-            setIsThinking(true); 
-            expectingResponseRef.current = true;
-            return;
-        }
-
         setIsThinking(true);
         expectingResponseRef.current = true;
+        
         workerRef.current.postMessage({
             type: 'compute',
             data: {
@@ -248,7 +220,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
             }
         });
         
-        // Start Timeout Watchdog
+        // Timeout Watchdog for Computation
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         timeoutRef.current = setTimeout(() => {
             if (expectingResponseRef.current) {
@@ -259,19 +231,19 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
             }
         }, 20000); // 20s
 
-    }, [boardSize, isThinking, isWorkerReady]);
+    }, [boardSize, isThinking, isWorkerReady, isInitializing, initializeAI]);
 
     const stopThinking = useCallback(() => {
         setIsThinking(false);
-        pendingRequestRef.current = null;
         expectingResponseRef.current = false;
-        if (timeoutRef.current) clearTimeout(timeoutRef.current); // Clear
+        pendingRequestRef.current = null;
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         if (workerRef.current) {
             workerRef.current.postMessage({ type: 'stop' });
         }
     }, []);
 
-    // --- Page Visibility Handler (Save Battery) ---
+    // Page Visibility (Battery Save)
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.hidden) {
@@ -290,11 +262,11 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         isWorkerReady,
         isLoading,
         isThinking,
-        isInitializing, // Export
-        initStatus,    // Export
+        isInitializing, 
+        initStatus,    
         aiWinRate,
         requestWebAiMove,
         stopThinking,
-        initializeAI   // Export
+        initializeAI
     };
 };

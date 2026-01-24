@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, PenTool, FileUp, Globe, Heart, RotateCcw, BookOpen } from 'lucide-react';
+import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, PenTool, FileUp, Globe, Heart, RotateCcw, BookOpen, Brain } from 'lucide-react';
 import { BoardSize, GameType, GameMode, Player, ExtendedDifficulty } from '../types';
 import { getSliderBackground, getCalculatedVisits } from '../utils/helpers';
 import { sliderToVisits, visitsToSlider } from '../hooks/useKataGo';
@@ -41,6 +41,7 @@ interface SettingsModalProps {
     onOpenOnline: () => void;
     onOpenAbout: () => void;
     onOpenTutorial: () => void;
+    onOpenTsumego: () => void;
 
     isElectronAvailable: boolean;
 }
@@ -61,6 +62,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onOpenOnline,
     onOpenAbout,
     onOpenTutorial,
+    onOpenTsumego,
     isElectronAvailable
 }) => {
     // Temp State for Game Settings
@@ -407,6 +409,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <Globe size={18}/> 联机对战
                         </button>
                         
+                        <button onClick={onOpenTsumego} className="btn-retro col-span-2 flex items-center justify-center gap-2 bg-[#a5d6a7] text-[#2e7d32] border-[#81c784] py-3 rounded-xl font-bold text-sm">
+                             <Brain size={18}/> 死活题闯关
+                        </button>
+
                         <button onClick={onOpenTutorial} className="btn-retro col-span-2 flex items-center justify-center gap-2 bg-[#81d4fa] text-[#0277bd] border-[#4fc3f7] py-3 rounded-xl font-bold text-sm">
                             <BookOpen size={18}/> 新手教程
                         </button>

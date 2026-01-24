@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCcw, SkipForward, Play, Eraser, Undo2 } from 'lucide-react';
+import { RotateCcw, SkipForward, Play, Eraser, Undo2, Lightbulb } from 'lucide-react';
 import { AppMode, HistoryItem, Player } from '../types';
 import { getSliderBackground } from '../utils/helpers';
 
@@ -22,6 +22,13 @@ interface GameControlsProps {
     currentPlayer: Player;
     myColor: Player | null;
     consecutivePasses: number;
+    // Tsumego
+    isTsumego?: boolean;
+    hasPrevProblem?: boolean;
+    hasNextProblem?: boolean;
+    handlePrevProblem?: () => void;
+    handleNextProblem?: () => void;
+    handleHint?: () => void;
 }
 
 export const GameControls: React.FC<GameControlsProps> = ({
@@ -42,7 +49,14 @@ export const GameControls: React.FC<GameControlsProps> = ({
     onlineStatus,
     currentPlayer,
     myColor,
-    consecutivePasses
+    consecutivePasses,
+    // Tsumego Props
+    isTsumego,
+    hasPrevProblem,
+    hasNextProblem,
+    handlePrevProblem,
+    handleNextProblem,
+    handleHint
 }) => {
     return (
         <div className="mt-auto">
@@ -91,16 +105,55 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
             {/* PLAYING MODE CONTROLS */}
             {appMode === 'playing' && (
-                <div className="grid grid-cols-3 gap-3">
-                    <button onClick={handleUndo} disabled={history.length === 0 || isThinking || gameOver || onlineStatus === 'connected'} className="btn-retro btn-sand flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50">
-                        <Undo2 size={20} /> <span className="text-xs">悔棋</span>
-                    </button>
-                    <button onClick={() => handlePass(false)} disabled={gameOver || (onlineStatus === 'connected' && currentPlayer !== myColor)} className={`btn-retro btn-coffee flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50 ${consecutivePasses === 1 ? 'animate-pulse' : ''}`}>
-                        <SkipForward size={20} /> <span className="text-xs">{consecutivePasses === 1 ? '结算' : '停着'}</span>
-                    </button>
-                    <button onClick={() => resetGame(onlineStatus === 'connected')} className="btn-retro btn-beige flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold">
-                        <RotateCcw size={20} /> <span className="text-xs">重开</span>
-                    </button>
+                <div className={`grid gap-3 ${isTsumego ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                    {/* Tsumego Specific Controls */}
+                    {isTsumego ? (
+                         <>
+                            <button 
+                                onClick={handlePrevProblem} 
+                                disabled={!hasPrevProblem}
+                                className="btn-retro btn-sand flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50 disabled:grayscale"
+                            >
+                                <SkipForward size={20} className="rotate-180" /> <span className="text-xs">上一题</span>
+                            </button>
+                            
+                            <button 
+                                onClick={handleHint} 
+                                className="btn-retro btn-sand flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50"
+                            >
+                                <Lightbulb size={20} /> <span className="text-xs">提示</span>
+                            </button>
+
+                            <button 
+                                onClick={handleUndo} 
+                                disabled={history.length === 0 || isThinking || gameOver}
+                                className="btn-retro btn-coffee flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50"
+                            >
+                                <Undo2 size={20} /> <span className="text-xs">撤销</span>
+                            </button>
+
+                            <button 
+                                onClick={handleNextProblem} 
+                                disabled={!hasNextProblem}
+                                className="btn-retro btn-beige flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50 disabled:grayscale"
+                            >
+                                <SkipForward size={20} /> <span className="text-xs">下一题</span>
+                            </button>
+                         </>
+                    ) : (
+                        // Standard Go Controls
+                        <>
+                            <button onClick={handleUndo} disabled={history.length === 0 || isThinking || gameOver || onlineStatus === 'connected'} className="btn-retro btn-sand flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50">
+                                <Undo2 size={20} /> <span className="text-xs">悔棋</span>
+                            </button>
+                            <button onClick={() => handlePass(false)} disabled={gameOver || (onlineStatus === 'connected' && currentPlayer !== myColor)} className={`btn-retro btn-coffee flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50 ${consecutivePasses === 1 ? 'animate-pulse' : ''}`}>
+                                <SkipForward size={20} /> <span className="text-xs">{consecutivePasses === 1 ? '结算' : '停着'}</span>
+                            </button>
+                            <button onClick={() => resetGame(onlineStatus === 'connected')} className="btn-retro btn-beige flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold">
+                                <RotateCcw size={20} /> <span className="text-xs">重开</span>
+                            </button>
+                        </>
+                    )}
                 </div>
             )}
         </div>

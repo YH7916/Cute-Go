@@ -61,6 +61,16 @@ export class OnnxEngine {
             // Configure session options
             // Detect Mobile to avoid WebGPU crashes if not explicitly requested
             const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+            const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            
+            // [Memory Fix] iOS Jetsam Protection
+            if (isIOS) {
+                console.log("[OnnxEngine] iOS detected: Disabling SIMD and Proxy for stability.");
+                ort.env.wasm.simd = false;
+                ort.env.wasm.proxy = false; 
+                // ort.env.wasm.numThreads is handled by session options, but global env helps too
+            }
+
             const preferredBackend = this.config.gpuBackend || (isMobile ? 'wasm' : 'webgpu');
 
             const options: ort.InferenceSession.SessionOptions = {
@@ -79,6 +89,8 @@ export class OnnxEngine {
 
             // Handle Split Models (Cloudflare Pages 25MB limit workaround)
             if (this.config.modelParts && this.config.modelParts.length > 0) {
+                 // ... (Splitting logic remains same, just logging)
+                 // Keeping existing split logic but ensuring we log clearly
                 console.log(`[OnnxEngine] Loading model from ${this.config.modelParts.length} parts...`);
                 
                 try {
@@ -87,8 +99,6 @@ export class OnnxEngine {
                     onProgress?.(`正在下载模型 (${completed}/${total})...`);
 
                     const buffers = await Promise.all(this.config.modelParts.map(async (partUrl, idx) => {
-                        // [Optimization] Cache Enabled (Removed timestamp busting)
-                        // This allows the 25MB model to be cached by the browser/CDN
                         const res = await fetch(partUrl);
                         if (!res.ok) throw new Error(`Failed to fetch part: ${partUrl}`);
                         const buf = await res.arrayBuffer();
@@ -98,7 +108,6 @@ export class OnnxEngine {
                     }));
                     
                     onProgress?.(`正在合并模型数据...`);
-                    // Merge buffers
                     const totalLength = buffers.reduce((acc, buf) => acc + buf.byteLength, 0);
                     const merged = new Uint8Array(totalLength);
                     let offset = 0;
@@ -108,7 +117,7 @@ export class OnnxEngine {
                     }
                     console.log(`[OnnxEngine] Merged model parts. Total size: ${(totalLength / 1024 / 1024).toFixed(2)} MB`);
                     modelData = merged;
-                    onProgress?.(`正在启动 AI 引擎 (首次需编译，请稍候)...`); // Update status before create
+                    onProgress?.(`正在启动 AI 引擎 (首次需编译，请稍候)...`); 
                 } catch (e) {
                     console.error('[OnnxEngine] Failed to load model parts:', e);
                     throw e;
@@ -118,21 +127,37 @@ export class OnnxEngine {
             }
 
             try {
+                console.log(`[OnnxEngine] Creating InferenceSession with provider: ${preferredBackend}`);
+                console.log(`[OnnxEngine] Env State:`, JSON.stringify(ort.env.wasm));
+                
                 // @ts-ignore
                 this.session = await ort.InferenceSession.create(modelData, options);
                 console.log(`[OnnxEngine] Model loaded successfully (${preferredBackend})`);
             } catch (e) {
-                console.warn(`[OnnxEngine] ${preferredBackend} failed, falling back to WASM...`, e);
-                // Fallback to WASM only
+                console.warn(`[OnnxEngine] ${preferredBackend} failed, falling back to WASM... Error: ${(e as Error).message}`);
+                
+                // Fallback to WASM only (Safest)
                 const wasmOptions: ort.InferenceSession.SessionOptions = {
                     executionProviders: ['wasm'],
-                    graphOptimizationLevel: 'disabled', // Keep disabled for WASM stability based on previous NaN issues
+                    graphOptimizationLevel: 'disabled',
                 };
-                if (this.config.numThreads) {
-                    wasmOptions.intraOpNumThreads = this.config.numThreads;
-                    wasmOptions.interOpNumThreads = this.config.numThreads;
+                
+                // Disable SIMD/Threads for fallback purely
+                ort.env.wasm.simd = false;
+                ort.env.wasm.proxy = false;
+                ort.env.wasm.numThreads = 1;
+
+                console.log("[OnnxEngine] Retrying with basic WASM (No SIMD/Threads)...");
+                this.session = await ort.InferenceSession.create(this.config.modelPath, wasmOptions); // Fallback usually expects path? or can take buffer too
+                // Actually if we have buffer 'modelData', use it!
+                // But wait, if modelData was huge, maybe that's why? 
+                // Let's rely on create accepting both.
+                if (typeof modelData !== 'string') {
+                     this.session = await ort.InferenceSession.create(modelData, wasmOptions);
+                } else {
+                     this.session = await ort.InferenceSession.create(this.config.modelPath, wasmOptions);
                 }
-                this.session = await ort.InferenceSession.create(this.config.modelPath, wasmOptions);
+                
                 console.log('[OnnxEngine] Model loaded successfully (WASM Fallback)');
             }
         } catch (e) {

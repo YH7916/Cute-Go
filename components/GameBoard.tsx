@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { getAllGroups } from '../utils/goLogic';
-import { BoardState, Player, Stone, GameType } from '../types';
+import { BoardState, Player, Stone, GameType, GameMode } from '../types';
 import { StoneFace } from './StoneFaces';
 import { ZoomOut } from 'lucide-react';
 
@@ -23,6 +23,7 @@ interface GameBoardProps {
   lastMove: { x: number, y: number } | null;
   showQi: boolean;
   gameType: GameType;
+  gameMode?: GameMode; // Added
   showCoordinates?: boolean;
   extraSVG?: React.ReactNode;
   autoShowQiAt?: { x: number, y: number };
@@ -54,6 +55,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   lastMove,
   showQi,
   gameType,
+  gameMode,
   showCoordinates = false,
   extraSVG,
   autoShowQiAt
@@ -200,7 +202,65 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               setActiveQiSegments(segments);
           }
       }
-  }, [autoShowQiAt, board]); // Add board to deps so it re-calcs if board changes (e.g. initial setup)
+  }, [autoShowQiAt]);
+
+  // --- Auto Zoom Logic (Dynamic) ---
+  useEffect(() => {
+    const isTsumego = gameMode === 'Tsumego';
+    
+    // Only apply auto-zoom for 19x19 boards in Tsumego mode
+    if (isTsumego && boardSize === 19) {
+        const stones = board.flat().filter(s => s !== null);
+        if (stones.length === 0) return;
+
+        let minX = 19, maxX = 0;
+        let minY = 19, maxY = 0;
+
+        stones.forEach(s => {
+             if (s.x < minX) minX = s.x;
+             if (s.x > maxX) maxX = s.x;
+             if (s.y < minY) minY = s.y;
+             if (s.y > maxY) maxY = s.y;
+        });
+
+        // Add padding (2 cells around)
+        const PADDING = 2;
+        minX = Math.max(0, minX - PADDING);
+        maxX = Math.min(18, maxX + PADDING);
+        minY = Math.max(0, minY - PADDING);
+        maxY = Math.min(18, maxY + PADDING);
+
+        const width = maxX - minX + 1;
+        const height = maxY - minY + 1;
+        
+        // If the area is too big (e.g. > 15x15), don't zoom (scale ~1)
+        // Viewport is ~19 cells. 
+        // Scale = 19 / max(width, height)
+        const boundingSize = Math.max(width, height);
+        
+        if (boundingSize > 15) {
+             setTransform({ scale: 1, x: 0, y: 0 });
+             return;
+        }
+
+        const targetScale = Math.min(2.5, 19 / boundingSize);
+        
+        // Calculate center of the bounding box
+        const bboxCenterX = (minX + maxX) / 2;
+        const bboxCenterY = (minY + maxY) / 2;
+        
+        const centerBoard = 9; // Center of 19x19 (0..18)
+        const deltaX = centerBoard - bboxCenterX;
+        const deltaY = centerBoard - bboxCenterY;
+        
+        const offsetX = deltaX * CELL_SIZE * targetScale;
+        const offsetY = deltaY * CELL_SIZE * targetScale;
+
+        setTransform({ scale: targetScale, x: offsetX, y: offsetY });
+    } else {
+         setTransform({ scale: 1, x: 0, y: 0 });
+    }
+  }, [gameMode, boardSize, board, CELL_SIZE]);
 
   const handleStoneHover = (x: number, y: number) => {
     if (!showQi) {
