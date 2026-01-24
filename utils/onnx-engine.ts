@@ -60,24 +60,40 @@ export class OnnxEngine {
             // Note: WASM files must be served correctly.
             // Configure session options
             // Detect Mobile to avoid WebGPU crashes if not explicitly requested
-            const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
-            const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
             
-            // [Memory Fix] iOS Jetsam Protection
-            if (isIOS) {
-                console.log("[OnnxEngine] iOS detected: Disabling SIMD and Proxy for stability.");
+            // [Memory Fix] Low-End Device Protection (All Mobile)
+            // Jetsam (iOS) and Low-Memory Killers (Android Wechat/H5) are strict.
+            // Disabling SIMD/Proxy reduces memory footprint significantly at cost of speed.
+            if (isMobile) {
+                console.log("[OnnxEngine] Mobile detected: Disabling SIMD and Proxy for max stability.");
                 ort.env.wasm.simd = false;
                 ort.env.wasm.proxy = false; 
-                // ort.env.wasm.numThreads is handled by session options, but global env helps too
+                ort.env.wasm.numThreads = 1; // Force 1 thread here too
+                
+                // [CRITICAL FIX] Use CDN for Mobile WASM
+                // The local package seems to be missing 'ort-wasm.wasm' (Vanilla Lite version).
+                // We force mobile to fetch the lightweight binary (~3MB) from jsdelivr to avoid the 11MB+ SIMD binary.
+                console.log("[OnnxEngine] Mobile: Switching WASM path to CDN for lightweight binary...");
+                ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/';
             }
 
             const preferredBackend = this.config.gpuBackend || (isMobile ? 'wasm' : 'webgpu');
 
+            // [Memory Fix] Graph Optimization consumes huge RAM during compile time.
+            // On low-end mobile, we MUST disable it to prevent OOM.
+            // 'disabled' = fastest startup, lowest memory, slightly slower inference.
+            // [Update] 'disabled' might be causing inference to hang/fail. Trying 'basic'.
+            const graphOptLevel = isMobile ? 'basic' : 'all';
+
             const options: ort.InferenceSession.SessionOptions = {
                 executionProviders: [preferredBackend, 'wasm'], 
-                graphOptimizationLevel: 'all', 
+                graphOptimizationLevel: graphOptLevel,
+                enableCpuMemArena: true, // [Restore] Arena helps performance and fragmentation
+                enableMemPattern: true,
+                executionMode: 'sequential', // Force sequential
             };
-
+            
             if (this.config.numThreads) {
                 options.intraOpNumThreads = this.config.numThreads;
                 options.interOpNumThreads = this.config.numThreads;
@@ -111,10 +127,15 @@ export class OnnxEngine {
                     const totalLength = buffers.reduce((acc, buf) => acc + buf.byteLength, 0);
                     const merged = new Uint8Array(totalLength);
                     let offset = 0;
-                    for (const buf of buffers) {
-                        merged.set(new Uint8Array(buf), offset);
-                        offset += buf.byteLength;
+                    
+                    // Copy and immediately try to dereference (fake) by looping
+                    for (let i = 0; i < buffers.length; i++) {
+                        merged.set(new Uint8Array(buffers[i]), offset);
+                        offset += buffers[i].byteLength;
+                        // @ts-ignore
+                        buffers[i] = null; // Help GC
                     }
+
                     console.log(`[OnnxEngine] Merged model parts. Total size: ${(totalLength / 1024 / 1024).toFixed(2)} MB`);
                     modelData = merged;
                     onProgress?.(`正在启动 AI 引擎 (首次需编译，请稍候)...`); 
@@ -132,6 +153,11 @@ export class OnnxEngine {
                 
                 // @ts-ignore
                 this.session = await ort.InferenceSession.create(modelData, options);
+
+                // [Memory Fix] IMMEDIATELY release the JS copy of the model
+                // The WASM runtime now has its own copy. We don't need this duplicate 20MB in JS heap.
+                (modelData as any) = null; 
+
                 console.log(`[OnnxEngine] Model loaded successfully (${preferredBackend})`);
             } catch (e) {
                 console.warn(`[OnnxEngine] ${preferredBackend} failed, falling back to WASM... Error: ${(e as Error).message}`);
@@ -139,7 +165,10 @@ export class OnnxEngine {
                 // Fallback to WASM only (Safest)
                 const wasmOptions: ort.InferenceSession.SessionOptions = {
                     executionProviders: ['wasm'],
-                    graphOptimizationLevel: 'disabled',
+                    graphOptimizationLevel: 'disabled', // Strongest fallback
+                    enableCpuMemArena: false,
+                    enableMemPattern: false,
+                    executionMode: 'sequential'
                 };
                 
                 // Disable SIMD/Threads for fallback purely
@@ -149,10 +178,14 @@ export class OnnxEngine {
 
                 console.log("[OnnxEngine] Retrying with basic WASM (No SIMD/Threads)...");
                 this.session = await ort.InferenceSession.create(this.config.modelPath, wasmOptions); // Fallback usually expects path? or can take buffer too
-                // Actually if we have buffer 'modelData', use it!
-                // But wait, if modelData was huge, maybe that's why? 
-                // Let's rely on create accepting both.
-                if (typeof modelData !== 'string') {
+                // Actually where modelData was used, we might need to recreate it if it was nulled?
+                // Wait, if create failed, modelData SHOULD be intact.. but wait.
+                // The previous logic didn't null model data until success.
+                // But my fix above does.
+                // If create throws, we are in catch block. modelData is still valid (unless I nulled it in try? No, I nulled it AFTER await).
+                // So modelData is safe to use here.
+
+                if (typeof modelData !== 'string' && modelData) {
                      this.session = await ort.InferenceSession.create(modelData, wasmOptions);
                 } else {
                      this.session = await ort.InferenceSession.create(this.config.modelPath, wasmOptions);
@@ -174,8 +207,10 @@ export class OnnxEngine {
         const komi = options.komi ?? 7.5;
         const history = options.history || [];
 
-        console.time('[OnnxEngine] Inference');
-        console.log(`[OnnxEngine] Starting analysis... BoardSize: ${size}, Color: ${color}, History: ${history.length}`);
+        const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+        if (!isMobile) console.time('[OnnxEngine] Inference');
+        console.log(`[OnnxEngine] Starting analysis...`); // Reduced logging
 
         // 1. Prepare Input Tensors (NCHW)
         // [Batch, Channels, Height, Width] -> [1, 22, 19, 19]
@@ -205,7 +240,7 @@ export class OnnxEngine {
             feeds['global_input'] = globalInputTensor;
 
             results = await this.session.run(feeds);
-            console.timeEnd('[OnnxEngine] Inference');
+            if (!isMobile) console.timeEnd('[OnnxEngine] Inference');
 
             // 3. Process Results
             const policy = results.policy ? results.policy.data as Float32Array : null;
@@ -232,15 +267,21 @@ export class OnnxEngine {
             const winrate = this.processWinrate(value);
             const lead = misc[0] * 20;
 
-            // Log detailed results
-            console.log(`[OnnxEngine] Analysis Complete. (Temp: ${options.temperature ?? 0})`);
-            console.log(`  - Win Rate: ${winrate.toFixed(1)}%`);
-            console.log(`  - Score Lead: ${lead.toFixed(1)}`);
-            console.log(`  - Top 3 Moves:`);
-            moveInfos.slice(0, 3).forEach((m, i) => {
-                const moveStr = m.x === -1 ? 'Pass' : `(${m.x},${m.y})`;
-                console.log(`    ${i + 1}. ${moveStr} (Prob: ${(m.prior * 100).toFixed(1)}%)`);
-            });
+            // [Memory Fix] Reduce IPC payload on mobile
+            // We only need the best move. Sending 360 move objects kills the message channel or GC.
+            const resultMoves = isMobile ? moveInfos.slice(0, 1) : moveInfos;
+
+            // Log detailed results (Desktop Only)
+            if (!isMobile) {
+                console.log(`[OnnxEngine] Analysis Complete. (Temp: ${options.temperature ?? 0})`);
+                console.log(`  - Win Rate: ${winrate.toFixed(1)}%`);
+                console.log(`  - Score Lead: ${lead.toFixed(1)}`);
+                console.log(`  - Top 3 Moves:`);
+                moveInfos.slice(0, 3).forEach((m, i) => {
+                    const moveStr = m.x === -1 ? 'Pass' : `(${m.x},${m.y})`;
+                    console.log(`    ${i + 1}. ${moveStr} (Prob: ${(m.prior * 100).toFixed(1)}%)`);
+                });
+            }
 
             return {
                 rootInfo: {
@@ -248,7 +289,7 @@ export class OnnxEngine {
                     lead: lead,
                     scoreStdev: 0
                 },
-                moves: moveInfos
+                moves: resultMoves
             };
         } catch (e) {
             console.timeEnd('[OnnxEngine] Inference');

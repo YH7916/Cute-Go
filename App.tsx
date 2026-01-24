@@ -402,8 +402,14 @@ const App: React.FC = () => {
                 const aiConfig = getAIConfig(newSettings.difficulty);
                 
                 if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
-                    console.log("[App] Triggering Lazy AI Init (Model Required)...");
-                    webAiEngine.initializeAI();
+                    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+                    if (!isMobile) {
+                        console.log("[App] Triggering Lazy AI Init (Model Required)...");
+                        webAiEngine.initializeAI();
+                    } else {
+                        console.log("[App] Mobile: Deferring AI Init to first move.");
+                    }
+                    
                     // AI Move will be requested when init completes? 
                     // Or we just wait. The logic below checks locks.
                     // If we need AI to move FIRST (White), logic is usually in useEffect or manual trigger.
@@ -426,6 +432,16 @@ const App: React.FC = () => {
     // [New] Effect: Auto-trigger Lazy Init on Startup/Settings Change if needed
     // This handles the case where user reloads page with "Hard" mode active
     useEffect(() => {
+        const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+        
+        // [Optimization] Do NOT auto-init on Mobile. 
+        // Mobile devices (especially iOS) might crash if we init immediately on load.
+        // Wait for user interaction (First Move or Start Game).
+        if (isMobile) {
+            console.log("[App] Mobile detected: Skipping Auto-Init to save memory.");
+            return;
+        }
+
         if (!isElectronAvailable && settings.gameMode === 'PvAI') {
              const aiConfig = getAIConfig(settings.difficulty);
              if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {

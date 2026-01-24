@@ -175,6 +175,13 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
     } catch (err: any) {
         console.error('[AI Worker] Error:', err);
+        // [Fix] Critical: If init failed, we must clear the engine instance so retry can work.
+        // Otherwise 'reinit' thinks we are ready but session is null.
+        if (engine) {
+             console.error('[AI Worker] Resetting broken engine instance.');
+             try { engine.dispose(); } catch (e) {}
+             engine = null;
+        }
         ctx.postMessage({ type: 'error', message: err.message });
     }
 };
