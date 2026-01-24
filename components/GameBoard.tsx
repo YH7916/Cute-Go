@@ -4,6 +4,18 @@ import { BoardState, Player, Stone, GameType } from '../types';
 import { StoneFace } from './StoneFaces';
 import { ZoomOut } from 'lucide-react';
 
+export const calculateBoardConstants = (boardSize: number, showCoordinates: boolean = false) => {
+  // Dynamic cell size: Smaller boards have larger cells, maxing out at 19
+  // FIXED: Revert to 40 as standard base
+  const CELL_SIZE = Math.min(40, 420 / (boardSize + 1)); 
+  
+  // Increase padding if coordinates are shown
+  const BASE_PADDING = boardSize >= 19 ? 12 : 20;
+  const GRID_PADDING = showCoordinates ? BASE_PADDING + 15 : BASE_PADDING;
+  
+  return { CELL_SIZE, GRID_PADDING };
+};
+
 interface GameBoardProps {
   board: BoardState;
   onIntersectionClick: (x: number, y: number) => void;
@@ -12,6 +24,8 @@ interface GameBoardProps {
   showQi: boolean;
   gameType: GameType;
   showCoordinates?: boolean;
+  extraSVG?: React.ReactNode;
+  autoShowQiAt?: { x: number, y: number };
 }
 
 type ConnectionType = 'ortho' | 'loose';
@@ -40,15 +54,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   lastMove,
   showQi,
   gameType,
-  showCoordinates = false
+  showCoordinates = false,
+  extraSVG,
+  autoShowQiAt
 }) => {
   const boardSize = board.length;
-  // Dynamic cell size: Smaller boards have larger cells, maxing out at 19
-  const CELL_SIZE = Math.min(40, 420 / (boardSize + 1)); 
-  
-  // Increase padding if coordinates are shown
-  const BASE_PADDING = boardSize >= 19 ? 12 : 20;
-  const GRID_PADDING = showCoordinates ? BASE_PADDING + 15 : BASE_PADDING;
+  const { CELL_SIZE, GRID_PADDING } = useMemo(() => 
+    calculateBoardConstants(boardSize, showCoordinates), 
+  [boardSize, showCoordinates]);
   
   const STONE_RADIUS = CELL_SIZE * 0.45; 
   
@@ -179,6 +192,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       return segments;
   };
 
+  // --- Auto Show Qi Effect ---
+  useEffect(() => {
+      if (autoShowQiAt) {
+          const segments = calculateQiFlow(autoShowQiAt.x, autoShowQiAt.y);
+          if (segments.length > 0) {
+              setActiveQiSegments(segments);
+          }
+      }
+  }, [autoShowQiAt, board]); // Add board to deps so it re-calcs if board changes (e.g. initial setup)
+
   const handleStoneHover = (x: number, y: number) => {
     if (!showQi) {
         if (activeQiSegments.length > 0) setActiveQiSegments([]);
@@ -193,7 +216,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   };
 
   const handleMouseLeaveBoard = () => {
-      setActiveQiSegments([]);
+      if (!autoShowQiAt) {
+           setActiveQiSegments([]);
+      }
   };
 
   // 统一处理点击：如果是空位则落子，如果是棋子则显示气（移动端友好）
@@ -775,6 +800,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             className="relative z-10 w-full h-full select-none"
             style={{ maxWidth: '100%', maxHeight: '100%' }}
         >
+            {extraSVG}
             <defs>
                 <filter id="goo-silk">
                     <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.15} result="blur" />

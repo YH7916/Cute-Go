@@ -12,6 +12,10 @@ export interface AIConfig {
 }
 
 export function getAIConfig(rank: string): AIConfig {
+    // Environment Check
+    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+    const simCap = isMobile ? 10 : 1000; // Cap at 10 for mobile, high for desktop
+
     const kyuMatch = rank.match(/(\d+)k/);
     const danMatch = rank.match(/(\d+)d/);
 
@@ -19,8 +23,6 @@ export function getAIConfig(rank: string): AIConfig {
         const k = parseInt(kyuMatch[1]);
         
         // 18k -> 6k: Use Local Heuristic AI
-        // Reason: Neural Network (even with 1 sim) is often 1d+ level.
-        // We use Local AI for Kyu levels to give beginners a chance.
         if (k >= 6) { 
             return {
                 useModel: false,
@@ -33,11 +35,9 @@ export function getAIConfig(rank: string): AIConfig {
         
         // 5k -> 1k: Start using WebAI (Neural Network)
         // Extreme Speed Optimization:
-        // KataGo b18 is so strong that 1 simulation is already ~1d level intuition.
-        // We set 5k-1k to just 1-3 simulations.
         return {
             useModel: true,
-            simulations: Math.round(1 + (5 - k) * 0.5), // 5k=1, 4k=1.5(2), ... 1k=3
+            simulations: Math.min(simCap, Math.round(1 + (5 - k) * 0.5)), // 5k=1...1k=3
             randomness: 0,
             heuristicFactor: 1.0
         };
@@ -47,11 +47,9 @@ export function getAIConfig(rank: string): AIConfig {
         const d = parseInt(danMatch[1]);
         // 1d -> 9d
         // Extreme Speed: 
-        // 1d: 5 sims
-        // 9d: 13 sims (Still almost instant, very strong)
         return {
             useModel: true,
-            simulations: Math.round(5 + (d - 1) * 1), // 1d=5 ... 9d=13
+            simulations: Math.min(simCap, Math.round(5 + (d - 1) * 1)), // 1d=5 ... 9d=13(capped at 10 on mobile)
             randomness: 0,
             heuristicFactor: 1.0 
         };

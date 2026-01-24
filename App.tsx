@@ -41,6 +41,7 @@ import { UserPage } from './components/UserPage';
 import { OnlineMenu } from './components/OnlineMenu';
 import { ImportExportModal } from './components/ImportExportModal';
 import { EndGameModal } from './components/EndGameModal';
+import { TutorialModal } from './components/TutorialModal';
 import { PassConfirmationModal } from './components/PassConfirmationModal';
 import { OfflineLoadingModal } from './components/OfflineLoadingModal';
 import { LoginModal } from './components/LoginModal';
@@ -59,8 +60,17 @@ const App: React.FC = () => {
     const [showMenu, setShowMenu] = useState(false);
     const [showUserPage, setShowUserPage] = useState(false);
     const [showPassModal, setShowPassModal] = useState(false);
+    const [showTutorial, setShowTutorial] = useState(false); // Tutorial State
     const [isThinking, setIsThinking] = useState(false); 
     const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+    // --- Tutorial Init Check ---
+    useEffect(() => {
+        const hasSeen = localStorage.getItem('cute_go_tutorial_seen');
+        if (!hasSeen) {
+            setShowTutorial(true);
+        }
+    }, []);
 
     // Auth & Profile
     const [session, setSession] = useState<Session | null>(null);
@@ -231,7 +241,17 @@ const App: React.FC = () => {
         onAiPass: () => handlePass(false),
         onAiResign: () => endGame(settings.userColor, 'AI 认为胜率过低，投子认输')
     });
-    const { isWorkerReady, isLoading: isWebLoading, isThinking: isWebThinking, aiWinRate: webWinRate, stopThinking: stopWebThinking, requestWebAiMove } = webAiEngine;
+    const { 
+        isWorkerReady, 
+        isLoading: isWebLoading, // Legacy loading state (internal)
+        isThinking: isWebThinking, 
+        aiWinRate: webWinRate, 
+        stopThinking: stopWebThinking, 
+        requestWebAiMove,
+        isInitializing: isWebInitializing, // New
+        initStatus: webInitStatus, // New
+        initializeAI // New
+    } = webAiEngine;
 
     const [isFirstRun] = useState(() => !localStorage.getItem('has_run_ai_before'));
     const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
@@ -352,15 +372,53 @@ const App: React.FC = () => {
         resetGame(false, newSettings.boardSize); // This handles board creation
 
         // AI specific init
-        if (isElectronAvailable && newSettings.gameType === 'Go') {
-            electronAiEngine.resetAI(newSettings.boardSize, 7.5);
-             if (newSettings.gameMode === 'PvAI' && newSettings.userColor === 'white') {
-               setTimeout(() => {
-                    electronAiEngine.requestAiMove('black', newSettings.difficulty, newSettings.maxVisits, getResignThreshold(newSettings.difficulty)); 
-               }, 500);
+        if (newSettings.gameMode === 'PvAI') {
+            if (isElectronAvailable && newSettings.gameType === 'Go') {
+                electronAiEngine.resetAI(newSettings.boardSize, 7.5);
+                 if (newSettings.userColor === 'white') {
+                   setTimeout(() => {
+                        electronAiEngine.requestAiMove('black', newSettings.difficulty, newSettings.maxVisits, getResignThreshold(newSettings.difficulty)); 
+                   }, 500);
+                }
+            } 
+            else if (!isElectronAvailable && newSettings.gameType === 'Go') {
+                // [Lazy Load] Trigger Initialization specific for H5
+                // Check if this difficulty actually NEEDS the model
+                const aiConfig = getAIConfig(newSettings.difficulty);
+                
+                if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                    console.log("[App] Triggering Lazy AI Init (Model Required)...");
+                    webAiEngine.initializeAI();
+                    // AI Move will be requested when init completes? 
+                    // Or we just wait. The logic below checks locks.
+                    // If we need AI to move FIRST (White), logic is usually in useEffect or manual trigger.
+                    // For now, Init -> App waits.
+                    // If user is White, AI should move. But AI is not ready. 
+                    // We need a way to auto-start AI move after Init. 
+                    // (Adding simple effect for this or trusting user to wait).
+                    // Actually, if user is White, we need to trigger AI move once ready.
+                    // Let's handle that in the `useEffect` that watches `isWorkerReady`.
+                }
+                
+                // If AI is already ready, and user is White, trigger Logic?
+                if (webAiEngine.isWorkerReady && newSettings.userColor === 'white') {
+                    // Logic handled in AI Trigger Effect
+                }
             }
         }
     };
+
+    // [New] Effect: Auto-trigger Lazy Init on Startup/Settings Change if needed
+    // This handles the case where user reloads page with "Hard" mode active
+    useEffect(() => {
+        if (!isElectronAvailable && settings.gameMode === 'PvAI') {
+             const aiConfig = getAIConfig(settings.difficulty);
+             if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                 console.log("[App] Auto-triggering AI Init (Startup/Reload)...");
+                 webAiEngine.initializeAI();
+             }
+        }
+    }, [settings.gameMode, settings.difficulty, isElectronAvailable, webAiEngine.isWorkerReady, webAiEngine.isInitializing]);
 
     const executeMove = (x: number, y: number, isRemote: boolean) => {
         const currentBoard = gameState.boardRef.current; 
@@ -498,20 +556,16 @@ const App: React.FC = () => {
         const isAIPassInPvAI = !isRemote && settings.gameMode === 'PvAI' && settings.gameType === 'Go' && gameState.currentPlayerRef.current !== settings.userColor;
 
         if (isUserPassInPvAI || isAIPassInPvAI) {
+            // [Fix] Change to Standard 2-Pass Rule
+            // Unlock AI thinking state
             if (isElectronAvailable && isElectronThinking) electronAiEngine.stopThinking();
             setIsThinking(false);
-            // 确保 AI 锁被释放
             aiTurnLock.current = false;
-
-            const score = calculateScore(gameState.boardRef.current);
-            gameState.setFinalScore(score);
-            setShowPassModal(false);
-            gameState.setConsecutivePasses(2); // 视为双停
             
-            // AI Pass or User Pass -> Immediate Settlement
-            if (score.black > score.white) endGame('black', `比分: 黑 ${score.black} - 白 ${score.white}`);
-            else endGame('white', `比分: 白 ${score.white} - 黑 ${score.black}`);
-            return;
+            // Allow flow to fall through to increment counters below.
+            // If AI passes, we just let it be a pass.
+            // If User passes, same.
+            // Game ends when consecutive passes >= 2 (handled below).
         }
 
         gameState.setConsecutivePasses(prev => {
@@ -1060,6 +1114,13 @@ const App: React.FC = () => {
          else displayWinRate = settings.userColor === 'white' ? (100 - validWinRate) : validWinRate;
     }
 
+    // --- Persist AI Run Flag ---
+    useEffect(() => {
+        if (isWorkerReady && !isWebLoading) {
+            localStorage.setItem('has_run_ai_before', 'true');
+        }
+    }, [isWorkerReady, isWebLoading]);
+
     return (
         <div className="h-full w-full bg-[#f7e7ce] flex flex-col landscape:flex-row items-center relative select-none overflow-y-auto landscape:overflow-hidden text-[#5c4033]">
            
@@ -1167,6 +1228,14 @@ const App: React.FC = () => {
            </div>
 
            {/* --- Modals --- */}
+           <TutorialModal 
+               isOpen={showTutorial} 
+               onClose={() => {
+                   setShowTutorial(false);
+                   localStorage.setItem('cute_go_tutorial_seen', 'true');
+               }} 
+           />
+
            <SettingsModal 
                 isOpen={showMenu}
                 onClose={() => setShowMenu(false)}
@@ -1185,6 +1254,7 @@ const App: React.FC = () => {
                 onOpenImport={() => { setShowImportModal(true); setShowMenu(false); }}
                 onOpenOnline={() => setShowOnlineMenu(true)}
                 onOpenAbout={() => { setShowAboutModal(true); setShowMenu(false); }}
+                onOpenTutorial={() => { setShowTutorial(true); setShowMenu(false); }}
                 isElectronAvailable={isElectronAvailable}
            />
 
@@ -1337,24 +1407,17 @@ const App: React.FC = () => {
            />
 
            {/* Web AI Loading Modal - Optimized UI */}
-           {isWebLoading && !isElectronAvailable && (
-             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-                 <div className="bg-[#fcf6ea] p-8 rounded-3xl shadow-2xl border-2 border-[#e3c086] flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-300 min-w-[280px]">
-                      <div className="relative">
-                          <div className="absolute inset-0 bg-[#e3c086]/30 rounded-full animate-ping duration-1000"></div>
-                          <div className="w-16 h-16 bg-[#e3c086]/20 rounded-full flex items-center justify-center relative border border-[#e3c086]/50">
-                               <Cpu size={32} className="text-[#8c6b38]" />
-                          </div>
-                      </div>
-                      <div className="text-center space-y-2">
-                          <h3 className="text-[#5c4033] font-bold text-xl tracking-wide">正在加载AI权重</h3>
-                          <div className="flex flex-col gap-1">
-                               <p className="text-[#8c6b38] text-sm font-medium">首次加载约 5-10 秒</p>
-                          </div>
-                      </div>
-                 </div>
-             </div>
-           )}
+            {/* Loading Modal (Shared for Electron & Web Lazy Load) */}
+            <OfflineLoadingModal 
+                isInitializing={isInitializing || isWebInitializing} 
+                isElectronAvailable={isElectronAvailable || isWebInitializing} // Force show if web init
+                isFirstRun={isFirstRun && isElectronAvailable} // Only show "First Run" hardware text for Local KataGo
+                onClose={() => {
+                     // For web, maybe allow closing? 
+                     // But initialization is heavy. Better wait.
+                }}
+                message={isWebInitializing ? webInitStatus : undefined}
+            />
 
         </div>
     );

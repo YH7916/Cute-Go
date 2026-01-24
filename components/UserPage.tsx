@@ -29,55 +29,60 @@ export const UserPage: React.FC<UserPageProps> = ({
 
     return (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-[#fcf6ea] rounded-[2rem] w-full max-w-sm shadow-2xl border-[6px] border-[#8c6b38] flex flex-col max-h-[90vh] overflow-hidden relative">
+          <div className="bg-[#fcf6ea] rounded-[2rem] w-full max-w-sm landscape:max-w-3xl shadow-2xl border-[6px] border-[#8c6b38] flex flex-col max-h-[90vh] overflow-hidden relative">
             {/* Header */}
-            <div className="bg-[#fcf6ea] border-b-2 border-[#e3c086] border-dashed p-4 flex justify-between items-center shrink-0">
+            <div className="bg-[#fcf6ea] border-b-2 border-[#e3c086] border-dashed p-4 landscape:p-3 flex justify-between items-center shrink-0">
                 <h2 className="text-2xl font-black text-[#5c4033] tracking-wide">我的资料</h2>
                 <button onClick={onClose} className="text-[#8c6b38] hover:text-[#5c4033] bg-[#fff] rounded-full p-2 border-2 border-[#e3c086] transition-colors"><X size={20}/></button>
             </div>
 
-            <div className="p-6 overflow-y-auto custom-scrollbar flex flex-col gap-6">
-                <div className="bg-[#fff]/60 p-4 rounded-2xl border border-[#e3c086] flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-[#5c4033] rounded-full flex items-center justify-center text-[#fcf6ea] border-2 border-[#8c6b38]">
-                            <UserIcon size={24} />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-black text-[#5c4033]">{userProfile?.nickname || '未登录'}</span>
-                            <span className="text-xs font-bold text-[#8c6b38] bg-[#e3c086]/20 px-2 py-0.5 rounded inline-flex items-center gap-1">
-                                <Shield size={12} /> Rating: {userProfile?.elo ?? '—'}
-                            </span>
-                        </div>
-                    </div>
-                    {(() => {
-                        const badge = getRankBadge(userProfile?.elo ?? 0);
-                        return (
-                            <div className={`w-9 h-9 rounded-full bg-white border-2 border-[#e3c086] flex items-center justify-center ${badge.color}`} title={badge.label}>
-                                <badge.Icon size={18} />
+            <div className="p-6 landscape:p-4 overflow-y-auto custom-scrollbar flex flex-col landscape:grid landscape:grid-cols-2 landscape:gap-4 gap-6">
+                
+                {/* Left Column: Profile & Actions */}
+                <div className="flex flex-col gap-6 landscape:gap-4">
+                    <div className="bg-[#fff]/60 p-4 rounded-2xl border border-[#e3c086] flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 bg-[#5c4033] rounded-full flex items-center justify-center text-[#fcf6ea] border-2 border-[#8c6b38]">
+                                <UserIcon size={24} />
                             </div>
-                        );
-                    })()}
-                </div>
-
-                <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086] flex flex-col gap-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-[#8c6b38]">
-                        <span>账号状态</span>
-                        <span className="text-[#5c4033]">{session ? '已登录' : '未登录'}</span>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-black text-[#5c4033]">{userProfile?.nickname || '未登录'}</span>
+                                <span className="text-xs font-bold text-[#8c6b38] bg-[#e3c086]/20 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                    <Shield size={12} /> Rating: {userProfile?.elo ?? '—'}
+                                </span>
+                            </div>
+                        </div>
+                        {(() => {
+                            const badge = getRankBadge(userProfile?.elo ?? 0);
+                            return (
+                                <div className={`w-9 h-9 rounded-full bg-white border-2 border-[#e3c086] flex items-center justify-center ${badge.color}`} title={badge.label}>
+                                    <badge.Icon size={18} />
+                                </div>
+                            );
+                        })()}
                     </div>
 
-                    {session ? (
-                        <button onClick={onSignOutClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
-                            <LogOut size={16}/> 退出登录
-                        </button>
-                    ) : (
-                        <button onClick={onLoginClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
-                            <LogIn size={16}/> 登录 / 注册
-                        </button>
-                    )}
+                    <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086] flex flex-col gap-3">
+                        <div className="flex items-center justify-between text-xs font-bold text-[#8c6b38]">
+                            <span>账号状态</span>
+                            <span className="text-[#5c4033]">{session ? '已登录' : '未登录'}</span>
+                        </div>
+
+                        {session ? (
+                            <button onClick={onSignOutClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                                <LogOut size={16}/> 退出登录
+                            </button>
+                        ) : (
+                            <button onClick={onLoginClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                                <LogIn size={16}/> 登录 / 注册
+                            </button>
+                        )}
+                    </div>
                 </div>
 
-                <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086] flex flex-col gap-3 max-h-[300px] overflow-y-auto custom-scrollbar">
-                    <div className="flex items-center gap-2 mb-1">
+                {/* Right Column: Achievements */}
+                <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086] flex flex-col gap-3 max-h-[300px] landscape:max-h-full overflow-y-auto custom-scrollbar">
+                    <div className="flex items-center gap-2 mb-1 shrink-0">
                         <Medal size={16} className="text-[#8c6b38]" />
                         <span className="text-sm font-bold text-[#5c4033]">成就墙</span>
                         <span className="text-xs font-bold text-[#8c6b38] ml-auto">

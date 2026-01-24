@@ -19,6 +19,15 @@ let engine: OnnxEngine | null = null;
 
 const ctx: Worker = self as any;
 
+// [Fix] Catch global script errors (e.g. Import failures)
+ctx.onerror = (e) => {
+    const msg = e instanceof ErrorEvent ? e.message : 'Unknown Worker Error';
+    ctx.postMessage({ type: 'error', message: `脚本加载失败: ${msg}` });
+};
+
+// [Fix] Signal that worker script loaded successfully
+ctx.postMessage({ type: 'status', message: 'Worker 线程已启动...' });
+
 ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     const msg = e.data;
 
@@ -37,7 +46,9 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 debug: true // Enable debug for now
             });
 
-            await engine.initialize();
+            await engine.initialize((statusMsg) => {
+                ctx.postMessage({ type: 'status', message: statusMsg });
+            });
             ctx.postMessage({ type: 'init-complete' });
 
         } else if (msg.type === 'compute') {

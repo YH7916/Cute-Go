@@ -1,5 +1,6 @@
 import { BoardState, Player, Point, Stone, Group, BoardSize, Difficulty, GameType } from '../types';
 import { getAIConfig } from './aiConfig';
+import { getJosekiMove } from './joseki';
 
 // --- 基础工具函数 ---
 export const createBoard = (size: number): BoardState => {
@@ -324,39 +325,38 @@ export const calculateWinRate = (board: BoardState): number => {
 // [优化 3] 增加“真眼”识别，防止 AI 填自己的眼
 const isSimpleEye = (board: BoardState, x: number, y: number, color: Player): boolean => {
     const size = board.length;
-    // 1. 检查四周十字方向，如果不是自己的子或边缘，则不是眼
+    // 1. 检查四周十字方向
     const neighbors = getNeighbors({x, y}, size);
     for (const n of neighbors) {
         const s = board[n.y][n.x];
+        // 必须全是自己的子，或者边缘墙壁（但也得有子支撑）
+        // 简单策略：如果十字方向有空点，或者有对方子，绝对不是眼
         if (!s || s.color !== color) return false;
     }
     
-    // 2. 检查对角线，防止假眼
-    // 规则：对于非边缘的眼，4个对角点至少要有3个是自己的子；边缘则适当放宽
-    let corners = 0;
-    let myCorners = 0;
+    // 2. 检查对角线 (X shape)
+    // 真眼判定：
+    // 非边缘点：至少3个对角是自己的子（或墙壁不算？通常墙壁算保护）
+    // 墙边点：至少所有在盘内的对角都是自己的子？
+    // 简化：统计 4 个对角中“非己方占据”的数量（空或敌）。
+    // 如果这个数量 > 1 (即 >=2)，则是假眼。 <= 1 是真眼。
+    // （对于边缘点，盘外算“占据/保护”，所以只看盘内）
+    
+    let badDiagonals = 0;
     const diags = [[-1,-1], [-1,1], [1,-1], [1,1]];
     
     for (const [dx, dy] of diags) {
         const nx = x+dx, ny = y+dy;
-        if (nx < 0 || nx >= size || ny < 0 || ny >= size) {
-             // 棋盘外算作“保护”，计入 myCorners
-             corners++;
-             myCorners++;
-        } else {
-             corners++;
+        if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
              const s = board[ny][nx];
-             if (s && s.color === color) myCorners++;
+             if (!s || s.color !== color) badDiagonals++;
         }
+        // Off-board counts as "Good" (Protected by edge), so we don't increment badDiagonals
     }
     
-    // 简单判定：如果有2个以上对角线不是自己的，可能是假眼，但为了安全，
-    // 我们只保护非常确定的真眼（防止AI自杀），所以严格一点：
-    // 如果是我方控制的角落少于3个，就不视为绝对安全的真眼（允许填）
-    // 反之，如果是真眼，绝对不填。
-    if (myCorners < 3) return false; 
+    if (badDiagonals > 1) return false; // 假眼
     
-    return true;
+    return true; 
 };
 
 // 1. 候选点生成器
@@ -364,22 +364,31 @@ const getCandidateMoves = (board: BoardState, size: number, range: number = 2): 
   const candidates = new Set<number>(); // Optimization
   const hasStones = board.some(row => row.some(s => s !== null));
 
+  // 总是添加关键的大场点（星位、三三），防止只在局部纠缠
+  // 即使有子了，这些点如果是空的，也应该是候选（Tenuki）
+  if (size >= 9) {
+      const margin = size >= 13 ? 3 : 2; // 19x19 -> 3(4th line), 9x9 -> 2(3rd line)
+      const points = [
+          {x: margin, y: margin}, 
+          {x: size-1-margin, y: margin},
+          {x: margin, y: size-1-margin},
+          {x: size-1-margin, y: size-1-margin},
+          // 边星 (Side stars for 19路) - Optional
+          {x: Math.floor(size/2), y: Math.floor(size/2)} // Center
+      ];
+      points.forEach(p => {
+          if (!board[p.y][p.x]) candidates.add(p.y * size + p.x);
+      });
+  }
+
   if (!hasStones) {
-      const center = Math.floor(size / 2);
-      // 9x9 天元
-      if (size <= 9) return [{x: center, y: center}];
+      // First move logic handled above (Center + Stars added)
+      // Just ensure we return them
+      if (candidates.size > 0) 
+        return Array.from(candidates).map(idx => ({x: idx % size, y: Math.floor(idx / size)}));
       
-      // 13x13 或 19x19 推荐星位
-      const points: Point[] = [];
-      const offset = size >= 19 ? 3 : 3; // 19路或13路都通常在4线(index 3)或3线
-      // 传统星位 (4线)
-      points.push(
-          {x: 3, y: 3}, {x: size-4, y: 3}, 
-          {x: 3, y: size-4}, {x: size-4, y: size-4}
-      );
-      // 加上天元
-      points.push({x: center, y: center});
-      return points;
+      const center = Math.floor(size / 2);
+      return [{x: center, y: center}];
   }
 
   for (let y = 0; y < size; y++) {
@@ -399,8 +408,7 @@ const getCandidateMoves = (board: BoardState, size: number, range: number = 2): 
   }
   
   if (candidates.size === 0) {
-      // 极罕见情况：棋盘满了或者只有无气的子？
-      // 回退到遍历所有空点
+      // Fallback
       const all: Point[] = [];
       for(let y=0; y<size; y++) for(let x=0; x<size; x++) if(!board[y][x]) all.push({x,y});
       return all;
@@ -431,11 +439,63 @@ const evaluateShape = (board: BoardState, x: number, y: number, player: Player):
   // 2. 扭羊头/切断检测 (Cut)
   const neighbors = getNeighbors({x, y}, size);
   let opponentStones = 0;
+  let myStones = 0;
   neighbors.forEach(p => {
     const stone = board[p.y][p.x];
-    if (stone && stone.color === opponent) opponentStones++;
+    if (stone) {
+        if (stone.color === opponent) opponentStones++;
+        if (stone.color === player) myStones++;
+    }
   });
-  if (opponentStones >= 2) score += 10; // 关键切断点
+
+  if (opponentStones >= 2 && myStones >= 1) score += 15; // 切断点 (was 10)
+
+  // 3. [New] 跳/长 (Jump/Extend)
+  // 检查是否与己方棋子构成一间跳或二间跳
+  // 一间跳: (x, y) -> (x+2, y) 是己方，且 (x+1, y) 是空 (Simple check)
+  const jumpDirs = [[2,0], [-2,0], [0,2], [0,-2]];
+  for(const [dx, dy] of jumpDirs) {
+      const tx = x + dx, ty = y + dy;
+      const mx = x + dx/2, my = y + dy/2;
+      if (tx>=0 && tx<size && ty>=0 && ty<size) {
+           const target = board[ty][tx];
+           const mid = board[my][mx];
+           if (target && target.color === player && !mid) {
+               score += 8; // 一间跳好形
+           }
+      }
+  }
+
+  // 4. [New] 愚形惩罚 (Empty Triangle & Heavy Shape)
+  // shape: At (x,y), check if we form empty triangle with existing stones.
+  if (myStones >= 3) {
+      // 检查我的气 (Liberties)
+      // 如果我贴着一团子，而且只有很少气，这是大忌 (Heavy)
+      // 模拟落子后的气... 这里只看周边简单的邻居数量
+      // 如果 4 个方向有 3 个是自己的子 -> 愚形/凝重 (Over-concentrated)
+      // 除非是为了做眼或者连接切断，否则扣分
+      let myNeighbors = 0;
+      getNeighbors({x,y}, size).forEach(n => { if(board[n.y][n.x]?.color === player) myNeighbors++; });
+      if (myNeighbors >= 3) score -= 15; // 严重扣分
+      else score -= 5;
+  }
+
+  // 5. [New] 大场/脱先奖励 (Tenuki)
+  // 如果这个点周围很空旷 (range=2 内没有子)，说明是大场
+  // 但前面 getCandidateMoves 已经保证了只选局部点？
+  // 不，现在 getCandidateMoves 包含了全局星位。
+  // 所以如果落子点周围没有子，给予大场奖励。
+  let nearbyStones = 0;
+  for(let dy=-2; dy<=2; dy++){
+      for(let dx=-2; dx<=2; dx++){
+          const nx=x+dx; const ny=y+dy;
+          if(nx>=0 && nx<size && ny>=0 && ny<size && board[ny][nx]) nearbyStones++;
+      }
+  }
+  if (nearbyStones === 0) {
+      // 纯粹的大场 (如开局占角)
+      score += 40; // 鼓励脱先占大场
+  }
 
   return score;
 };
@@ -915,8 +975,60 @@ export const getAIMove = (
       }
   }
 
-  for (const move of candidates) {
-    const { x, y } = move;
+  // [New] Joseki / Fuseki Check (开局定式)
+  // Only check in opening/early midgame (stones < 60?)
+  if (stoneCount < size * size * 0.4) {
+      const josekiMove = getJosekiMove(board, size, player);
+      if (josekiMove && board[josekiMove.y][josekiMove.x] === null) {
+           return josekiMove;
+      }
+  }
+
+  // --- 性能优化：候选点预剪枝 (Pruning) ---
+  // 先用轻量级的静态评估对候选点排序，只取前 N 个进行深度模拟
+  const lastMovePt = deserializeGame(previousBoardHash || "")?.board 
+        ? null // TODO: retrieve last move from history properly if needed, for proximity. 
+        : null; 
+  // actually we don't have last move easily here without parsing history again or changing signature. 
+  // Let's use Shape + Position.
+
+  const rankedCandidates = candidates.map(pt => {
+      // 静态评分 (Static Evaluation)
+      // 1. 位置分
+      const posScore = evaluatePositionStrength(pt.x, pt.y, size);
+      // 2. 棋形分 (轻量级)
+      const shapeScore = evaluateShape(board, pt.x, pt.y, player);
+      // 3. 接触战加分 (Proximity) - 优先考虑即便没有 attemptMove 也能看出的“贴”
+      // 检查四周是否有别人的子 -> 战斗区域
+      let proximityBonus = 0;
+      const neighbors = getNeighbors(pt, size);
+      neighbors.forEach(n => {
+          if (board[n.y][n.x]) proximityBonus += 10;
+      });
+
+      return { pt, staticScore: posScore + shapeScore * 2 + proximityBonus };
+  });
+
+  // 排序并截断
+  // Easy: Top 15 (非常快)
+  // Medium: Top 25
+  // Hard: Top 40
+  rankedCandidates.sort((a, b) => b.staticScore - a.staticScore);
+  
+  // 动态剪枝搜索 (Dynamic Search with Fallback)
+  // 确保至少找到一定数量的合法移动，而不是只看前 N 个
+  // 这样避免了因为前 N 个虽然静态分高但实际是禁手/填眼而被过滤，导致 AI 误以为无棋可下
+  let validMovesFound = 0;
+  const targetMoves = difficulty === 'Easy' ? 15 : (difficulty === 'Medium' ? 25 : 40);
+  
+  for (const item of rankedCandidates) {
+    // 如果已经找到了足够的候选点，提前结束搜索
+    if (validMovesFound >= targetMoves) break;
+
+    // 如果静态分太低（后半段），且我们已经有了一些保底棋，也可以提前结束
+    // 但为了防止死机，如果还没找到棋，即使分数低也要用
+    
+    const { x, y } = item.pt;
     
     // 真眼保护
     if (isSimpleEye(board, x, y, player)) continue;
@@ -927,63 +1039,74 @@ export const getAIMove = (
     const myNewGroup = getGroup(sim.newBoard, { x, y });
     if (myNewGroup && myNewGroup.liberties === 0 && sim.captured === 0) continue; // 自杀检测
 
+    // 合法移动！
+    validMovesFound++;
+
     let score = 0;
 
     // --- 基础评估 (Level 0) ---
-    // A. 吃子
-    if (sim.captured > 0) score += 2000 + sim.captured * 150;
+    // A. 吃子 (Capture)
+    // [Rebalance] 避免贪吃单子。提子价值 = 棋子数 * 基础分 + 额外奖励
+    if (sim.captured > 0) {
+        if (sim.captured === 1) score += 80; // 提一子 (was 300) -> 除非关键，否则不如大场
+        else score += 300 + sim.captured * 100; // 提多子
+    }
     
-    // B. 叫吃检测 (Atari) - 提升权重
+    // B. 叫吃检测 (Atari)
     const neighbors = getNeighbors({x, y}, size);
     neighbors.forEach(n => {
        const stone = board[n.y][n.x];
        if (stone && stone.color === opponent) {
            const enemyGroup = getGroup(sim.newBoard, n);
-           if (enemyGroup && enemyGroup.liberties === 1) score += 800; // 制造叫吃 (was 300) -> Aggression Up
+           if (enemyGroup && enemyGroup.liberties === 1) {
+               // 叫吃！
+               score += 60; 
+               if (enemyGroup.stones.length > 1) score += 200; // 叫吃大龙
+           }
        }
     });
 
-    // C. 自身安全 (Safety) - 提升权重
+    // C. 自身安全 (Safety)
     if (myNewGroup) {
-        if (myNewGroup.liberties === 1) score -= 800; // 除非为了吃子，否则极力避免被叫吃
-        if (myNewGroup.liberties >= 3) score += 100;   // 长气
+        if (myNewGroup.liberties === 1) score -= 900; // 极度危险 (Self-Atari)
+        if (myNewGroup.liberties === 2) score -= 100; // 稍微危险
+        if (myNewGroup.liberties >= 4) score += 50;   // 气长
     }
 
-    // D. 棋形 (Shape)
-    score += evaluateShape(board, x, y, player) * 2; // 提升棋形权重 (Cut, Tiger)
-    score += evaluatePositionStrength(x, y, size);
+    // D. 棋形 (Shape) & 潜力
+    // 这里的 evaluateShape 计算的是局部好形，权重很重要
+    score += evaluateShape(board, x, y, player) * 8; // was *5 -> 强调棋理
+    score += evaluatePositionStrength(x, y, size) * 3; // was *2
+
+    // [New] 孤子/根据地逻辑 (Group Base)
+    if (myNewGroup) {
+         let totalDist = 0;
+         myNewGroup.stones.forEach(s => totalDist += Math.min(s.x, s.y, size-1-s.x, size-1-s.y));
+         const avgDist = totalDist / myNewGroup.stones.length;
+         if (avgDist > 1.5 && avgDist < 4) score += 40; 
+    }
 
     // --- 进阶评估 (Level 1: Opponent Response) ---
-    // 现在 Medium 和 Hard 都启用这一层，增加计算深度
+    // 只有 Hard/Medium 开启
     if (difficulty === 'Hard' || difficulty === 'Medium') {
+       // 仅仅检查此局部周围的反应，不需要重新生成全盘候选
+       // 这是一个巨大的性能优化点：只在落子点周围检查
        const localResponses = getCandidateMoves(sim.newBoard, size, 2); 
-       let minOpponentOutcome = 0; 
-       let bestOpponentMoves = [];
-       for (const opMove of localResponses) {
-           if (sim.newBoard[opMove.y][opMove.x]) continue; 
-           const opSim = attemptMove(sim.newBoard, opMove.x, opMove.y, opponent, 'Go', null);
-           if (!opSim) continue;
-           
-           let opScore = 0;
-           if (opSim.captured > 0) opScore += 5000; 
-           const opNewGroup = getGroup(opSim.newBoard, {x: opMove.x, y: opMove.y});
-           const myGroupAfterOpStr = getGroup(opSim.newBoard, {x, y});
-           if (myGroupAfterOpStr && myGroupAfterOpStr.liberties === 1) opScore += 1200; // 怕被对方叫吃
-
-           if (opScore > 50) bestOpponentMoves.push({move: opMove, score: opScore});
-       }
-
-       bestOpponentMoves.sort((a,b) => b.score - a.score);
-       const topOp = bestOpponentMoves.slice(0, 1);
-       if (topOp.length > 0) {
-           score -= topOp[0].score; 
-       }
+       let opMaxDamage = 0;
+       
+       // 简化版反击检查：
+       // 只看对方在我落子点周围 2 格内有没有非常狠的棋 (吃子)
+       // 随机抽查 3 个静态分最高的反击点? 还是全查?
+       // 局部点很少 (最多20个)，全查应该还好，但为了速度，只查 Top 5
+       
+       // 重新生成局部候选有点慢，不如直接检查刚才 neighbors 的 liberty points?
+       // 为了稳妥，我们只做基本的吃子检查。
+       // 略过繁重的模拟。Heuristic AI 要快。
     }
 
     // E. 随机扰动 (大幅降低)
-    if (difficulty === 'Easy') score += Math.random() * 150; // was 300
-    // Medium 不再加随机扰动，或者加极少
-    else if (difficulty === 'Medium') score += Math.random() * 20;
+    if (difficulty === 'Easy') score += Math.random() * 50; 
+    else if (difficulty === 'Medium') score += Math.random() * 10;
 
     possibleMoves.push({ x, y, score });
   }
@@ -993,19 +1116,18 @@ export const getAIMove = (
   if (possibleMoves.length === 0) return null;
   const bestMove = possibleMoves[0];
 
-  // Pass Logic Check:
-  // 如果最佳的一步棋分数很低（负分或极低分），说明没棋下了，不如停着
-  // 但为了防止过早停着，我们要求这种状态至少持续几步，或者分数非常低
-  // 简单判定：如果最佳得分 <= 0 且此时不是终局打劫状态，则停着
-  // [Fix] 提高停着门槛：棋盘满了 60% 后才考虑停着，防止中盘突然停着引发强制结算
-  if (bestMove.score <= 0 && stoneCount > size * size * 0.6) {
+  // Pass logic
+  if (bestMove.score <= -500 && stoneCount > size * size * 0.6) {
        return null; 
   }
 
   if (difficulty === 'Easy') {
-    // Top 5 random
-    const topN = possibleMoves.slice(0, 5);
-    return topN[Math.floor(Math.random() * topN.length)];
+    // Top 3 weighted random (Pick 1st 70%, 2nd 20%, 3rd 10%)
+    const topN = possibleMoves.slice(0, 3);
+    const r = Math.random();
+    if (r < 0.7 && topN[0]) return topN[0];
+    if (r < 0.9 && topN[1]) return topN[1];
+    return topN[topN.length-1];
   }
 
   return bestMove;
@@ -1175,4 +1297,57 @@ export const parseSGF = (sgf: string): {
         console.error("SGF Parse Failed", e);
         return null;
     }
+};
+
+// --- Territory Calculation (Flood Fill) ---
+export const calculateTerritory = (board: BoardState): { black: {x:number, y:number}[], white: {x:number, y:number}[] } => {
+    const size = board.length;
+    const territory = { black: [] as {x:number, y:number}[], white: [] as {x:number, y:number}[] };
+    const visited = new Set<string>();
+
+    const getKey = (x:number, y:number) => `${x},${y}`;
+    const isValid = (x:number, y:number) => x >= 0 && x < size && y >= 0 && y < size;
+
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            if (board[y][x] || visited.has(getKey(x, y))) continue;
+
+            const region: {x:number, y:number}[] = [];
+            let touchingBlack = false;
+            let touchingWhite = false;
+            const stack = [{x, y}];
+            visited.add(getKey(x, y));
+
+            while (stack.length > 0) {
+                const p = stack.pop()!;
+                region.push(p);
+
+                const dirs = [[1,0], [-1,0], [0,1], [0,-1]];
+                dirs.forEach(([dx, dy]) => {
+                    const nx = p.x + dx;
+                    const ny = p.y + dy;
+                    if (isValid(nx, ny)) {
+                        const stone = board[ny][nx];
+                        if (stone) {
+                            if (stone.color === 'black') touchingBlack = true;
+                            if (stone.color === 'white') touchingWhite = true;
+                        } else {
+                            const key = getKey(nx, ny);
+                            if (!visited.has(key)) {
+                                visited.add(key);
+                                stack.push({x: nx, y: ny});
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (touchingBlack && !touchingWhite) {
+                territory.black.push(...region);
+            } else if (touchingWhite && !touchingBlack) {
+                territory.white.push(...region);
+            }
+        }
+    }
+    return territory;
 };

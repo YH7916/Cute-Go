@@ -6,15 +6,24 @@ interface OfflineLoadingModalProps {
     isElectronAvailable: boolean;
     isFirstRun: boolean;
     onClose: () => void;
+    message?: string; // New: Custom status message
 }
 
 export const OfflineLoadingModal: React.FC<OfflineLoadingModalProps> = ({
     isInitializing,
     isElectronAvailable,
     isFirstRun,
-    onClose
+    onClose,
+    message 
 }) => {
-    if (!isInitializing || !isElectronAvailable) return null;
+    // [Fix] Allow showing this modal even if NOT Electron (for H5 lazy load)
+    // Pass isElectronAvailable=true from H5 if we want to force show it? 
+    // Or just remove the check.
+    // Better: Add `forceShow` or just rely on `isInitializing`.
+    // The previous check `if (!isInitializing || !isElectronAvailable) return null;` blocked H5.
+    // Let's change the condition.
+    const isVisible = isInitializing && (isElectronAvailable || !!message);
+    if (!isVisible) return null;
 
     return (
         <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-500">
@@ -27,11 +36,16 @@ export const OfflineLoadingModal: React.FC<OfflineLoadingModalProps> = ({
                 </div>
 
                 <h2 className="text-2xl font-black text-[#5c4033] mb-3">
-                    {isFirstRun ? "正在进行首次初始化" : "AI 引擎启动中..."}
+                    {message ? "AI 引擎启动中..." : (isFirstRun ? "正在进行首次初始化" : "AI 引擎启动中...")}
                 </h2>
 
-                <div className="bg-[#e3c086]/20 p-4 rounded-xl border border-[#e3c086] mb-6">
-                    {isFirstRun ? (
+                <div className="bg-[#e3c086]/20 p-4 rounded-xl border border-[#e3c086] mb-6 w-full">
+                    {message ? (
+                         <p className="text-sm font-bold text-[#8c6b38] leading-relaxed animate-pulse">
+                            <Zap size={16} className="inline mr-1 mb-1"/>
+                            {message}
+                         </p>
+                    ) : isFirstRun ? (
                         <>
                             <p className="text-sm font-bold text-[#8c6b38] leading-relaxed text-left">
                                 <AlertCircle size={16} className="inline mr-1 mb-1"/>

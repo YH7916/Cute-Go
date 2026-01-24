@@ -44,7 +44,7 @@ export class OnnxEngine {
         this.config = config;
     }
 
-    async initialize() {
+    async initialize(onProgress?: (msg: string) => void) {
         if (this.session) return;
 
         try {
@@ -76,13 +76,24 @@ export class OnnxEngine {
             // Handle Split Models (Cloudflare Pages 25MB limit workaround)
             if (this.config.modelParts && this.config.modelParts.length > 0) {
                 console.log(`[OnnxEngine] Loading model from ${this.config.modelParts.length} parts...`);
+                
                 try {
-                    const buffers = await Promise.all(this.config.modelParts.map(async (partUrl) => {
-                        const res = await fetch(partUrl);
+                    let completed = 0;
+                    const total = this.config.modelParts.length;
+                    onProgress?.(`正在下载模型 (${completed}/${total})...`);
+
+                    const buffers = await Promise.all(this.config.modelParts.map(async (partUrl, idx) => {
+                        // [Fix] Cache Busting to bypass faulty Service Worker
+                        const safeUrl = `${partUrl}?t=${Date.now()}`;
+                        const res = await fetch(safeUrl);
                         if (!res.ok) throw new Error(`Failed to fetch part: ${partUrl}`);
-                        return await res.arrayBuffer();
+                        const buf = await res.arrayBuffer();
+                        completed++;
+                        onProgress?.(`正在下载模型 (${completed}/${total})...`);
+                        return buf;
                     }));
                     
+                    onProgress?.(`正在合并模型数据...`);
                     // Merge buffers
                     const totalLength = buffers.reduce((acc, buf) => acc + buf.byteLength, 0);
                     const merged = new Uint8Array(totalLength);
@@ -93,6 +104,7 @@ export class OnnxEngine {
                     }
                     console.log(`[OnnxEngine] Merged model parts. Total size: ${(totalLength / 1024 / 1024).toFixed(2)} MB`);
                     modelData = merged;
+                    onProgress?.(`正在启动 AI 引擎 (首次需编译，请稍候)...`); // Update status before create
                 } catch (e) {
                     console.error('[OnnxEngine] Failed to load model parts:', e);
                     throw e;
