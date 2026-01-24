@@ -14,7 +14,9 @@ type WorkerMessage =
             difficulty?: 'Easy' | 'Medium' | 'Hard';
             temperature?: number; // [New]
       } }
-    | { type: 'stop' };
+    | { type: 'stop' }
+    | { type: 'release' }
+    | { type: 'reinit' };
 
 let engine: OnnxEngine | null = null;
 
@@ -36,6 +38,9 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         if (msg.type === 'init') {
             const { modelPath, modelParts, wasmPath, numThreads } = msg.payload;
             
+            // Cache config for Re-Init
+            (self as any).aiConfig = msg.payload;
+
             // Dispose existing engine if any
             if (engine) engine.dispose();
 
@@ -50,6 +55,37 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             await engine.initialize((statusMsg) => {
                 ctx.postMessage({ type: 'status', message: statusMsg });
             });
+            ctx.postMessage({ type: 'init-complete' });
+
+        } else if (msg.type === 'release') {
+            if (engine) {
+                console.log("[AI Worker] Releasing engine memory...");
+                engine.dispose();
+                engine = null;
+            }
+            ctx.postMessage({ type: 'released' });
+
+        } else if (msg.type === 'reinit') {
+            const config = (self as any).aiConfig;
+            if (!config) {
+                 ctx.postMessage({ type: 'error', message: 'No cached config for reinit' });
+                 return;
+            }
+            
+            if (!engine) {
+                console.log("[AI Worker] Re-Initializing engine...");
+                engine = new OnnxEngine({
+                    modelPath: config.modelPath,
+                    modelParts: config.modelParts,
+                    wasmPath: config.wasmPath,
+                    numThreads: config.numThreads,
+                    debug: true
+                });
+                await engine.initialize((statusMsg) => {
+                     // Be less verbose on re-init
+                     if (statusMsg.includes('启动')) ctx.postMessage({ type: 'status', message: statusMsg });
+                });
+            }
             ctx.postMessage({ type: 'init-complete' });
 
         } else if (msg.type === 'compute') {

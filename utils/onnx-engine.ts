@@ -492,11 +492,16 @@ export class OnnxEngine {
 
     dispose() {
         if (this.session) {
-            // this.session.release(); // release() doesn't exist on InferenceSession? 
-            // It might act as a wrapper.
-            // onnxruntime-web session doesn't explicitly require dispose in JS, GC handles it, 
-            // but if there's a release method.. checking reference.. 
-            // Reference didn't show dispose.
+            try {
+                // @ts-ignore - 'release' is available in recent ort-web but might be missing in types
+                if (typeof this.session.release === 'function') {
+                    // @ts-ignore
+                    this.session.release();
+                    console.log("[OnnxEngine] Session released.");
+                }
+            } catch (e) {
+                console.warn("[OnnxEngine] Failed to release session:", e);
+            }
             this.session = null;
         }
     }

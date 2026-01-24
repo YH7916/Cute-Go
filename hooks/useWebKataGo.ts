@@ -22,6 +22,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const expectingResponseRef = useRef(false);
     const initializingRef = useRef(false); 
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const releaseTimeoutRef = useRef<NodeJS.Timeout | null>(null); // [New] Deferred Release
 
     // Initialization Function
     const initializeAI = useCallback(() => {
@@ -50,7 +51,6 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         const numThreads = isMobile ? 1 : Math.min(2, navigator.hardwareConcurrency || 2);
         
         console.log(`[WebAI] Worker Config: Threads=${numThreads} Mobile=${isMobile}`);
-        console.log(`[WebAI] Resolved Paths:`, { modelUrl, wasmUrl });
 
         try {
             const worker = new Worker(new URL('../worker/ai.worker.ts', import.meta.url), { type: 'module' });
@@ -79,7 +79,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
             worker.onmessage = (e) => {
                 const msg = e.data;
                 if (msg.type === 'init-complete') {
-                    console.log('[WebAI] Worker Ready.');
+                    console.log('[WebAI] Worker Ready (or Re-Initialized).');
                     clearTimeout(initWatchdog);
                     setIsWorkerReady(true);
                     setIsLoading(false);
@@ -121,7 +121,26 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
 
                     if (move) onAiMove(move.x, move.y);
                     else onAiPass();
+                    
+                    // [Memory Saving] Deferred Release on Mobile (15s delay)
+                    // If user moves again within 15s, we clear this timeout.
+                    if (isMobile) {
+                        if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
+                        
+                        // Log only
+                        // console.log("[WebAI] Scheduling memory release in 15s...");
+                        
+                        releaseTimeoutRef.current = setTimeout(() => {
+                             console.log("[WebAI] Idle timeout: Releasing memory now.");
+                             worker.postMessage({ type: 'release' });
+                             releaseTimeoutRef.current = null;
+                        }, 15000);
+                    }
 
+                } else if (msg.type === 'released') {
+                    console.log("[WebAI] Worker memory released (Suspended).");
+                    setIsWorkerReady(false); // Mark as not ready so next req triggers re-init
+                    
                 } else if (msg.type === 'status') {
                     setInitStatus(msg.message);
                 } else if (msg.type === 'error') {
@@ -166,6 +185,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     useEffect(() => {
         return () => {
             console.log("[WebAI] Cleaning up worker...");
+            if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
             if (workerRef.current) {
                 workerRef.current.terminate();
                 workerRef.current = null;
@@ -183,13 +203,33 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         difficulty: 'Easy' | 'Medium' | 'Hard' = 'Hard',
         temperature: number = 0
     ) => {
-        // [Lazy Load Warning]
+        const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+        // Cancel any pending release since we are active again!
+        if (releaseTimeoutRef.current) {
+            clearTimeout(releaseTimeoutRef.current);
+            releaseTimeoutRef.current = null;
+        }
+
+        // [Lazy Load / Re-Init Logic]
         if (!isWorkerReady) {
-            console.warn("AI requested but not ready. Call initializeAI() first.");
-            // If not initialized, try initializing?
+            console.warn("AI requested but not ready.");
+            
+            // If worker exists but is 'released' (memory saved), re-init it.
+            if (workerRef.current && !isInitializing) {
+                 console.log("[WebAI] Worker exists but suspended. Re-Initializing...");
+                 pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature };
+                 // Silent Re-init: Treat as "Thinking" to user, so no popup appears.
+                 setInitStatus(""); 
+                 setIsThinking(true); 
+                 expectingResponseRef.current = true;
+                 workerRef.current.postMessage({ type: 'reinit' });
+                 return;
+            }
+
+            // If not initialized at all, try initializing?
             if (!isInitializing && !workerRef.current) {
-                 // Initialize and Queue
-                 console.log("Auto-initializing for request...");
+                 console.log("[WebAI] Auto-initializing for request...");
                  pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature };
                  initializeAI();
             } else if (isInitializing) {
