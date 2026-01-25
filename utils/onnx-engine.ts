@@ -266,9 +266,34 @@ export class OnnxEngine {
             }
 
             // Parse outputs
-            const moveInfos = this.extractMoves(finalPolicy, size, board, color, options.temperature ?? 0);
-            const winrate = this.processWinrate(value);
-            const lead = misc[0] * 20;
+                        const moveInfos = this.extractMoves(finalPolicy, size, board, color, options.temperature ?? 0);
+            
+            // [Territory-based Calculation]
+            // --- Post Processing ---
+            let winrate = 50;
+            let lead = 0;
+            let finalOwnership: Float32Array | null = null;
+
+            if (ownership) {
+                // 1. Normalize Model Output to Absolute (+1=Black, -1=White)
+                // Note: Current model B18 output is Relative (Pla-dependent).
+                // If Pla = Black: Output is Absolute.
+                // If Pla = White: Output is Relative (Inverted). Need to flip to get Absolute.
+                finalOwnership = new Float32Array(ownership.length);
+                if (color === 1) { 
+                    finalOwnership.set(ownership);
+                } else { 
+                    for(let i=0; i<ownership.length; i++) finalOwnership[i] = -ownership[i];
+                }
+
+                // 2. Calculate Score Lead (Relative to Current Player)
+                // Using the Absolute Ownership map
+                lead = this.calculateTerritoryScore(finalOwnership, komi, size, color); 
+                winrate = this.deriveWinRateFromScore(lead);
+            }
+
+            // Fallback if ownership missing? (Rare)
+            // lead/winrate initialized to 0/50 above.
 
             // [Memory Fix] Reduce IPC payload on mobile
             // We only need the best move. Sending 360 move objects kills the message channel or GC.
@@ -291,13 +316,7 @@ export class OnnxEngine {
                     winrate: winrate,
                     lead: lead,
                     scoreStdev: 0,
-                    ownership: ownership ? new Float32Array(ownership) : null // Clone or pass ref? Pass ref usually fine if we don't dispose buffer immediately.
-                    // Wait, output buffers are views of WASM memory?
-                    // If we dispose `results`, does the data become invalid?
-                    // ort-web: yes, likely. We should copy it specifically if we plan to use it after session run?
-                    // Actually, `results.ownership.data` is likely a TypedArray view.
-                    // It is safest to copy it because we might not control when WASM memory is reclaimed.
-                    // COPY IT: new Float32Array(ownership)
+                    ownership: finalOwnership // Return Normalized Absolute Data
                 },
                 moves: resultMoves
             };
@@ -446,6 +465,40 @@ export class OnnxEngine {
         const sum = e0 + e1 + e2;
         
         return (e0 / sum) * 100; // Return percentage
+    }
+
+    private calculateTerritoryScore(ownership: Float32Array, komi: number, size: number, playerColor: Sign): number {
+        // Ownership Logic: Normalized to ABSOLUTE (+1=Black, -1=White)
+        
+        let blackPoints = 0;
+        let whitePoints = 0;
+
+        // Use constant for threshold (defined at top of file, or here for now)
+        const TERRITORY_THRESHOLD = 0.3; 
+
+        for (let i = 0; i < ownership.length; i++) {
+            const val = ownership[i];
+            if (val > TERRITORY_THRESHOLD) blackPoints += 1;
+            else if (val < -TERRITORY_THRESHOLD) whitePoints += 1;
+        }
+        
+        // Absolute Score: (Black - White) - Komi
+        const absoluteScore = (blackPoints - whitePoints) - komi;
+        
+        // Return Lead relative to CURRENT PLAYER
+        // If Black (1): return Abs; If White (-1): return -Abs.
+        return playerColor === 1 ? absoluteScore : -absoluteScore;
+    }
+
+    private deriveWinRateFromScore(scoreLead: number): number {
+        // Logistic Function.
+        // Hard Scoring reduces the magnitude of the lead compared to Soft Scoring (which includes 0.4s).
+        // A "Current Form" lead of 10 points is significant.
+        // T=8: 10pts -> ~78% (Conservative)
+        // T=5: 10pts -> ~88% (Reasonable)
+        const T = 5.0; 
+        const winProbability = 1 / (1 + Math.exp(-scoreLead / T));
+        return winProbability * 100;
     }
 
     private extractMoves(policy: Float32Array, size: number, board: MicroBoard, color: Sign, temperature: number) {

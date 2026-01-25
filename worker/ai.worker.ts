@@ -209,9 +209,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                               move: { x: best.x, y: best.y }, 
                               winRate: result.rootInfo.winrate,
                               lead: result.rootInfo.lead,
-                              ownership: color === 'white' && result.rootInfo.ownership
-                                  ? result.rootInfo.ownership.map(v => -v) 
-                                  : result.rootInfo.ownership
+                              ownership: result.rootInfo.ownership
                           } 
                       });
                  }
