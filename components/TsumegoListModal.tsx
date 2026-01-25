@@ -19,8 +19,8 @@ interface TsumegoListModalProps {
 
 // Temporary Hardcoded Sets
 const TSUMEGO_SETS: TsumegoSet[] = [
-    { title: "棋经众妙", filename: "qjzm.sgf", difficulty: "Easy" },
-    { title: "玄玄棋经", filename: "xxqj.sgf", difficulty: "Medium" }
+    { title: "棋经众妙", filename: "qjzm.sgf", difficulty: "Hard" },
+    { title: "玄玄棋经", filename: "xxqj.sgf", difficulty: "Hard" }
 ];
 
 export const TsumegoListModal: React.FC<TsumegoListModalProps> = ({

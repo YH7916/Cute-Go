@@ -83,13 +83,13 @@ export class OnnxEngine {
             // [Memory Fix] Graph Optimization consumes huge RAM during compile time.
             // On low-end mobile, we MUST disable it to prevent OOM.
             // 'disabled' = fastest startup, lowest memory, slightly slower inference.
-            // [Update] 'disabled' might be causing inference to hang/fail. Trying 'basic'.
+            // [Update] 60s timeout allows us to use 'basic' again for better inference speed.
             const graphOptLevel = isMobile ? 'basic' : 'all';
 
             const options: ort.InferenceSession.SessionOptions = {
                 executionProviders: [preferredBackend, 'wasm'], 
                 graphOptimizationLevel: graphOptLevel,
-                enableCpuMemArena: true, // [Restore] Arena helps performance and fragmentation
+                enableCpuMemArena: true, 
                 enableMemPattern: true,
                 executionMode: 'sequential', // Force sequential
             };

@@ -19,6 +19,7 @@ type WorkerMessage =
     | { type: 'reinit' };
 
 let engine: OnnxEngine | null = null;
+let initPromise: Promise<void> | null = null;
 
 const ctx: Worker = self as any;
 
@@ -51,10 +52,15 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 numThreads: numThreads,
                 debug: true // Enable debug for now
             });
-
-            await engine.initialize((statusMsg) => {
+            
+            // [Lock] Prevent race conditions
+            initPromise = engine.initialize((statusMsg) => {
                 ctx.postMessage({ type: 'status', message: statusMsg });
             });
+            
+            await initPromise;
+            initPromise = null; // Unlock
+
             ctx.postMessage({ type: 'init-complete' });
 
         } else if (msg.type === 'release') {
@@ -66,6 +72,14 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             ctx.postMessage({ type: 'released' });
 
         } else if (msg.type === 'reinit') {
+            // [Lock] If already initializing, just wait!
+            if (initPromise) {
+                console.log("[AI Worker] Already initializing, waiting...");
+                await initPromise;
+                ctx.postMessage({ type: 'init-complete' });
+                return;
+            }
+
             const config = (self as any).aiConfig;
             if (!config) {
                  ctx.postMessage({ type: 'error', message: 'No cached config for reinit' });
@@ -81,11 +95,15 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     numThreads: config.numThreads,
                     debug: true
                 });
-                await engine.initialize((statusMsg) => {
+                
+                initPromise = engine.initialize((statusMsg) => {
                      // Be less verbose on re-init
                      if (statusMsg.includes('启动')) ctx.postMessage({ type: 'status', message: statusMsg });
                 });
+                await initPromise;
+                initPromise = null;
             }
+            // If engine exists and no promise, we assume it is ready.
             ctx.postMessage({ type: 'init-complete' });
 
         } else if (msg.type === 'compute') {

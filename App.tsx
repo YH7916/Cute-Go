@@ -437,8 +437,11 @@ const App: React.FC = () => {
         // [Optimization] Do NOT auto-init on Mobile. 
         // Mobile devices (especially iOS) might crash if we init immediately on load.
         // Wait for user interaction (First Move or Start Game).
-        if (isMobile) {
-            console.log("[App] Mobile detected: Skipping Auto-Init to save memory.");
+        // [Optimization] On Mobile, ONLY auto-init if we are actually in PvAI mode.
+        // We still want to avoid init on landing (PvP mode) to keep startup fast/safe.
+        // But once user picks PvAI, we should start loading immediately.
+        if (isMobile && settings.gameMode !== 'PvAI') {
+            console.log("[App] Mobile detected (Non-AI Mode): Skipping Auto-Init.");
             return;
         }
 

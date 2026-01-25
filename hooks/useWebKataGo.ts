@@ -60,10 +60,10 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
             const initWatchdog = setTimeout(() => {
                 if (initializingRef.current && !isWorkerReady) {
                     console.warn("[WebAI] Worker Init Timeout!");
-                    setInitStatus("AI 启动超时 (请尝试刷新)");
+                    setInitStatus("AI 启动超时 (网络/设备过慢)");
                     setIsInitializing(false);
                 }
-            }, 20000); // 20s watchdog
+            }, 60000); // 60s watchdog (Mobile can be slow)
 
             worker.onerror = (err) => {
                 console.error("Worker Error:", err);
