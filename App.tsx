@@ -13,7 +13,8 @@ import {
   deserializeGame, 
   generateSGF,
   parseSGF,
-  getBoardHash
+  getBoardHash,
+  cleanBoardWithTerritory // [New]
 } from './utils/goLogic';
 import { getAIConfig } from './utils/aiConfig';
 import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown, Brain, Cpu } from 'lucide-react';
@@ -43,6 +44,7 @@ import { ImportExportModal } from './components/ImportExportModal';
 import { EndGameModal } from './components/EndGameModal';
 import { TutorialModal } from './components/TutorialModal';
 import { PassConfirmationModal } from './components/PassConfirmationModal';
+import { AnalysisPanel } from './components/AnalysisPanel';
 import { OfflineLoadingModal } from './components/OfflineLoadingModal';
 import { LoginModal } from './components/LoginModal';
 import { AchievementNotification } from './components/AchievementNotification';
@@ -104,6 +106,7 @@ const App: React.FC = () => {
     const [opponentProfile, setOpponentProfile] = useState<{ id: string; elo: number } | null>(null);
     const [copied, setCopied] = useState(false);
     const [gameCopied, setGameCopied] = useState(false);
+    const [showTerritory, setShowTerritory] = useState(false); // [New] Territory Toggle
 
     // Import/Export
     const [showImportModal, setShowImportModal] = useState(false);
@@ -265,6 +268,8 @@ const App: React.FC = () => {
         requestWebAiMove,
         isInitializing: isWebInitializing, // New
         initStatus: webInitStatus, // New
+        aiLead: webLead,
+        aiTerritory: webTerritory,
         initializeAI // New
     } = webAiEngine;
 
@@ -347,6 +352,8 @@ const App: React.FC = () => {
 
         if (isElectronAvailable && settings.gameType === 'Go') {
             electronAiEngine.resetAI(sizeToUse, 7.5);
+        } else if (!isElectronAvailable) {
+            webAiEngine.resetAI(); // [Fix] Clear WebAI state
         }
 
         if (keepOnline && shouldBroadcast && onlineStatusRef.current === 'connected' && dataChannelRef.current?.readyState === 'open') {
@@ -1435,14 +1442,34 @@ const App: React.FC = () => {
     };
     
     // Win Rate Calculation for Display
-    const currentRawWinRate = isElectronAvailable ? electronWinRate : (settings.difficulty === 'Hard' && isWorkerReady ? webWinRate : calculateWinRate(gameState.board));
-    const validWinRate = (currentRawWinRate !== 50) ? currentRawWinRate : calculateWinRate(gameState.board);
-    let displayWinRate = 50;
+    // Win Rate Calculation for Display (Normalized to Black Win %)
+    let displayWinRate = calculateWinRate(gameState.board); // Default Heuristic (Already Black%)
+
     if (settings.showWinRate && !gameState.gameOver && gameState.appMode === 'playing' && settings.gameType === 'Go') {
-         if (!isElectronAvailable && settings.difficulty === 'Hard' && isWorkerReady) displayWinRate = 100 - validWinRate;
-         else if (isElectronAvailable) displayWinRate = settings.userColor === 'white' ? (100 - validWinRate) : validWinRate;
-         else displayWinRate = settings.userColor === 'white' ? (100 - validWinRate) : validWinRate;
+         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
+         
+         if (isElectronAvailable && electronWinRate !== 50) {
+             // Electron AI (Assume relative to AI color)
+             displayWinRate = (aiColor === 'white') ? (100 - electronWinRate) : electronWinRate;
+         } 
+         else if (!isElectronAvailable && isWorkerReady && settings.gameMode === 'PvAI' && webWinRate !== 50) {
+             // Web AI (Returns WinRate for Current AI Mover)
+             // If AI is White, it returns White%. We convert to Black%.
+             displayWinRate = (aiColor === 'white') ? (100 - webWinRate) : webWinRate;
+         }
     }
+
+    // Lead Calculation (Normalized to Black Lead)
+    let displayLead: number | null = null;
+    if (settings.gameMode === 'PvAI' && webLead !== null && isWorkerReady) {
+         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
+         // Web Lead is relative to Mover (AI).
+         // If AI is White, Lead +5 means White leads by 5. Black Lead = -5.
+         displayLead = (aiColor === 'white') ? -webLead : webLead;
+    }
+
+
+
 
     // --- Persist AI Run Flag ---
     useEffect(() => {
@@ -1474,6 +1501,8 @@ const App: React.FC = () => {
                            showQi={settings.showQi}
                            gameType={settings.gameType}
                            showCoordinates={settings.showCoordinates}
+                           territory={settings.gameMode === 'PvAI' ? webTerritory : null}
+                           showTerritory={showTerritory}
                        />
                    </div>
                </div>
@@ -1529,14 +1558,25 @@ const App: React.FC = () => {
                     whiteCaptures={gameState.whiteCaptures}
                     gameType={settings.gameType}
                     isThinking={isThinking}
-                    showWinRate={settings.showWinRate}
+                    showWinRate={settings.showWinRate && settings.gameMode !== 'PvAI'}
                     appMode={gameState.appMode}
                     gameOver={gameState.gameOver}
                     userColor={settings.userColor}
                     displayWinRate={displayWinRate}
                 />
 
-                <GameControls 
+                {settings.gameMode === 'PvAI' && settings.showWinRate && (
+                    <AnalysisPanel 
+                        winRate={displayWinRate}
+                        lead={displayLead}
+                        isThinking={isThinking}
+                        showTerritory={showTerritory}
+                        onToggleTerritory={() => setShowTerritory(prev => !prev)}
+                        userColor={settings.userColor}
+                    />
+                )}
+
+                <GameControls  
                     appMode={gameState.appMode}
                     setupTool={gameState.setupTool}
                     setSetupTool={gameState.setSetupTool}

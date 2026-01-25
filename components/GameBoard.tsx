@@ -27,6 +27,8 @@ interface GameBoardProps {
   showCoordinates?: boolean;
   extraSVG?: React.ReactNode;
   autoShowQiAt?: { x: number, y: number };
+  territory?: Float32Array | null;
+  showTerritory?: boolean;
 }
 
 type ConnectionType = 'ortho' | 'loose';
@@ -58,7 +60,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   gameMode,
   showCoordinates = false,
   extraSVG,
-  autoShowQiAt
+  autoShowQiAt,
+  territory,
+  showTerritory
 }) => {
   const boardSize = board.length;
   const { CELL_SIZE, GRID_PADDING } = useMemo(() => 
@@ -647,6 +651,47 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     return hits;
   };
 
+  const renderTerritory = () => {
+      if (!showTerritory || !territory) return null;
+      const rects = [];
+      const len = boardSize * boardSize;
+      // Safety check for array length
+      if (territory.length < len) return null;
+
+      for (let i = 0; i < len; i++) {
+           const val = territory[i];
+           if (Math.abs(val) < 0.1) continue; // Noise/Neutral
+           
+           const x = i % boardSize;
+           const y = Math.floor(i / boardSize);
+           
+           // Don't draw over existing stones (Optional, but looks cleaner)
+           if (board[y][x]) continue;
+
+           const cx = GRID_PADDING + x * CELL_SIZE;
+           const cy = GRID_PADDING + y * CELL_SIZE;
+           
+           const color = val > 0 ? 'black' : 'white';
+           const opacity = Math.min(Math.abs(val) * 0.7, 0.8);
+           const size = CELL_SIZE * 0.5;
+           
+           rects.push(
+               <rect 
+                   key={`t-${i}`} 
+                   x={cx - size/2} 
+                   y={cy - size/2} 
+                   width={size} 
+                   height={size} 
+                   fill={color} 
+                   opacity={opacity} 
+                   rx={2}
+                   pointerEvents="none" 
+               />
+           );
+      }
+      return <g>{rects}</g>;
+  };
+
   // 渲染流动的气特效
   const renderQiFlow = () => {
       if (!showQi || activeQiSegments.length === 0) return null;
@@ -922,6 +967,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             </defs>
             
             <g>{renderGridLines()}</g>
+            {renderTerritory()}
             
             {/* 气流层放在网格之上，棋子之下 */}
             {renderQiFlow()}

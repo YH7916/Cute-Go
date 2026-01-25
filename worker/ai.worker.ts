@@ -108,7 +108,21 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
         } else if (msg.type === 'compute') {
             if (!engine) {
-                throw new Error('Engine not initialized');
+                // [Fix] Auto-recover if engine is missing (Race Condition safety)
+                const config = (self as any).aiConfig;
+                if (config) {
+                     console.warn("[AI Worker] Engine missing for compute (Race Condition detected). Auto-recovering...");
+                     engine = new OnnxEngine({
+                        modelPath: config.modelPath,
+                        modelParts: config.modelParts,
+                        wasmPath: config.wasmPath,
+                        numThreads: config.numThreads,
+                        debug: true
+                    });
+                    await engine.initialize();
+                } else {
+                    throw new Error('Engine not initialized');
+                }
             }
 
             const { board: boardState, history: gameHistory, color, size, komi, difficulty, temperature } = msg.data;
@@ -177,15 +191,41 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             // Select best move
             if (result.moves.length > 0) {
                  const best = result.moves[0];
-                 // If best is pass (-1, -1)
+                     // If best is pass (-1, -1)
                  if (best.x === -1) {
-                      ctx.postMessage({ type: 'ai-response', data: { move: null, winRate: result.rootInfo.winrate } });
+                      ctx.postMessage({ 
+                          type: 'ai-response', 
+                          data: { 
+                              move: null, 
+                              winRate: result.rootInfo.winrate,
+                              lead: result.rootInfo.lead,
+                              ownership: result.rootInfo.ownership
+                          } 
+                      });
                  } else {
-                      ctx.postMessage({ type: 'ai-response', data: { move: { x: best.x, y: best.y }, winRate: result.rootInfo.winrate } });
+                      ctx.postMessage({ 
+                          type: 'ai-response', 
+                          data: { 
+                              move: { x: best.x, y: best.y }, 
+                              winRate: result.rootInfo.winrate,
+                              lead: result.rootInfo.lead,
+                              ownership: color === 'white' && result.rootInfo.ownership
+                                  ? result.rootInfo.ownership.map(v => -v) 
+                                  : result.rootInfo.ownership
+                          } 
+                      });
                  }
             } else {
                  // No moves? Pass.
-                 ctx.postMessage({ type: 'ai-response', data: { move: null, winRate: 50 } });
+                 ctx.postMessage({ 
+                     type: 'ai-response', 
+                     data: { 
+                         move: null, 
+                         winRate: result.rootInfo.winrate,
+                         lead: result.rootInfo.lead,
+                         ownership: result.rootInfo.ownership
+                     } 
+                 });
             }
         } else if (msg.type === 'stop') {
             // No-op for now as ONNX run is atomicish. 

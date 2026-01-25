@@ -23,6 +23,7 @@ export interface AnalysisResult {
         winrate: number;
         lead: number;
         scoreStdev: number;
+        ownership: Float32Array | null; // [New] Territory layout (-1 to 1)
     };
     moves: {
         x: number;
@@ -242,10 +243,12 @@ export class OnnxEngine {
             results = await this.session.run(feeds);
             if (!isMobile) console.timeEnd('[OnnxEngine] Inference');
 
-            // 3. Process Results
+            // Process Results
             const policy = results.policy ? results.policy.data as Float32Array : null;
             const value = results.value ? results.value.data as Float32Array : null;
             const misc = results.miscvalue ? results.miscvalue.data as Float32Array : null;
+            // [New] Ownership (Territory)
+            const ownership = results.ownership ? results.ownership.data as Float32Array : null;
 
             if (!policy || !value || !misc) {
                 throw new Error('Model output missing policy, value, or miscvalue');
@@ -287,7 +290,14 @@ export class OnnxEngine {
                 rootInfo: {
                     winrate: winrate,
                     lead: lead,
-                    scoreStdev: 0
+                    scoreStdev: 0,
+                    ownership: ownership ? new Float32Array(ownership) : null // Clone or pass ref? Pass ref usually fine if we don't dispose buffer immediately.
+                    // Wait, output buffers are views of WASM memory?
+                    // If we dispose `results`, does the data become invalid?
+                    // ort-web: yes, likely. We should copy it specifically if we plan to use it after session run?
+                    // Actually, `results.ownership.data` is likely a TypedArray view.
+                    // It is safest to copy it because we might not control when WASM memory is reclaimed.
+                    // COPY IT: new Float32Array(ownership)
                 },
                 moves: resultMoves
             };
@@ -337,12 +347,13 @@ export class OnnxEngine {
 
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                // Feature 0: Ones
+                // Feature 0: Ones (Restored)
                 set(0, y, x, 1.0);
 
                 const c = board.get(x, y);
-                if (c === pla) set(1, y, x, 1.0);
-                else if (c === opp) set(2, y, x, 1.0);
+                // Model expects [Ones, Pla, Opp]
+                if (c === pla) set(1, y, x, 1.0);      // Pla -> Ch 1
+                else if (c === opp) set(2, y, x, 1.0); // Opp -> Ch 2
 
                 if (c !== 0) {
                     const libs = board.getLiberties(x, y);
@@ -525,7 +536,7 @@ export class OnnxEngine {
                     return [m];
                 }
             }
-            return [weightedMoves[weightedMoves.length - 1]]; // Fallback
+            return weightedMoves.length > 0 ? [weightedMoves[weightedMoves.length - 1]] : []; // Fallback
         }
 
         return moves;

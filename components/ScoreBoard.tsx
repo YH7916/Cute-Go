@@ -1,6 +1,7 @@
 import React from 'react';
 import { Player, GameType, AppMode } from '../types';
 import { RenderStoneIcon } from './common/RenderStoneIcon';
+import { Map as MapIcon } from 'lucide-react';
 
 interface ScoreBoardProps {
     currentPlayer: Player;
@@ -64,6 +65,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                     </div>
                 </div>
             )}
+
         </div>
     );
 };

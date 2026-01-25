@@ -320,6 +320,35 @@ export const calculateWinRate = (board: BoardState): number => {
     return (1 / (1 + Math.exp(-k * diff))) * 100;
 };
 
+// [New] Smart Scoring: Remove dead stones based on AI ownership
+// Ownership: Positive = Black, Negative = White. Range -1 to 1.
+// Threshold: > 0.5 (Confirmed Black), < -0.5 (Confirmed White).
+export const cleanBoardWithTerritory = (board: BoardState, territory: Float32Array): BoardState => {
+    const size = board.length;
+    // Deep Clone to avoid mutating game state
+    const newBoard = board.map(row => row.map(s => s ? { ...s } : null));
+
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const idx = y * size + x;
+            const owner = territory[idx];
+            const stone = newBoard[y][x];
+
+            if (stone) {
+                // If Stone is Black, but Owner is White (< -0.5) -> Dead
+                if (stone.color === 'black' && owner < -0.5) {
+                     newBoard[y][x] = null; // Remove dead black stone
+                }
+                // If Stone is White, but Owner is Black (> 0.5) -> Dead
+                else if (stone.color === 'white' && owner > 0.5) {
+                     newBoard[y][x] = null; // Remove dead white stone
+                }
+            }
+        }
+    }
+    return newBoard;
+};
+
 // --- 增强版 AI 系统 ---
 
 // [优化 3] 增加“真眼”识别，防止 AI 填自己的眼

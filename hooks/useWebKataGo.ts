@@ -16,6 +16,8 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const [isInitializing, setIsInitializing] = useState(false);
     const [initStatus, setInitStatus] = useState<string>('');
     const [aiWinRate, setAiWinRate] = useState(50);
+    const [aiLead, setAiLead] = useState<number | null>(null);
+    const [aiTerritory, setAiTerritory] = useState<Float32Array | null>(null);
     
     const workerRef = useRef<Worker | null>(null);
     const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[]; simulations: number; komi?: number; difficulty?: string; temperature?: number } | null>(null);
@@ -23,6 +25,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
     const initializingRef = useRef(false); 
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const releaseTimeoutRef = useRef<NodeJS.Timeout | null>(null); // [New] Deferred Release
+    const isReleasingRef = useRef(false); // [Fix] Race Condition Lock
 
     // Initialization Function
     const initializeAI = useCallback(() => {
@@ -114,8 +117,10 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                     if (!expectingResponseRef.current) return;
                     if (timeoutRef.current) clearTimeout(timeoutRef.current);
                     
-                    const { move, winRate } = msg.data;
+                    const { move, winRate, lead, ownership } = msg.data;
                     setAiWinRate(winRate);
+                    setAiLead(lead ?? null);
+                    if (ownership) setAiTerritory(new Float32Array(ownership));
                     setIsThinking(false);
                     expectingResponseRef.current = false;
 
@@ -132,6 +137,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                         
                         releaseTimeoutRef.current = setTimeout(() => {
                              console.log("[WebAI] Idle timeout: Releasing memory now.");
+                             isReleasingRef.current = true; //Mark as releasing
                              worker.postMessage({ type: 'release' });
                              releaseTimeoutRef.current = null;
                         }, 15000);
@@ -139,6 +145,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
 
                 } else if (msg.type === 'released') {
                     console.log("[WebAI] Worker memory released (Suspended).");
+                    isReleasingRef.current = false; // Release done
                     setIsWorkerReady(false); // Mark as not ready so next req triggers re-init
                     
                 } else if (msg.type === 'status') {
@@ -186,6 +193,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         return () => {
             console.log("[WebAI] Cleaning up worker...");
             if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
+            isReleasingRef.current = false;
             if (workerRef.current) {
                 workerRef.current.terminate();
                 workerRef.current = null;
@@ -212,8 +220,8 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         }
 
         // [Lazy Load / Re-Init Logic]
-        if (!isWorkerReady) {
-            console.warn("AI requested but not ready.");
+        if (!isWorkerReady || isReleasingRef.current) {
+            console.warn("AI requested but not ready (or releasing).");
             
             // If worker exists but is 'released' (memory saved), re-init it.
             if (workerRef.current && !isInitializing) {
@@ -283,6 +291,12 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         }
     }, []);
 
+    const resetAI = useCallback(() => {
+        setAiWinRate(50);
+        setAiLead(null);
+        setAiTerritory(null);
+    }, []);
+
     // Page Visibility (Battery Save)
     useEffect(() => {
         const handleVisibilityChange = () => {
@@ -305,8 +319,11 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
         isInitializing, 
         initStatus,    
         aiWinRate,
+        aiLead,
+        aiTerritory,
         requestWebAiMove,
         stopThinking,
-        initializeAI
+        initializeAI,
+        resetAI // [New]
     };
 };
