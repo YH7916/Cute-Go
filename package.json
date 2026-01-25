@@ -1,7 +1,7 @@
 {
   "name": "cute-go",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.3.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -62,6 +62,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.0.1",
+    "@capacitor/app": "^8.0.0",
     "@sabaki/immutable-gametree": "^1.9.4",
     "@sabaki/sgf": "^3.4.7",
     "@supabase/supabase-js": "^2.90.1",
