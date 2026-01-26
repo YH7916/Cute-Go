@@ -42,7 +42,7 @@ export interface TsumegoSet {
   difficulty: string;
 } 
 
-export type Difficulty = string; // '18k'...'9d'
+export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 
 export type AchievementCategory = 'milestone' | 'skill' | 'social' | 'fun';
 

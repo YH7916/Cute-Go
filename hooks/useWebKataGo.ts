@@ -51,9 +51,13 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
 
         // --- 2. Worker config ---
         const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-        const numThreads = isMobile ? 1 : Math.min(2, navigator.hardwareConcurrency || 2);
+        const isIsolated = typeof window !== 'undefined' && window.crossOriginIsolated;
         
-        console.log(`[WebAI] Worker Config: Threads=${numThreads} Mobile=${isMobile}`);
+        // [Fix] If not crossOriginIsolated (missing COOP/COEP headers), SharedArrayBuffer is unavailable.
+        // We MUST force numThreads = 1 to avoid crashing/hanging in standard H5 environments.
+        const numThreads = (isMobile || !isIsolated) ? 1 : Math.min(2, navigator.hardwareConcurrency || 2);
+        
+        console.log(`[WebAI] Worker Config: Threads=${numThreads} Mobile=${isMobile} Isolated=${isIsolated}`);
 
         try {
             const worker = new Worker(new URL('../worker/ai.worker.ts', import.meta.url), { type: 'module' });

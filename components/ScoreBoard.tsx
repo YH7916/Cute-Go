@@ -54,7 +54,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 </div>
             </div>
 
-            {showWinRate && gameType === 'Go' && appMode === 'playing' && !gameOver && (
+            {showWinRate && appMode === 'playing' && !gameOver && (
                 <div className="relative w-full h-5 rounded-full overflow-hidden flex shadow-inner mt-2 border border-[#5c4033]/30">
                      {/* Win Rate Bar Visuals adapted for User Color */}
                     <div className="h-full bg-gradient-to-r from-[#2a2a2a] to-[#5c4033] transition-all duration-1000 ease-in-out relative flex items-center" style={{ width: `${userColor === 'white' ? (100 - displayWinRate) : displayWinRate}%` }}>

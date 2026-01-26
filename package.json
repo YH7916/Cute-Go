@@ -68,7 +68,7 @@
     "@supabase/supabase-js": "^2.90.1",
     "electron-is-dev": "^3.0.1",
     "lucide-react": "^0.562.0",
-    "onnxruntime-web": "^1.23.2",
+    "onnxruntime-web": "1.18.0",
     "peerjs": "1.5.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"

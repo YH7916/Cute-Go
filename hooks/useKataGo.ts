@@ -175,9 +175,10 @@ export const useKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseKata
     }
 
     sendCommand(`kata-set-param maxVisits ${visits}`);
-    if (typeof resignThreshold === 'number') {
-      sendCommand(`kata-set-param resignThreshold ${resignThreshold}`);
-    }
+    // [Fix] config.json not supporting dynamic resignThreshold adjustment
+    // if (typeof resignThreshold === 'number') {
+    //   sendCommand(`kata-set-param resignThreshold ${resignThreshold}`);
+    // }
     
     // 稍微延时发送 genmove 确保参数生效
     setTimeout(() => {

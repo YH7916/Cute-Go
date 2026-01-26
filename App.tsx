@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { GameBoard } from './components/GameBoard';
 import { BoardSize, Player, GameMode, GameType } from './types';
 import { 
@@ -14,14 +14,16 @@ import {
   generateSGF,
   parseSGF,
   getBoardHash,
-  cleanBoardWithTerritory // [New]
+  cleanBoardWithTerritory, // [New]
+  calculateGomokuWinRate // [New]
 } from './utils/goLogic';
 import { getAIConfig } from './utils/aiConfig';
-import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown, Brain, Cpu } from 'lucide-react';
+import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown, Brain, Cpu, Home } from 'lucide-react';
 
 // Hooks
 import { useKataGo, sliderToVisits, visitsToSlider } from './hooks/useKataGo';
 import { useWebKataGo } from './hooks/useWebKataGo';
+import { useCloudKataGo } from './hooks/useCloudKataGo';
 import { useAchievements } from './hooks/useAchievements';
 import { useAppSettings } from './hooks/useAppSettings';
 import { useGameState } from './hooks/useGameState';
@@ -52,6 +54,9 @@ import { AboutModal } from './components/AboutModal';
 import { TsumegoListModal, TsumegoSet } from './components/TsumegoListModal';
 import TsumegoResultModal from './components/TsumegoResultModal';
 import { parseSGFToTree, SGFNode } from './utils/sgfParser';
+import { StartScreen } from './components/StartScreen';
+import { SkinShopModal } from './components/SkinShopModal';
+import { BOARD_THEMES, BoardThemeId } from './utils/themes';
 
 import { Session } from '@supabase/supabase-js';
 
@@ -68,7 +73,10 @@ const App: React.FC = () => {
     const [showTutorial, setShowTutorial] = useState(false); 
     const [showTsumegoList, setShowTsumegoList] = useState(false); // [New] Tsumego Modal
     const [isThinking, setIsThinking] = useState(false); 
+    const [useCloud, setUseCloud] = useState(true); // [New] Cloud AI Toggle
     const [toastMsg, setToastMsg] = useState<string | null>(null);
+    const [showStartScreen, setShowStartScreen] = useState(true);
+    const [showSkinShop, setShowSkinShop] = useState(false);
 
     // --- Tsumego State ---
     const [tsumegoRoot, setTsumegoRoot] = useState<SGFNode | null>(null);
@@ -259,6 +267,20 @@ const App: React.FC = () => {
         onAiPass: () => handlePass(false),
         onAiResign: () => endGame(settings.userColor, 'AI 认为胜率过低，投子认输')
     });
+
+    const cloudAiEngine = useCloudKataGo({
+        onAiMove: (x, y) => executeMove(x, y, false),
+        onAiPass: () => handlePass(false),
+        onAiResign: () => endGame(settings.userColor, 'Cloud AI 认输')
+    });
+    const { 
+        isThinking: isCloudThinking,
+        aiWinRate: cloudWinRate,
+        aiLead: cloudLead,
+        requestCloudAiMove,
+        errorMsg: cloudErrorMsg 
+    } = cloudAiEngine;
+
     const { 
         isWorkerReady, 
         isLoading: isWebLoading, // Legacy loading state (internal)
@@ -275,7 +297,7 @@ const App: React.FC = () => {
 
     const [isFirstRun] = useState(() => !localStorage.getItem('has_run_ai_before'));
     const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
-    const showThinkingStatus = isThinking || isElectronThinking || isWebThinking;
+    const showThinkingStatus = isThinking || isElectronThinking || isWebThinking || isCloudThinking;
 
     // --- Visibility Handler (App Level) ---
     // Resets AI lock when going to background to prevent stuck state
@@ -346,6 +368,7 @@ const App: React.FC = () => {
         setShowMenu(false);
         setShowPassModal(false);
         setIsThinking(false);
+        aiTurnLock.current = false;
         gameState.setAppMode('playing');
         setEloDiffText(null);
         setEloDiffStyle(null);
@@ -439,27 +462,53 @@ const App: React.FC = () => {
     // [New] Effect: Auto-trigger Lazy Init on Startup/Settings Change if needed
     // This handles the case where user reloads page with "Hard" mode active
     useEffect(() => {
+        if (showStartScreen || gameState.appMode !== 'playing') return; // [Fix] Defer AI load
+
         const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
         
-        // [Optimization] Do NOT auto-init on Mobile. 
-        // Mobile devices (especially iOS) might crash if we init immediately on load.
-        // Wait for user interaction (First Move or Start Game).
-        // [Optimization] On Mobile, ONLY auto-init if we are actually in PvAI mode.
-        // We still want to avoid init on landing (PvP mode) to keep startup fast/safe.
-        // But once user picks PvAI, we should start loading immediately.
         if (isMobile && settings.gameMode !== 'PvAI') {
             console.log("[App] Mobile detected (Non-AI Mode): Skipping Auto-Init.");
             return;
         }
 
-        if (!isElectronAvailable && settings.gameMode === 'PvAI') {
+        if (!isElectronAvailable && settings.gameMode === 'PvAI' && !useCloud && settings.gameType === 'Go') {
              const aiConfig = getAIConfig(settings.difficulty);
              if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
-                 console.log("[App] Auto-triggering AI Init (Startup/Reload)...");
+                 console.log("[App] Auto-triggering AI Init (Playing Mode)...");
                  webAiEngine.initializeAI();
              }
         }
-    }, [settings.gameMode, settings.difficulty, isElectronAvailable, webAiEngine.isWorkerReady, webAiEngine.isInitializing]);
+    }, [settings.gameMode, settings.difficulty, isElectronAvailable, webAiEngine.isWorkerReady, webAiEngine.isInitializing, showStartScreen, useCloud, gameState.appMode]);
+
+    // --- Start Screen Handler ---
+    const handleStartGame = (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local') => {
+        settings.setGameMode(mode);
+        
+        // Reset Logic
+        resetGame(false, undefined, false);
+
+        if (mode === 'PvAI') {
+             if (aiType === 'cloud') {
+                 setUseCloud(true);
+             } else {
+                 setUseCloud(false);
+                 // Auto Init Lazy AI if needed
+                 if (!isElectronAvailable) {
+                     const aiConfig = getAIConfig(settings.difficulty);
+                     if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                         webAiEngine.initializeAI();
+                     }
+                 }
+             }
+             // Ensure User Color is respected or defaulted? 
+             // Logic in resetGame uses defaults.
+        } else {
+             setUseCloud(false); // irrelevant for PvP but keep clean
+        }
+        
+        setShowStartScreen(false);
+        vibrate(20);
+    };
 
     // --- Tsumego Logic ---
     const handleOpenTsumego = () => {
@@ -1028,7 +1077,26 @@ const App: React.FC = () => {
           if (shouldUseHighLevelAI) {
               if (!aiTurnLock.current) {
                   aiTurnLock.current = true; 
-                  if (isElectronAvailable) {
+                  
+                  if (useCloud) {
+                      // Cloud Mode - Optimized for Speed
+                      // Use aiConfig simulations.
+                      // [Fix] Minimum 15 visits to prevent KataGo from returning empty moves/passing due to low search.
+                      // 15 visits is still instant (~20ms on GPU).
+                      let sims = aiConfig.simulations;
+                      sims = Math.max(15, sims * 2);
+                      if (sims > 100) sims = 100; // Cap at 100 for Hard
+                      
+                      const komi = settings.boardSize === 9 ? 6.5 : 7.5;
+                      requestCloudAiMove(
+                          gameState.boardRef.current,
+                          aiColor,
+                          gameState.historyRef.current,
+                          sims, 
+                          komi
+                      );
+                  }
+                  else if (isElectronAvailable) {
                       electronAiEngine.requestAiMove(aiColor, settings.difficulty, settings.maxVisits, getResignThreshold(settings.difficulty));
                   } else {
                       // Web AI Request
@@ -1100,7 +1168,7 @@ const App: React.FC = () => {
             // User turn, ensure lock is free
             if (gameState.currentPlayer === settings.userColor) aiTurnLock.current = false;
         }
-    }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable, isPageVisible]);
+    }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable, isPageVisible, useCloud, requestCloudAiMove]);
 
     /*
     // --- Web AI Turn (Worker) - REDUNDANT / MERGED ABOVE ---
@@ -1445,27 +1513,43 @@ const App: React.FC = () => {
     // Win Rate Calculation for Display (Normalized to Black Win %)
     let displayWinRate = calculateWinRate(gameState.board); // Default Heuristic (Already Black%)
 
-    if (settings.showWinRate && !gameState.gameOver && gameState.appMode === 'playing' && settings.gameType === 'Go') {
-         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
-         
-         if (isElectronAvailable && electronWinRate !== 50) {
-             // Electron AI (Assume relative to AI color)
-             displayWinRate = (aiColor === 'white') ? (100 - electronWinRate) : electronWinRate;
-         } 
-         else if (!isElectronAvailable && isWorkerReady && settings.gameMode === 'PvAI' && webWinRate !== 50) {
-             // Web AI (Returns WinRate for Current AI Mover)
-             // If AI is White, it returns White%. We convert to Black%.
-             displayWinRate = (aiColor === 'white') ? (100 - webWinRate) : webWinRate;
-         }
+     if (settings.showWinRate && !gameState.gameOver && gameState.appMode === 'playing' && settings.gameType === 'Go') {
+          const aiColor = settings.userColor === 'black' ? 'white' : 'black';
+          
+          if (useCloud && cloudWinRate !== 50) {
+              displayWinRate = (aiColor === 'white') ? (100 - cloudWinRate) : cloudWinRate;
+          }
+          else if (isElectronAvailable && electronWinRate !== 50) {
+              // Electron AI (Assume relative to AI color)
+              displayWinRate = (aiColor === 'white') ? (100 - electronWinRate) : electronWinRate;
+          } 
+          else if (!isElectronAvailable && isWorkerReady && settings.gameMode === 'PvAI' && webWinRate !== 50) {
+              // Web AI (Returns WinRate for Current AI Mover)
+              // If AI is White, it returns White%. We convert to Black%.
+              displayWinRate = (aiColor === 'white') ? (100 - webWinRate) : webWinRate;
+          }
     }
+
+    // [Fix] Gomoku Win Rate
+     if (settings.showWinRate && !gameState.gameOver && gameState.appMode === 'playing' && settings.gameType === 'Gomoku') {
+         // Use strict heuristic win rate
+         displayWinRate = calculateGomokuWinRate(gameState.board);
+     }
+
 
     // Lead Calculation (Normalized to Black Lead)
     let displayLead: number | null = null;
-    if (settings.gameMode === 'PvAI' && webLead !== null && isWorkerReady) {
-         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
-         // Web Lead is relative to Mover (AI).
-         // If AI is White, Lead +5 means White leads by 5. Black Lead = -5.
-         displayLead = (aiColor === 'white') ? -webLead : webLead;
+    const aiColor = settings.userColor === 'black' ? 'white' : 'black';
+    
+    if (settings.gameMode === 'PvAI') {
+         if (useCloud && cloudLead !== null) {
+              displayLead = (aiColor === 'white') ? -cloudLead : cloudLead;
+         }
+         else if (!isElectronAvailable && webLead !== null && isWorkerReady) {
+              // Web Lead is relative to Mover (AI).
+              // If AI is White, Lead +5 means White leads by 5. Black Lead = -5.
+              displayLead = (aiColor === 'white') ? -webLead : webLead;
+         }
     }
 
 
@@ -1487,12 +1571,29 @@ const App: React.FC = () => {
                </div>
            )}
 
+           {showStartScreen && (
+               <StartScreen 
+                   onStartGame={handleStartGame}
+                   onOpenTsumego={handleOpenTsumego}
+                   onOpenTutorial={() => setShowTutorial(true)}
+                   onOpenOnline={() => setShowOnlineMenu(true)}
+                   onOpenImport={() => setShowImportModal(true)}
+                   onOpenSettings={() => setShowMenu(true)}
+                   onOpenAbout={() => setShowAboutModal(true)}
+                   onStartSetup={() => { setShowStartScreen(false); resetGame(false); gameState.setAppMode('setup'); }}
+                   onOpenUserPage={() => setShowUserPage(true)}
+                    onOpenSkinShop={() => setShowSkinShop(true)}
+               />
+           )}
+
            <AchievementNotification newUnlocked={newUnlocked} clearNewUnlocked={clearNewUnlocked} />
 
            {/* --- BOARD AREA --- */}
            <div className="relative flex-grow h-[60%] landscape:h-full w-full landscape:w-auto landscape:flex-1 flex items-center justify-center p-2 order-2 landscape:order-1 min-h-0 min-w-0">
                <div className="w-full h-full max-w-full max-h-full aspect-square flex items-center justify-center">
-                   <div className="transform transition-transform w-full h-full">
+                   <div 
+                       className="transform transition-transform w-full h-full relative"
+                   >
                        <GameBoard 
                            board={gameState.appMode === 'review' && gameState.history[gameState.reviewIndex] ? gameState.history[gameState.reviewIndex].board : gameState.board} 
                            onIntersectionClick={handleIntersectionClick}
@@ -1500,9 +1601,12 @@ const App: React.FC = () => {
                            lastMove={gameState.appMode === 'review' && gameState.history[gameState.reviewIndex] ? gameState.history[gameState.reviewIndex].lastMove : gameState.lastMove}
                            showQi={settings.showQi}
                            gameType={settings.gameType}
+                           gameMode={settings.gameMode}
                            showCoordinates={settings.showCoordinates}
                            territory={settings.gameMode === 'PvAI' ? webTerritory : null}
                            showTerritory={showTerritory}
+                           stoneSkin={settings.stoneSkin}
+                           boardSkin={settings.boardSkin}
                        />
                    </div>
                </div>
@@ -1529,26 +1633,30 @@ const App: React.FC = () => {
            {/* --- SIDEBAR --- */}
            <div className="w-full landscape:w-96 flex flex-col gap-4 p-4 z-20 shrink-0 bg-[#f7e7ce] landscape:bg-[#f2e6d6] landscape:h-full landscape:border-l-4 landscape:border-[#e3c086] order-1 landscape:order-2 shadow-xl landscape:shadow-none">
                 <div className="flex justify-between items-center">
-                    <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => { setShowStartScreen(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><Home size={20} /></button>
+                        <button onClick={() => { setShowUserPage(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><UserIcon size={20} /></button>
+                        <button onClick={() => { setShowMenu(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><Settings size={20} /></button>
+                    </div>
+
+                    <div className="flex flex-col items-end">
                         <span className="font-black text-[#5c4033] text-xl leading-tight flex items-center gap-2 tracking-wide">
-                        {gameState.appMode === 'setup' ? '电子挂盘' : gameState.appMode === 'review' ? '复盘模式' : (settings.gameType === 'Go' ? '围棋' : '五子棋')}
-                        {gameState.appMode === 'playing' && (
-                            <span className="text-[10px] font-bold text-[#8c6b38] bg-[#e3c086]/30 px-2 py-1 rounded-full border border-[#e3c086]">
-                                {settings.boardSize}路 • {settings.gameMode === 'PvP' ? '双人' : settings.difficulty} • {onlineStatus === 'connected' ? '在线' : (settings.gameMode === 'PvAI' ? '人机' : '本地')}
-                            </span>
-                        )}
                         {onlineStatus === 'connected' && (
                                 <span className="relative flex h-2 w-2">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                                 </span>
                         )}
+                        {gameState.appMode === 'setup' ? '电子挂盘' : gameState.appMode === 'review' ? '复盘模式' : (settings.gameType === 'Go' ? '围棋' : '五子棋')}
                         </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => { setShowUserPage(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><UserIcon size={20} /></button>
-                        <button onClick={() => { setShowMenu(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><Settings size={20} /></button>
+                        {gameState.appMode === 'playing' && (
+                            <span className="text-[10px] font-bold text-[#8c6b38] bg-[#e3c086]/30 px-2 py-1 rounded-full border border-[#e3c086] mt-1">
+                                {settings.boardSize}路 • {settings.gameMode === 'PvP' ? '双人' : settings.difficulty} • 
+                                <button onClick={() => setUseCloud(!useCloud)} className="hover:underline ml-1">
+                                    {onlineStatus === 'connected' ? '在线' : (settings.gameMode === 'PvAI' ? (useCloud ? '云端 AI' : '本地 AI') : '本地')}
+                                </button>
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -1558,14 +1666,14 @@ const App: React.FC = () => {
                     whiteCaptures={gameState.whiteCaptures}
                     gameType={settings.gameType}
                     isThinking={isThinking}
-                    showWinRate={settings.showWinRate && settings.gameMode !== 'PvAI'}
+                    showWinRate={settings.showWinRate && (settings.gameMode !== 'PvAI' || settings.gameType === 'Gomoku')}
                     appMode={gameState.appMode}
                     gameOver={gameState.gameOver}
                     userColor={settings.userColor}
                     displayWinRate={displayWinRate}
                 />
 
-                {settings.gameMode === 'PvAI' && settings.showWinRate && (
+                {gameState.appMode === 'playing' && settings.gameMode === 'PvAI' && settings.showWinRate && settings.gameType === 'Go' && (
                     <AnalysisPanel 
                         winRate={displayWinRate}
                         lead={displayLead}
@@ -1580,7 +1688,13 @@ const App: React.FC = () => {
                     appMode={gameState.appMode}
                     setupTool={gameState.setupTool}
                     setSetupTool={gameState.setSetupTool}
-                    finishSetup={() => { gameState.setAppMode('playing'); gameState.setHistory([]); }}
+                    finishSetup={() => { 
+                        gameState.setAppMode('playing'); 
+                        gameState.setHistory([]); 
+                        gameState.historyRef.current = [];
+                        aiTurnLock.current = false;
+                        setIsThinking(false);
+                    }}
                     reviewIndex={gameState.reviewIndex}
                     history={gameState.history}
                     setReviewIndex={gameState.setReviewIndex}
@@ -1655,10 +1769,10 @@ const App: React.FC = () => {
            <SettingsModal 
                 isOpen={showMenu}
                 onClose={() => setShowMenu(false)}
-                currentGameSettings={{
+                currentGameSettings={useMemo(() => ({
                     boardSize: settings.boardSize, gameType: settings.gameType, gameMode: settings.gameMode,
                     difficulty: settings.difficulty, maxVisits: settings.maxVisits, userColor: settings.userColor
-                }}
+                }), [settings.boardSize, settings.gameType, settings.gameMode, settings.difficulty, settings.maxVisits, settings.userColor])}
                 onApplyGameSettings={handleApplySettings}
                 showQi={settings.showQi} setShowQi={settings.setShowQi}
                 showWinRate={settings.showWinRate} setShowWinRate={settings.setShowWinRate}
@@ -1672,7 +1786,17 @@ const App: React.FC = () => {
                 onOpenAbout={() => { setShowAboutModal(true); setShowMenu(false); }}
                 onOpenTutorial={() => { setShowTutorial(true); setShowMenu(false); }}
                 onOpenTsumego={handleOpenTsumego}
+                onOpenSkinShop={() => setShowSkinShop(true)}
                 isElectronAvailable={isElectronAvailable}
+           />
+
+           <SkinShopModal
+                isOpen={showSkinShop}
+                onClose={() => setShowSkinShop(false)}
+                currentBoardSkin={settings.boardSkin}
+                currentStoneSkin={settings.stoneSkin}
+                onSetBoardSkin={settings.setBoardSkin}
+                onSetStoneSkin={settings.setStoneSkin}
            />
 
            {showTsumegoList && (
@@ -1698,6 +1822,15 @@ const App: React.FC = () => {
                userAchievements={userAchievements}
                onLoginClick={() => { setShowLoginModal(true); setShowUserPage(false); }}
                onSignOutClick={handleSignOut}
+           />
+
+           <SkinShopModal 
+               isOpen={showSkinShop}
+               onClose={() => setShowSkinShop(false)}
+               currentBoardSkin={settings.boardSkin}
+               currentStoneSkin={settings.stoneSkin}
+               onSetBoardSkin={settings.setBoardSkin}
+               onSetStoneSkin={settings.setStoneSkin}
            />
 
            <OnlineMenu 

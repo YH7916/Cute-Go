@@ -15,7 +15,7 @@ export const useAppSettings = () => {
   const [boardSize, setBoardSize] = useState<BoardSize>(() => loadState('boardSize', 9));
   const [gameType, setGameType] = useState<GameType>(() => loadState('gameType', 'Go'));
   const [gameMode, setGameMode] = useState<GameMode>(() => loadState('gameMode', 'PvP'));
-  const [difficulty, setDifficulty] = useState<ExtendedDifficulty>(() => loadState('difficulty', '18k'));
+  const [difficulty, setDifficulty] = useState<ExtendedDifficulty>(() => loadState('difficulty', 'Easy'));
   
   // 思考量状态 (默认 1)
   const [maxVisits, setMaxVisits] = useState<number>(() => loadState('maxVisits', 1));
@@ -29,6 +29,10 @@ export const useAppSettings = () => {
   const [showCoordinates, setShowCoordinates] = useState<boolean>(() => loadState('showCoordinates', false));
   const [musicVolume, setMusicVolume] = useState<number>(() => loadState('musicVolume', 0.3));
   const [hapticEnabled, setHapticEnabled] = useState<boolean>(() => loadState('hapticEnabled', true));
+
+  // Skins
+  const [boardSkin, setBoardSkin] = useState<string>(() => loadState('boardSkin', 'wood'));
+  const [stoneSkin, setStoneSkin] = useState<string>(() => loadState('stoneSkin', 'classic'));
 
   // 监听状态变化并自动保存
   useEffect(() => {
@@ -44,7 +48,12 @@ export const useAppSettings = () => {
     localStorage.setItem('showCoordinates', JSON.stringify(showCoordinates));
     localStorage.setItem('musicVolume', JSON.stringify(musicVolume));
     localStorage.setItem('hapticEnabled', JSON.stringify(hapticEnabled));
-  }, [boardSize, gameType, gameMode, difficulty, maxVisits, userColor, showQi, showWinRate, showCoordinates, musicVolume, hapticEnabled]);
+    
+    localStorage.setItem('boardSkin', JSON.stringify(boardSkin));
+    localStorage.setItem('stoneSkin', JSON.stringify(stoneSkin));
+  }, [boardSize, gameType, gameMode, difficulty, maxVisits, userColor, 
+      showQi, showWinRate, showCoordinates, musicVolume, hapticEnabled,
+      boardSkin, stoneSkin]); // Added deps
 
   return {
     boardSize, setBoardSize,
@@ -57,6 +66,8 @@ export const useAppSettings = () => {
     showWinRate, setShowWinRate,
     showCoordinates, setShowCoordinates,
     musicVolume, setMusicVolume,
-    hapticEnabled, setHapticEnabled
+    hapticEnabled, setHapticEnabled,
+    boardSkin, setBoardSkin,
+    stoneSkin, setStoneSkin
   };
 };

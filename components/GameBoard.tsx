@@ -3,6 +3,7 @@ import { getAllGroups } from '../utils/goLogic';
 import { BoardState, Player, Stone, GameType, GameMode } from '../types';
 import { StoneFace } from './StoneFaces';
 import { ZoomOut } from 'lucide-react';
+import { STONE_THEMES, BOARD_THEMES, StoneThemeId, BoardThemeId } from '../utils/themes';
 
 export const calculateBoardConstants = (boardSize: number, showCoordinates: boolean = false) => {
   // Dynamic cell size: Smaller boards have larger cells, maxing out at 19
@@ -29,7 +30,10 @@ interface GameBoardProps {
   autoShowQiAt?: { x: number, y: number };
   territory?: Float32Array | null;
   showTerritory?: boolean;
+  stoneSkin?: string;
+  boardSkin?: string; // New
 }
+
 
 type ConnectionType = 'ortho' | 'loose';
 
@@ -62,7 +66,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   extraSVG,
   autoShowQiAt,
   territory,
-  showTerritory
+  showTerritory,
+  stoneSkin = 'classic',
+  boardSkin = 'wood'
 }) => {
   const boardSize = board.length;
   const { CELL_SIZE, GRID_PADDING } = useMemo(() => 
@@ -208,63 +214,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       }
   }, [autoShowQiAt]);
 
-  // --- Auto Zoom Logic (Dynamic) ---
-  useEffect(() => {
-    const isTsumego = gameMode === 'Tsumego';
-    
-    // Only apply auto-zoom for 19x19 boards in Tsumego mode
-    if (isTsumego && boardSize === 19) {
-        const stones = board.flat().filter(s => s !== null);
-        if (stones.length === 0) return;
-
-        let minX = 19, maxX = 0;
-        let minY = 19, maxY = 0;
-
-        stones.forEach(s => {
-             if (s.x < minX) minX = s.x;
-             if (s.x > maxX) maxX = s.x;
-             if (s.y < minY) minY = s.y;
-             if (s.y > maxY) maxY = s.y;
-        });
-
-        // Add padding (2 cells around)
-        const PADDING = 2;
-        minX = Math.max(0, minX - PADDING);
-        maxX = Math.min(18, maxX + PADDING);
-        minY = Math.max(0, minY - PADDING);
-        maxY = Math.min(18, maxY + PADDING);
-
-        const width = maxX - minX + 1;
-        const height = maxY - minY + 1;
-        
-        // If the area is too big (e.g. > 15x15), don't zoom (scale ~1)
-        // Viewport is ~19 cells. 
-        // Scale = 19 / max(width, height)
-        const boundingSize = Math.max(width, height);
-        
-        if (boundingSize > 15) {
-             setTransform({ scale: 1, x: 0, y: 0 });
-             return;
-        }
-
-        const targetScale = Math.min(2.5, 19 / boundingSize);
-        
-        // Calculate center of the bounding box
-        const bboxCenterX = (minX + maxX) / 2;
-        const bboxCenterY = (minY + maxY) / 2;
-        
-        const centerBoard = 9; // Center of 19x19 (0..18)
-        const deltaX = centerBoard - bboxCenterX;
-        const deltaY = centerBoard - bboxCenterY;
-        
-        const offsetX = deltaX * CELL_SIZE * targetScale;
-        const offsetY = deltaY * CELL_SIZE * targetScale;
-
-        setTransform({ scale: targetScale, x: offsetX, y: offsetY });
-    } else {
-         setTransform({ scale: 1, x: 0, y: 0 });
-    }
-  }, [gameMode, boardSize, board, CELL_SIZE]);
 
   const handleStoneHover = (x: number, y: number) => {
     if (!showQi) {
@@ -744,14 +693,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   };
 
     const renderSolidBody = (color: Player) => {
-        const baseColor = color === 'black' ? '#2a2a2a' : '#f0f0f0';
+        const theme = STONE_THEMES[stoneSkin as StoneThemeId] || STONE_THEMES['classic'];
+        const baseColor = color === 'black' ? theme.blackColor : theme.whiteColor;
+        const borderColor = color === 'black' ? theme.blackBorder : theme.whiteBorder;
         const isGomoku = gameType === 'Gomoku';
-        const filterId = color === 'black' ? 'url(#jelly-black)' : 'url(#jelly-white)';
+        // Use theme filter if available, else default jelly
+        const filterId = theme.filter ? undefined : (color === 'black' ? 'url(#jelly-black)' : 'url(#jelly-white)');
+        const styleFilter = theme.filter ? { filter: theme.filter } : undefined;
     
         const orthoWidth = gameType === 'Gomoku' ? CELL_SIZE * 0.2 : CELL_SIZE * 0.95;
 
         return (
-                <g filter={isGomoku ? undefined : filterId}>
+                <g filter={!theme.filter && !isGomoku ? filterId : undefined}>
            {!isGomoku && (
              <g>
                {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => (
@@ -764,6 +717,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         stroke={baseColor}
                         strokeWidth={orthoWidth}
                         strokeLinecap="round"
+                        style={styleFilter}
                     />
                ))}
              </g>
@@ -775,8 +729,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             cy={GRID_PADDING + s.y * CELL_SIZE}
                             r={STONE_RADIUS}
                             fill={baseColor}
+                            stroke={borderColor}
+                            strokeWidth={isGomoku ? 1 : 0.5}
                             filter={isGomoku ? filterId : undefined}
                             className="stone-enter"
+                            style={styleFilter}
                         />
                     ))}
         </g>
@@ -784,7 +741,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   };
 
     const renderLooseSilk = (color: Player) => {
-        const baseColor = color === 'black' ? '#2a2a2a' : '#f0f0f0';
+        const theme = STONE_THEMES[stoneSkin as StoneThemeId] || STONE_THEMES['classic'];
+        const baseColor = color === 'black' ? theme.blackColor : theme.whiteColor;
         const isGomoku = gameType === 'Gomoku';
         const trim = isGomoku ? STONE_RADIUS * 0.7 : 0;
         const filterId = isGomoku ? 'url(#goo-silk-gomoku)' : 'url(#goo-silk)';
@@ -886,16 +844,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         }
       `}</style>
       <div 
-        className="w-full h-full relative transition-transform duration-75 ease-linear origin-center"
+        className="w-full h-full relative transition-transform duration-75 ease-linear origin-center rounded-xl overflow-hidden shadow-2xl border-[6px]"
         style={{
-            transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`
+            transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+            borderColor: BOARD_THEMES[boardSkin as BoardThemeId]?.borderColor || '#8c6b38',
+            backgroundColor: BOARD_THEMES[boardSkin as BoardThemeId]?.borderColor || '#8c6b38', // Fill gap
         }}
       >
         <div 
-            className="absolute inset-0 bg-[#e3c086]"
+            className="absolute inset-0 transition-all duration-300"
             style={{
-                backgroundImage: 'radial-gradient(circle, #deb879 10%, transparent 10.5%)',
-                backgroundSize: '20px 20px',
+                background: BOARD_THEMES[boardSkin as BoardThemeId]?.background || '#e3c086',
+                backgroundImage: BOARD_THEMES[boardSkin as BoardThemeId]?.backgroundImage,
+                backgroundSize: BOARD_THEMES[boardSkin as BoardThemeId]?.backgroundSize,
                 zIndex: 0
             }}
         />

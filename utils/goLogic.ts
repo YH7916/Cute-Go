@@ -320,6 +320,43 @@ export const calculateWinRate = (board: BoardState): number => {
     return (1 / (1 + Math.exp(-k * diff))) * 100;
 };
 
+// --- Gomoku Win Rate (Heuristic) ---
+export const calculateGomokuWinRate = (board: BoardState): number => {
+    const size = board.length;
+    let maxBlackThreat = 0;
+    let maxWhiteThreat = 0;
+
+    // Scan for highest threat for both sides
+    for(let y=0; y<size; y++) {
+        for(let x=0; x<size; x++) {
+            if (!board[y][x]) {
+                const bVal = getGomokuShapeScore(board, x, y, 'black');
+                if (bVal > maxBlackThreat) maxBlackThreat = bVal;
+                
+                const wVal = getGomokuShapeScore(board, x, y, 'white');
+                if (wVal > maxWhiteThreat) maxWhiteThreat = wVal;
+            }
+        }
+    }
+    
+    // Immediate Win Checks
+    if (maxBlackThreat >= 100000000) return 100;
+    if (maxWhiteThreat >= 100000000) return 0;
+    
+    // Open 4 Checks (Virtually Win)
+    if (maxBlackThreat >= 10000000) return 99;
+    if (maxWhiteThreat >= 10000000) return 1;
+    
+    // Heuristic Diff
+    const diff = maxBlackThreat - maxWhiteThreat;
+    
+    // Sigmoid scaling: Open 3 (100,000) should shift significantly
+    const k = 0.00002; 
+    const probability = 1 / (1 + Math.exp(-k * diff));
+    
+    return probability * 100;
+};
+
 // [New] Smart Scoring: Remove dead stones based on AI ownership
 // Ownership: Positive = Black, Negative = White. Range -1 to 1.
 // Threshold: > 0.5 (Confirmed Black), < -0.5 (Confirmed White).

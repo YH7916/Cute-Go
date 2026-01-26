@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, PenTool, FileUp, Globe, Heart, RotateCcw, BookOpen, Brain } from 'lucide-react';
+import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, RotateCcw, Palette } from 'lucide-react';
 import { BoardSize, GameType, GameMode, Player, ExtendedDifficulty } from '../types';
 import { getSliderBackground, getCalculatedVisits } from '../utils/helpers';
 import { sliderToVisits, visitsToSlider } from '../hooks/useKataGo';
-import { RANKS } from '../utils/aiConfig';
+
 
 export interface GameSettingsData {
     boardSize: BoardSize;
@@ -42,7 +42,8 @@ interface SettingsModalProps {
     onOpenAbout: () => void;
     onOpenTutorial: () => void;
     onOpenTsumego: () => void;
-
+    onOpenSkinShop: () => void;
+    
     isElectronAvailable: boolean;
 }
 
@@ -63,6 +64,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onOpenAbout,
     onOpenTutorial,
     onOpenTsumego,
+    onOpenSkinShop,
     isElectronAvailable
 }) => {
     // Temp State for Game Settings
@@ -80,11 +82,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             setTempGameType(currentGameSettings.gameType);
             setTempGameMode(currentGameSettings.gameMode);
             
-            // Auto-migrate Legacy Difficulty
+            // Auto-fix difficulty to Easy/Medium/Hard valid values
             let diff = currentGameSettings.difficulty;
-            if (diff === 'Easy') diff = '18k';
-            else if (diff === 'Medium') diff = '10k';
-            else if (diff === 'Hard') diff = '1d';
+            if (['Easy', 'Medium', 'Hard'].indexOf(diff) === -1) {
+                diff = 'Easy';
+            }
             
             setTempDifficulty(diff);
             setTempMaxVisits(currentGameSettings.maxVisits);
@@ -145,7 +147,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 <div className="inset-track rounded-xl p-1 relative h-12 flex items-center">
                                     <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${tempGameType === 'Gomoku' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
                                     <button onClick={() => setTempGameType('Go')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Go' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>围棋</button>
-                                    <button onClick={() => setTempGameType('Gomoku')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Gomoku' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>五子棋</button>
+                                    <button onClick={() => {
+                                        setTempGameType('Gomoku');
+                                        // Auto-fix difficulty if switching to Gomoku and current is Rank
+                                        if (['Easy', 'Medium', 'Hard'].indexOf(tempDifficulty) === -1) {
+                                            setTempDifficulty('Easy');
+                                        }
+                                    }} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Gomoku' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>五子棋</button>
                                 </div>
 
                                 <div className="inset-track rounded-xl p-1 relative h-12 flex items-center">
@@ -170,146 +178,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </div>
                             )}
 
-                            {/* Difficulty (Rank Selection) */}
+                            {/* Difficulty Selection (Unified for Go & Gomoku) */}
                             {tempGameMode === 'PvAI' && (
                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                                    {/* Go: Difficulty Selection */}
-                                    {tempGameType === 'Go' && (
-                                        <>
-                                            {/* ELECTRON: Easy/Medium/Hard + Visits Slider */}
-                                            {isElectronAvailable ? (
-                                                <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
-                                                    <div className="flex justify-between items-center px-1">
-                                                        <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
-                                                            <Cpu size={16} className="text-[#8c6b38]"/> 难度预设
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        {(['Easy', 'Medium', 'Hard'] as const).map(diff => (
-                                                            <button
-                                                                key={diff}
-                                                                onClick={() => handleDifficultySelect(diff)}
-                                                                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border-2 ${
-                                                                    tempDifficulty === diff 
-                                                                    ? 'bg-[#8c6b38] text-[#fcf6ea] border-[#5c4033] shadow-inner' 
-                                                                    : 'bg-[#fff] text-[#8c6b38] border-[#e3c086] hover:bg-[#fcf6ea]'
-                                                                }`}
-                                                            >
-                                                                {diff === 'Easy' ? '简单' : diff === 'Medium' ? '中等' : '困难'}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                    
-                                                    {/* Thinking Amount Slider */}
-                                                    <div className="pt-2 border-t border-[#e3c086]/30 flex flex-col gap-2">
-                                                         <div className="flex justify-between items-center px-1">
-                                                            <span className="text-xs font-bold text-[#8c6b38] flex items-center gap-1">
-                                                                <Wind size={14}/> 思考量 (模拟数)
-                                                            </span>
-                                                            <span className="text-xs font-black text-[#5c4033] bg-[#e3c086]/30 px-2 py-0.5 rounded-md">
-                                                                {tempMaxVisits}
-                                                            </span>
-                                                        </div>
-                                                        <div className="relative h-8 flex items-center px-2">
-                                                            <input 
-                                                                type="range" min="0" max="100" step="1" 
-                                                                value={visitsToSlider(tempMaxVisits)}
-                                                                onChange={(e) => handleCustomChange(sliderToVisits(parseFloat(e.target.value)))}
-                                                                className="cute-range w-full"
-                                                                style={{ 
-                                                                    background: getSliderBackground(visitsToSlider(tempMaxVisits), 0, 100), 
-                                                                    touchAction: 'none'
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                /* WEB/MOBILE: Rank Slider */
-                                                <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
-                                                    <div className="flex justify-between items-center px-1">
-                                                        <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
-                                                            <Cpu size={16} className="text-[#8c6b38]"/> AI 棋力
-                                                        </span>
-                                                        <span className="text-xs font-black text-[#fcf6ea] bg-[#8c6b38] px-2 py-0.5 rounded-md shadow-sm">
-                                                            {tempDifficulty}
-                                                        </span>
-                                                    </div>
-                                                    
-                                                    <div className="relative h-8 flex items-center px-2">
-                                                         <input 
-                                                            type="range" min="0" max="100" step="1"
-                                                            value={(() => {
-                                                                const idx = RANKS.indexOf(tempDifficulty);
-                                                                const safeIdx = idx >= 0 ? idx : RANKS.indexOf('5k');
-                                                                const splitIdx = RANKS.indexOf('1d');
-                                                                if (safeIdx <= splitIdx) {
-                                                                    return (safeIdx / splitIdx) * 50;
-                                                                } else {
-                                                                    return 50 + ((safeIdx - splitIdx) / (RANKS.length - 1 - splitIdx)) * 50;
-                                                                }
-                                                            })()} 
-                                                            onChange={(e) => {
-                                                                const val = parseInt(e.target.value);
-                                                                const splitIdx = RANKS.indexOf('1d');
-                                                                let targetIdx = 0;
-                                                                if (val <= 50) {
-                                                                    targetIdx = Math.round((val / 50) * splitIdx);
-                                                                } else {
-                                                                    targetIdx = splitIdx + Math.round(((val - 50) / 50) * (RANKS.length - 1 - splitIdx));
-                                                                }
-                                                                const rank = RANKS[targetIdx];
-                                                                if (rank) setTempDifficulty(rank);
-                                                            }}
-                                                            className="cute-range w-full"
-                                                            style={{ 
-                                                                background: getSliderBackground((() => {
-                                                                    const idx = RANKS.indexOf(tempDifficulty);
-                                                                    const safeIdx = idx >= 0 ? idx : RANKS.indexOf('5k');
-                                                                    const splitIdx = RANKS.indexOf('1d');
-                                                                    if (safeIdx <= splitIdx) return (safeIdx / splitIdx) * 50;
-                                                                    else return 50 + ((safeIdx - splitIdx) / (RANKS.length - 1 - splitIdx)) * 50;
-                                                                })(), 0, 100),
-                                                                touchAction: 'none'
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="flex justify-between px-1 relative">
-                                                        <span className="text-[10px] text-[#8c6b38]/60 font-medium">18k</span>
-                                                        <span className="text-[10px] text-[#8c6b38]/60 font-medium absolute left-1/2 -translate-x-1/2">1d</span>
-                                                        <span className="text-[10px] text-[#8c6b38]/60 font-medium">9d</span>
-                                                    </div>
-                                                </div>
-                                            )}
-                        
-                                        </>
-                                    )}
-                                    
-                                    {/* Gomoku: Difficulty Selection */}
-                                    {tempGameType === 'Gomoku' && (
-                                        <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
-                                            <div className="flex justify-between items-center px-1">
-                                                <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
-                                                    <Cpu size={16} className="text-[#8c6b38]"/> 难度选择
-                                                </span>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                {(['Easy', 'Medium', 'Hard'] as const).map(diff => (
-                                                    <button
-                                                        key={diff}
-                                                        onClick={() => setTempDifficulty(diff)}
-                                                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border-2 ${
-                                                            tempDifficulty === diff 
-                                                            ? 'bg-[#8c6b38] text-[#fcf6ea] border-[#5c4033] shadow-inner' 
-                                                            : 'bg-[#fff] text-[#8c6b38] border-[#e3c086] hover:bg-[#fcf6ea]'
-                                                        }`}
-                                                    >
-                                                        {diff === 'Easy' ? '简单' : diff === 'Medium' ? '中等' : '困难'}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                     <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
+                                        <div className="flex justify-between items-center px-1">
+                                            <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
+                                                <Cpu size={16} className="text-[#8c6b38]"/> 
+                                                {tempGameType === 'Go' && isElectronAvailable ? '难度预设' : 'AI 难度'}
+                                            </span>
                                         </div>
-                                    )}
+                                        <div className="flex gap-2">
+                                            {(['Easy', 'Medium', 'Hard'] as const).map(diff => (
+                                                <button
+                                                    key={diff}
+                                                    onClick={() => handleDifficultySelect(diff)}
+                                                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border-2 ${
+                                                        tempDifficulty === diff 
+                                                        ? 'bg-[#8c6b38] text-[#fcf6ea] border-[#5c4033] shadow-inner' 
+                                                        : 'bg-[#fff] text-[#8c6b38] border-[#e3c086] hover:bg-[#fcf6ea]'
+                                                    }`}
+                                                >
+                                                    {diff === 'Easy' ? '简单' : diff === 'Medium' ? '中等' : '困难'}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Electron: Thinking Amount Slider */}
+                                        {tempGameType === 'Go' && isElectronAvailable && (
+                                            <div className="pt-2 border-t border-[#e3c086]/30 flex flex-col gap-2">
+                                                <div className="flex justify-between items-center px-1">
+                                                    <span className="text-xs font-bold text-[#8c6b38] flex items-center gap-1">
+                                                        <Wind size={14}/> 思考量 (模拟数)
+                                                    </span>
+                                                    <span className="text-xs font-black text-[#5c4033] bg-[#e3c086]/30 px-2 py-0.5 rounded-md">
+                                                        {tempMaxVisits}
+                                                    </span>
+                                                </div>
+                                                <div className="relative h-8 flex items-center px-2">
+                                                    <input 
+                                                        type="range" min="0" max="100" step="1" 
+                                                        value={visitsToSlider(tempMaxVisits)}
+                                                        onChange={(e) => handleCustomChange(sliderToVisits(parseFloat(e.target.value)))}
+                                                        className="cute-range w-full"
+                                                        style={{ 
+                                                            background: getSliderBackground(visitsToSlider(tempMaxVisits), 0, 100), 
+                                                            touchAction: 'none'
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -364,6 +284,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </button>
                         </div>
 
+                        {/* Skin Shop Button */}
+                        <button 
+                            onClick={() => { onOpenSkinShop(); onClose(); }}
+                            className="btn-retro bg-[#fff] border-[#e3c086] text-[#8c6b38] hover:text-[#5c4033] hover:border-[#8c6b38] w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all"
+                        >
+                            <Palette size={18} />
+                            <span className="text-sm">外观商店</span>
+                        </button>
+
                         <div className="flex gap-3">
                              {/* Volume Control */}
                             <div className="flex-[2] flex items-center gap-3 bg-[#fff] px-3 py-2 rounded-2xl border-2 border-[#e3c086]">
@@ -395,34 +324,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                     </div>
 
-                    <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50 landscape:hidden"></div>
 
-                    {/* 3. Tools */}
-                    <div className="grid grid-cols-2 gap-2">
-                        <button onClick={onStartSetup} className="btn-retro btn-beige flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm">
-                            <PenTool size={16}/> 电子挂盘
-                        </button>
-                        <button onClick={onOpenImport} className="btn-retro btn-beige flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm">
-                            <FileUp size={16}/> 导入/导出
-                        </button>
-                        <button onClick={onOpenOnline} className="btn-retro col-span-2 flex items-center justify-center gap-2 bg-[#90caf9] text-[#1565c0] border-[#64b5f6] py-3 rounded-xl font-bold text-sm">
-                            <Globe size={18}/> 联机对战
-                        </button>
-                        
-                        <button onClick={onOpenTsumego} className="btn-retro col-span-2 flex items-center justify-center gap-2 bg-[#a5d6a7] text-[#2e7d32] border-[#81c784] py-3 rounded-xl font-bold text-sm">
-                             <Brain size={18}/> 死活题闯关
-                        </button>
-
-                        <button onClick={onOpenTutorial} className="btn-retro col-span-2 flex items-center justify-center gap-2 bg-[#81d4fa] text-[#0277bd] border-[#4fc3f7] py-3 rounded-xl font-bold text-sm">
-                            <BookOpen size={18}/> 新手教程
-                        </button>
-
-                        <button onClick={onOpenAbout} className="btn-retro col-span-2 flex items-center justify-center gap-2 bg-[#ffccbc] text-[#d84315] border-[#ffab91] py-3 rounded-xl font-bold text-sm">
-                            <Heart size={18} fill="#ff5722" className="animate-pulse" /> 关于与赞赏
-                        </button>
-                    </div>
                 </div>
-
             </div>
 
             {/* Footer Action */}

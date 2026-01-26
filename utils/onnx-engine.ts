@@ -59,10 +59,26 @@ export class OnnxEngine {
 
             // Configure simple session options
             // Note: WASM files must be served correctly.
-            // Configure session options
             // Detect Mobile to avoid WebGPU crashes if not explicitly requested
             const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+            // [CRITICAL CHECK] Detect if SharedArrayBuffer is available
+            const isIsolated = typeof self !== 'undefined' && (self as any).crossOriginIsolated;
             
+            // [Fix] If running in non-isolated environment (standard H5 without headers),
+            // the local 'ort-wasm-simd-threaded.wasm' WILL FAIL to load.
+            // We successfully downloaded 'ort-wasm.wasm' (Vanilla) to 'public/wasm/'.
+            // So we just disable SIMD/Threading and let it load the local Vanilla file.
+            if (!isIsolated && !isMobile) {
+                 console.warn("[OnnxEngine] ⚠️ No crossOriginIsolated detected! Multithreading disabled.");
+                 console.warn("[OnnxEngine] Using local vanilla WASM (ort-wasm.wasm) for compatibility.");
+                 
+                 ort.env.wasm.simd = false;
+                 ort.env.wasm.proxy = false;
+                 ort.env.wasm.numThreads = 1;
+                 // ort.env.wasm.wasmPaths = ... (Default to local)
+            }
+
             // [Memory Fix] Low-End Device Protection (All Mobile)
             // Jetsam (iOS) and Low-Memory Killers (Android Wechat/H5) are strict.
             // Disabling SIMD/Proxy reduces memory footprint significantly at cost of speed.
@@ -72,11 +88,10 @@ export class OnnxEngine {
                 ort.env.wasm.proxy = false; 
                 ort.env.wasm.numThreads = 1; // Force 1 thread here too
                 
-                // [CRITICAL FIX] Use CDN for Mobile WASM
-                // The local package seems to be missing 'ort-wasm.wasm' (Vanilla Lite version).
-                // We force mobile to fetch the lightweight binary (~3MB) from jsdelivr to avoid the 11MB+ SIMD binary.
-                console.log("[OnnxEngine] Mobile: Switching WASM path to CDN for lightweight binary...");
-                ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/';
+                // [CRITICAL FIX] Use Local Vanilla WASM
+                // We downloaded ort-wasm.wasm to public/wasm, so no need for CDN.
+                console.log("[OnnxEngine] Mobile: Using local vanilla WASM...");
+                // ort.env.wasm.wasmPaths = ... (Default to local)
             }
 
             const preferredBackend = this.config.gpuBackend || (isMobile ? 'wasm' : 'webgpu');

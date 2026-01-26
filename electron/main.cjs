@@ -38,7 +38,10 @@ function createWindow() {
   // 如果打包了(!isDev)，强制使用 loadFile
   if (isDev) {
     console.log("Running in Development Mode");
-    mainWindow.loadURL("http://localhost:3001");
+    // 强制清除缓存
+    mainWindow.webContents.session.clearCache().then(() => {
+        mainWindow.loadURL(`http://localhost:3001?t=${Date.now()}`);
+    });
     mainWindow.webContents.openDevTools(); // 开发模式打开控制台
   } else {
     console.log("Running in Production Mode");
