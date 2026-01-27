@@ -1508,7 +1508,7 @@ const App: React.FC = () => {
     const setupDataChannel = (dc: RTCDataChannel, isHost: boolean) => {
         dataChannelRef.current = dc;
         dc.onopen = () => {
-            setOnlineStatus('connected'); setIsMatching(false); setShowOnlineMenu(false); setShowMenu(false); settings.setGameMode('PvP');
+            setOnlineStatus('connected'); setIsMatching(false); setShowOnlineMenu(false); setShowMenu(false); setShowStartScreen(false); settings.setGameMode('PvP');
             if (isHost) {
                 setMyColor('white');
                 resetGame(true, boardSizeRef.current, false); 
