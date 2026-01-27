@@ -7,4 +7,5 @@ export const WORKER_URL = 'https://api.yesterhaze.codes';
 // AutoDL SSH Tunnel (Localhost)
 // export const CLOUD_AI_URL = 'http://127.0.0.1:6006/api/analyze';
 // Production: Aliyun FRP Bridge (HTTPS)
-export const CLOUD_AI_URL = 'https://katago.yesterhaze.codes/api/analyze';
+// export const CLOUD_AI_URL = 'https://katago.yesterhaze.codes:8443/api/analyze';
+export const CLOUD_AI_URL = 'http://39.104.59.160:8080/api/analyze';

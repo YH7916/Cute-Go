@@ -7,9 +7,10 @@ interface UseWebKataGoProps {
     onAiMove: (x: number, y: number) => void;
     onAiPass: () => void;
     onAiResign: () => void;
+    onAiError?: (error: string) => void;
 }
 
-export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseWebKataGoProps) => {
+export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiError }: UseWebKataGoProps) => {
     const [isWorkerReady, setIsWorkerReady] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
@@ -74,12 +75,14 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
 
             worker.onerror = (err) => {
                 console.error("Worker Error:", err);
+                const errMsg = "AI 线程崩溃或加载失败";
                 setInitStatus('AI 出错');
                 setIsThinking(false);
                 setIsLoading(false);
                 setIsInitializing(false);
                 initializingRef.current = false;
                 expectingResponseRef.current = false;
+                if (onAiError) onAiError(errMsg);
                 clearTimeout(initWatchdog);
             };
 
@@ -161,6 +164,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign }: UseW
                     setIsInitializing(false);
                     initializingRef.current = false; // Reset lock
                     expectingResponseRef.current = false;
+                    if (onAiError) onAiError(msg.message);
                 }
             };
 

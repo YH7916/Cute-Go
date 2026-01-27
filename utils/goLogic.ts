@@ -24,16 +24,15 @@ export const getGroup = (board: BoardState, start: Point): Group | null => {
 
   const color = stone.color;
   const group: Stone[] = [];
-  // Optimization: use number set (y * size + x) instead of string set
   const visited = new Set<number>();
   const queue: Point[] = [start];
+  let head = 0; // Use index to avoid O(n) shift()
   const liberties = new Set<number>();
 
-  // Init
   visited.add(start.y * size + start.x);
 
-  while (queue.length > 0) {
-    const current = queue.shift()!;
+  while (head < queue.length) {
+    const current = queue[head++];
     const currentStone = board[current.y][current.x];
     if (currentStone) group.push(currentStone);
 
@@ -54,7 +53,6 @@ export const getGroup = (board: BoardState, start: Point): Group | null => {
   return { 
       stones: group, 
       liberties: liberties.size,
-      // 保持接口兼容，还原回 Point 数组
       libertyPoints: Array.from(liberties).map(idx => ({
           x: idx % size,
           y: Math.floor(idx / size)
@@ -141,7 +139,6 @@ export const attemptMove = (
   // 我们可以只复制棋盘的行数组结构，而不需要复制每个棋子对象。
   // 这将大幅减少内存分配和垃圾回收压力。
   const safeBoard = board.map(row => [...row]);
-
   safeBoard[y][x] = { color: player, id: `${player}-${Date.now()}-${x}-${y}`, x, y };
 
   if (gameType === 'Gomoku') return { newBoard: safeBoard, captured: 0 };
@@ -150,26 +147,28 @@ export const attemptMove = (
   const opponent = player === 'black' ? 'white' : 'black';
   const neighbors = getNeighbors({ x, y }, size);
 
-  neighbors.forEach(n => {
+  // Use a more efficient capture loop
+  for (let i = 0; i < neighbors.length; i++) {
+    const n = neighbors[i];
     const stone = safeBoard[n.y][n.x];
     if (stone && stone.color === opponent) {
       const group = getGroup(safeBoard, n);
       if (group && group.liberties === 0) {
-        group.stones.forEach(s => {
+        for (let j = 0; j < group.stones.length; j++) {
+          const s = group.stones[j];
           safeBoard[s.y][s.x] = null;
           capturedCount++;
-        });
+        }
       }
     }
-  });
+  }
 
   const myGroup = getGroup(safeBoard, { x, y });
   // 自杀禁手检查：如果在这个位置落子后没气，且没有提掉对方的子，则为非法
   if (myGroup && myGroup.liberties === 0 && capturedCount === 0) return null; 
 
   if (previousBoardStateHash) {
-      const currentHash = getBoardHash(safeBoard);
-      if (currentHash === previousBoardStateHash) return null; // 简单的劫争检查
+      if (getBoardHash(safeBoard) === previousBoardStateHash) return null; // 简单的劫争检查
   }
 
   return { newBoard: safeBoard, captured: capturedCount };

@@ -470,6 +470,15 @@ const App: React.FC = () => {
         newUnlocked, clearNewUnlocked, checkEndGameAchievements, checkMoveAchievements, achievementsList, userAchievements
     } = useAchievements(session?.user?.id);
 
+    // --- AI Error Handler ---
+    const handleAiError = useCallback((err: string) => {
+        console.error("AI Error:", err);
+        aiTurnLock.current = false;
+        setIsThinking(false);
+        setToastMsg(`AI 出错: ${err}`);
+        setTimeout(() => setToastMsg(null), 5000);
+    }, []);
+
     // --- AI Engines ---
     const electronAiEngine = useKataGo({
         boardSize: settings.boardSize,
@@ -483,13 +492,15 @@ const App: React.FC = () => {
         boardSize: settings.boardSize,
         onAiMove: (x, y) => executeMove(x, y, false),
         onAiPass: () => handlePass(false),
-        onAiResign: () => endGame(settings.userColor, 'AI 认为胜率过低，投子认输')
+        onAiResign: () => endGame(settings.userColor, 'AI 认为胜率过低，投子认输'),
+        onAiError: handleAiError
     });
 
     const cloudAiEngine = useCloudKataGo({
         onAiMove: (x, y) => executeMove(x, y, false),
         onAiPass: () => handlePass(false),
-        onAiResign: () => endGame(settings.userColor, 'Cloud AI 认输')
+        onAiResign: () => endGame(settings.userColor, 'Cloud AI 认输'),
+        onAiError: handleAiError
     });
     const { 
         isThinking: isCloudThinking,

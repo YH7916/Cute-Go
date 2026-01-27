@@ -6,9 +6,10 @@ interface UseCloudKataGoProps {
     onAiMove: (x: number, y: number) => void;
     onAiPass: () => void;
     onAiResign: () => void;
+    onAiError?: (error: string) => void;
 }
 
-export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign }: UseCloudKataGoProps) => {
+export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign, onAiError }: UseCloudKataGoProps) => {
     const [isThinking, setIsThinking] = useState(false);
     const [aiWinRate, setAiWinRate] = useState(50);
     const [aiLead, setAiLead] = useState<number | null>(null);
@@ -26,10 +27,10 @@ export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign }: UseCloudKataG
     };
 
     // Stable Callback Refs to prevent requestCloudAiMove from changing
-    const callbacksRef = useRef({ onAiMove, onAiPass, onAiResign });
+    const callbacksRef = useRef({ onAiMove, onAiPass, onAiResign, onAiError });
     useEffect(() => {
-        callbacksRef.current = { onAiMove, onAiPass, onAiResign };
-    }, [onAiMove, onAiPass, onAiResign]);
+        callbacksRef.current = { onAiMove, onAiPass, onAiResign, onAiError };
+    }, [onAiMove, onAiPass, onAiResign, onAiError]);
 
     const requestCloudAiMove = useCallback(async (
         board: BoardState,
@@ -177,8 +178,9 @@ export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign }: UseCloudKataG
                 console.error('Cloud AI Error:', error);
                 const msg = error.message || '网络请求失败';
                 setErrorMsg(msg);
-                // Force alert to ensure user sees it (UI Toast might be failing)
-                alert(`Cloud AI Connection Failed:\n${msg}\n\nPlease check console/network logs.`);
+                if (callbacksRef.current.onAiError) {
+                    callbacksRef.current.onAiError(msg);
+                }
             }
         } finally {
             setIsThinking(false);
