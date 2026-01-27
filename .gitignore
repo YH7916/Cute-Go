@@ -33,3 +33,4 @@ gtp_logs/
 release/
 resources/
 kaya-main/
+components/AboutModal.tsx

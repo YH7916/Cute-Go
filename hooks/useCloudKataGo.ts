@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { BoardState, Player } from '../types';
 import { CLOUD_AI_URL } from '../utils/constants';
 
@@ -24,6 +24,12 @@ export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign }: UseCloudKataG
         const yChar = (size - y).toString();
         return `${xChar}${yChar}`;
     };
+
+    // Stable Callback Refs to prevent requestCloudAiMove from changing
+    const callbacksRef = useRef({ onAiMove, onAiPass, onAiResign });
+    useEffect(() => {
+        callbacksRef.current = { onAiMove, onAiPass, onAiResign };
+    }, [onAiMove, onAiPass, onAiResign]);
 
     const requestCloudAiMove = useCallback(async (
         board: BoardState,
@@ -139,9 +145,9 @@ export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign }: UseCloudKataG
             if (bestMove) {
                 if (typeof bestMove === 'string') {
                     if (bestMove.toLowerCase() === 'pass') {
-                        onAiPass();
+                        callbacksRef.current.onAiPass();
                     } else if (bestMove.toLowerCase() === 'resign') {
-                        onAiResign();
+                        callbacksRef.current.onAiResign();
                     } else {
                         // GTP string to x,y
                         // "D4" -> x=3, y=15 (if 19x19)
@@ -154,14 +160,14 @@ export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign }: UseCloudKataG
                         const row = parseInt(rowStr);
                         const y = size - row; 
                         
-                        onAiMove(x, y);
+                        callbacksRef.current.onAiMove(x, y);
                     }
                 } else if (typeof bestMove === 'object') {
                     // {x, y} format
-                    onAiMove(bestMove.x, bestMove.y);
+                    callbacksRef.current.onAiMove(bestMove.x, bestMove.y);
                 }
             } else {
-                onAiPass();
+                callbacksRef.current.onAiPass();
             }
 
         } catch (error: any) {
@@ -179,7 +185,7 @@ export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign }: UseCloudKataG
             abortControllerRef.current = null;
         }
 
-    }, [onAiMove, onAiPass, onAiResign]); // Removed isThinking from deps to prevent infinite re-trigger loop
+    }, []); // Dependency array is empty because callbacks are accessed via ref
 
     const stopThinking = useCallback(() => {
         if (abortControllerRef.current) {

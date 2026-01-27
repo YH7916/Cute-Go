@@ -1001,39 +1001,98 @@ const App: React.FC = () => {
         }
     }, [tsumegoCurrentNode, gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.gameOver]);
 
-    const executeMove = (x: number, y: number, isRemote: boolean) => {
+    const endGame = useCallback(async (winnerColor: Player, reason: string) => { 
+        gameState.setGameOver(true);
+        aiTurnLock.current = false;
+        setIsThinking(false);
+        if (aiTimerRef.current) { clearTimeout(aiTimerRef.current); aiTimerRef.current = null; }
+
+        gameState.setWinner(winnerColor);
+        gameState.setWinReason(reason);
+        vibrate([50, 50, 50, 50]);
+        playSfx('win');
+
+        if (session?.user?.id && (settings.gameMode === 'PvAI' || onlineStatus === 'connected')) {
+            const myPlayerColor = onlineStatus === 'connected' ? myColor : settings.userColor;
+            const currentScore = calculateScore(gameState.boardRef.current);
+            checkEndGameAchievements({
+               winner: winnerColor, myColor: myPlayerColor || 'black', 
+               score: currentScore, captures: { black: gameState.blackCaptures, white: gameState.whiteCaptures },
+               boardSize: settings.boardSize
+            });
+        }
+
+        if (onlineStatus === 'connected' && session && userProfile && opponentProfile && myColor) {
+            const isWin = myColor === winnerColor;
+            const result = isWin ? 'win' : 'loss';
+            const newElo = calculateElo(userProfile.elo, opponentProfile.elo, result);
+            const eloDiff = newElo - userProfile.elo;
+            const diffText = eloDiff > 0 ? `+${eloDiff}` : `${eloDiff}`;
+            gameState.setWinReason(`${reason} (积分 ${diffText})`);
+            setEloDiffText(diffText);
+            setEloDiffStyle(eloDiff > 0 ? 'normal' : 'negative');
+
+            if (isWin) {
+                const winnerNewElo = calculateElo(userProfile.elo, opponentProfile.elo, 'win');
+                const loserNewElo = calculateElo(opponentProfile.elo, userProfile.elo, 'loss');
+                await supabase.rpc('update_game_elo', { winner_id: session.user.id, loser_id: opponentProfile.id, winner_new_elo: winnerNewElo, loser_new_elo: loserNewElo });
+                
+                if (localStorage.getItem('is_taptap_user') === 'true') {
+                    submitTapTapElo(winnerNewElo);
+                }
+
+                fetchProfile(session.user.id);
+            } else {
+                if (localStorage.getItem('is_taptap_user') === 'true') {
+                    submitTapTapElo(newElo);
+                }
+                setTimeout(() => fetchProfile(session.user.id), 2000);
+            }
+        } 
+        else if (settings.gameMode === 'PvAI' && session && userProfile) {
+            const isWin = winnerColor === settings.userColor;
+            const resultScore: 0 | 0.5 | 1 = isWin ? 1 : 0;
+            const aiRating = getAiRating(settings.difficulty); 
+            const newElo = calculateNewRating(userProfile.elo, aiRating, resultScore, 16);
+            const eloDiff = newElo - userProfile.elo;
+            const diffText = eloDiff > 0 ? `+${eloDiff}` : `${eloDiff}`;
+            
+            if (isWin && userProfile.elo <= 1200 && aiRating >= 1800) {
+                 gameState.setWinReason(`史诗级胜利！战胜了强敌！ (积分 ${diffText})`);
+                 setEloDiffStyle('gold');
+            } else {
+                 gameState.setWinReason(`${reason} (积分 ${diffText})`);
+                 setEloDiffStyle(eloDiff > 0 ? 'normal' : 'negative');
+            }
+            setEloDiffText(diffText);
+            await supabase.from('profiles').update({ elo_rating: newElo }).eq('id', session.user.id);
+      
+            if (localStorage.getItem('is_taptap_user') === 'true') {
+                submitTapTapElo(newElo);
+            }
+
+            fetchProfile(session.user.id);
+        }
+    }, [gameState.blackCaptures, gameState.whiteCaptures, settings.boardSize, settings.difficulty, settings.gameMode, settings.userColor, session, userProfile, opponentProfile, myColor, onlineStatus, gameState.setGameOver, gameState.setWinner, gameState.setWinReason, vibrate, playSfx, gameState.boardRef, checkEndGameAchievements, calculateScore, calculateElo, setEloDiffText, setEloDiffStyle, supabase, calculateNewRating, fetchProfile]);
+
+    const executeMove = useCallback((x: number, y: number, isRemote: boolean) => {
         const currentBoard = gameState.boardRef.current; 
         const activePlayer = gameState.currentPlayerRef.current; 
         const currentType = gameTypeRef.current;
         
         let prevHash = null;
-        // Ko Rule Fix: We must check against the state *before* the opponent's last move.
-        // History contains: [Move1, Move2, ... MoveN(Opponent)].
-        // We are making Move N+1. State after our move cannot be same as State after Move N-1.
-        // So we check history[length - 1].
-        // Wait, array is 0-indexed. length is N. last is index N-1. 
-        // We want index N-2. 
-             // Ko Rule Fix: We must check against the state *before* the opponent's last move.
-             // History contains: [Move1, Move2, ... MoveN(Opponent)].
-             // We are making Move N+1. State after our move cannot be same as State after Move N-1.
-             // Actually, history is 0-indexed.
-             // history[N-1] is the item for Move N. it contains the board BEFORE Move N.
-             // So history[length-1].board is the State Before Opponent Move.
-             // This is what we want to check against (Simple Ko).
-             if (gameState.history.length >= 1) {
-                 prevHash = getBoardHash(gameState.history[gameState.history.length - 1].board);
-             }
+        if (gameState.history.length >= 1) {
+            prevHash = getBoardHash(gameState.history[gameState.history.length - 1].board);
+        }
         
-        // Tsumego Check
         if (settings.gameMode === 'Tsumego' && !isRemote) {
              const isValid = handleTsumegoMove(x, y);
-             if (!isValid) return; // Block invalid moves in Tsumego
+             if (!isValid) return; 
         }
         
         const result = attemptMove(currentBoard, x, y, activePlayer, currentType, prevHash);
         
         if (result) {
-            // Audio & Vibrate
             try {
                 if (result.captured > 0) {
                     playSfx('capture');
@@ -1044,7 +1103,6 @@ const App: React.FC = () => {
                 }
             } catch(e) {}
 
-            // Achievements
             if (!isRemote && session?.user?.id) {
                try {
                    checkMoveAchievements({
@@ -1053,13 +1111,12 @@ const App: React.FC = () => {
                } catch (achError) { console.warn("Achievement Error:", achError); }
             }
             
-            // State Update
             const newHistoryItem = { 
                 board: currentBoard, 
                 currentPlayer: activePlayer, 
                 blackCaptures: gameState.blackCaptures, 
                 whiteCaptures: gameState.whiteCaptures, 
-                lastMove: { x, y }, // Correct: This state was produced by move (x,y)
+                lastMove: { x, y }, 
                 consecutivePasses: gameState.consecutivePasses 
             };
             
@@ -1067,7 +1124,6 @@ const App: React.FC = () => {
                 gameState.setHistory(prev => [...prev, newHistoryItem]);
             }
             
-            // Critical Fix: Update Refs immediately to avoid AI reading stale state
             gameState.boardRef.current = result.newBoard; 
             gameState.historyRef.current = [...gameState.historyRef.current, newHistoryItem];
             
@@ -1093,7 +1149,7 @@ const App: React.FC = () => {
         } else {
             if (!isRemote) try { playSfx('error'); } catch(e) {}
         }
-    };
+    }, [gameState.history, settings.gameMode, settings.gameType, settings.boardSize, gameState.blackCaptures, gameState.whiteCaptures, gameState.consecutivePasses, handleTsumegoMove, endGame, session?.user?.id, gameState.boardRef, gameState.currentPlayerRef, gameTypeRef, getBoardHash, attemptMove, playSfx, vibrate, checkMoveAchievements, gameState.setHistory, gameState.setBoard, gameState.setLastMove, gameState.setConsecutivePasses, gameState.setPassNotificationDismissed, checkGomokuWin, gameState.setCurrentPlayer, gameState.setBlackCaptures, gameState.setWhiteCaptures]);
 
     const handlePass = useCallback((isRemote: boolean = false) => {
         console.log(`[App] handlePass Triggered. Remote: ${isRemote}, GameOver: ${gameState.gameOver}, Consecutive: ${gameState.consecutivePasses}, Current: ${gameState.currentPlayerRef.current}`);
@@ -1225,84 +1281,7 @@ const App: React.FC = () => {
          });
     };
 
-    const endGame = async (winnerColor: Player, reason: string) => { 
-        gameState.setGameOver(true);
-        // Ensure to unlock AI just in case
-        aiTurnLock.current = false;
-        setIsThinking(false);
-        if (aiTimerRef.current) { clearTimeout(aiTimerRef.current); aiTimerRef.current = null; }
 
-        gameState.setWinner(winnerColor);
-        gameState.setWinReason(reason);
-        vibrate([50, 50, 50, 50]);
-        playSfx('win');
-
-        if (session?.user?.id && (settings.gameMode === 'PvAI' || onlineStatus === 'connected')) {
-            const myPlayerColor = onlineStatus === 'connected' ? myColor : settings.userColor;
-            const currentScore = calculateScore(gameState.boardRef.current);
-            checkEndGameAchievements({
-               winner: winnerColor, myColor: myPlayerColor || 'black', 
-               score: currentScore, captures: { black: gameState.blackCaptures, white: gameState.whiteCaptures },
-               boardSize: settings.boardSize
-            });
-        }
-
-        if (onlineStatus === 'connected' && session && userProfile && opponentProfile && myColor) {
-            const isWin = myColor === winnerColor;
-            const result = isWin ? 'win' : 'loss';
-            const newElo = calculateElo(userProfile.elo, opponentProfile.elo, result);
-            const eloDiff = newElo - userProfile.elo;
-            const diffText = eloDiff > 0 ? `+${eloDiff}` : `${eloDiff}`;
-            gameState.setWinReason(`${reason} (积分 ${diffText})`);
-            setEloDiffText(diffText);
-            setEloDiffStyle(eloDiff > 0 ? 'normal' : 'negative');
-
-            if (isWin) {
-                const winnerNewElo = calculateElo(userProfile.elo, opponentProfile.elo, 'win');
-                const loserNewElo = calculateElo(opponentProfile.elo, userProfile.elo, 'loss');
-                await supabase.rpc('update_game_elo', { winner_id: session.user.id, loser_id: opponentProfile.id, winner_new_elo: winnerNewElo, loser_new_elo: loserNewElo });
-                
-                // [TapTap Sync]
-                if (localStorage.getItem('is_taptap_user') === 'true') {
-                    submitTapTapElo(winnerNewElo);
-                }
-
-                fetchProfile(session.user.id);
-            } else {
-                // If I lost, the winnerNewElo already includes my loss from their perspective? 
-                // No, my new Elo is calculated locally too.
-                if (localStorage.getItem('is_taptap_user') === 'true') {
-                    submitTapTapElo(newElo);
-                }
-                setTimeout(() => fetchProfile(session.user.id), 2000);
-            }
-        } 
-        else if (settings.gameMode === 'PvAI' && session && userProfile) {
-            const isWin = winnerColor === settings.userColor;
-            const resultScore: 0 | 0.5 | 1 = isWin ? 1 : 0;
-            const aiRating = getAiRating(settings.difficulty); // Use getAiRating from helpers
-            const newElo = calculateNewRating(userProfile.elo, aiRating, resultScore, 16);
-            const eloDiff = newElo - userProfile.elo;
-            const diffText = eloDiff > 0 ? `+${eloDiff}` : `${eloDiff}`;
-            
-            if (isWin && userProfile.elo <= 1200 && aiRating >= 1800) {
-                 gameState.setWinReason(`史诗级胜利！战胜了强敌！ (积分 ${diffText})`);
-                 setEloDiffStyle('gold');
-            } else {
-                 gameState.setWinReason(`${reason} (积分 ${diffText})`);
-                 setEloDiffStyle(eloDiff > 0 ? 'normal' : 'negative');
-            }
-            setEloDiffText(diffText);
-            await supabase.from('profiles').update({ elo_rating: newElo }).eq('id', session.user.id);
-      
-      // [TapTap Sync]
-      if (localStorage.getItem('is_taptap_user') === 'true') {
-        submitTapTapElo(newElo);
-      }
-
-      fetchProfile(session.user.id);
-        }
-    };
 
     // --- AI Turn Trigger ---
     useEffect(() => {
