@@ -1,5 +1,6 @@
 import { OnnxEngine, type AnalysisResult } from '../utils/onnx-engine';
 import { MicroBoard, type Sign } from '../utils/micro-board';
+import { LocalGoAI } from '../utils/localGoAi';
 
 // Define message types
 type WorkerMessage = 
@@ -180,12 +181,38 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             }
             
             // 3. Run Analysis
-            const result = await engine.analyze(board, pla, {
-                history: historyMoves,
-                komi: komi ?? 7.5,
-                difficulty: difficulty,
-                temperature: temperature
-            });
+            let result: AnalysisResult;
+            if (difficulty === 'Easy') {
+                // LOCAL AI BRANCH (Alpha-Beta Search)
+                // Use static import to avoid worker build issues
+                const localAi = new LocalGoAI(size);
+                const move = localAi.getBestMove(board, pla);
+                
+                // Simulate a KataGo-like result for UI compatibility
+                result = {
+                    moves: move ? [{ 
+                        x: move.x, y: move.y, u: 0, prior: 1, winrate: 0.5, 
+                        scoreMean: 0, scoreStdev: 0, lead: 0, vists: 1 
+                    }] : [{ 
+                        x: -1, y: -1, u: 0, prior: 1, winrate: 0.5, 
+                        scoreMean: 0, scoreStdev: 0, lead: 0, vists: 1 
+                    }],
+                    rootInfo: {
+                        winrate: 0.5, 
+                        lead: 0,
+                        scoreStdev: 0,
+                        ownership: new Float32Array(size * size).fill(0)
+                    }
+                };
+            } else {
+                // KATAGO BRANCH
+                result = await engine.analyze(board, pla, {
+                    history: historyMoves,
+                    komi: komi ?? 7.5,
+                    difficulty: difficulty,
+                    temperature: temperature
+                });
+            }
 
             // 4. Send Response
             // Select best move

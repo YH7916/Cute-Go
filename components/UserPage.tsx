@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, User as UserIcon, Shield, LogOut, LogIn, Medal, Sword, Trophy, Disc, Utensils, Clover, Check, Heart, Crown } from 'lucide-react';
+import { X, User as UserIcon, Shield, LogOut, LogIn, Medal, Sword, Trophy, Disc, Utensils, Clover, Check, Heart, Crown, ListOrdered } from 'lucide-react';
+import { isTapTapEnv } from '../utils/tapTapBridge';
 import { Session } from '@supabase/supabase-js';
 import { AchievementDef, UserAchievement } from '../types';
 import { getRankBadge } from '../utils/helpers';
@@ -13,6 +14,7 @@ interface UserPageProps {
     userAchievements: Record<string, any>; // using Record<string, any> to avoid strict type issues if UserAchievement structure varies slightly or use UserAchievement
     onLoginClick: () => void;
     onSignOutClick: () => void;
+    onTapTapLeaderboardClick?: () => void;
 }
 
 export const UserPage: React.FC<UserPageProps> = ({
@@ -23,7 +25,8 @@ export const UserPage: React.FC<UserPageProps> = ({
     achievementsList,
     userAchievements,
     onLoginClick,
-    onSignOutClick
+    onSignOutClick,
+    onTapTapLeaderboardClick
 }) => {
     if (!isOpen) return null;
 
@@ -69,9 +72,16 @@ export const UserPage: React.FC<UserPageProps> = ({
                         </div>
 
                         {session ? (
-                            <button onClick={onSignOutClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
-                                <LogOut size={16}/> 退出登录
-                            </button>
+                            <div className="flex flex-col gap-2">
+                                <button onClick={onSignOutClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                                    <LogOut size={16}/> 退出登录
+                                </button>
+                                {isTapTapEnv() && (
+                                    <button onClick={onTapTapLeaderboardClick} className="btn-retro w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-[#00cccc] border-[#009999] text-white">
+                                        <ListOrdered size={16}/> TapTap 排行榜
+                                    </button>
+                                )}
+                            </div>
                         ) : (
                             <button onClick={onLoginClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
                                 <LogIn size={16}/> 登录 / 注册

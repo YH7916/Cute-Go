@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { GameBoard } from './components/GameBoard';
-import { BoardSize, Player, GameMode, GameType } from './types';
+import { BoardSize } from './types';
 import { 
   createBoard,
   attemptMove, 
@@ -31,7 +31,8 @@ import { useAudio } from './hooks/useAudio';
 
 // Utils
 import { supabase } from './utils/supabaseClient';
-import { SignalMessage } from './types';
+import { tapLogin, getTapPlayerId, submitTapTapElo, openTapTapLeaderboard } from './utils/tapTapBridge';
+import { BoardState, Player, Stone, GameMode, GameType, Difficulty, AchievementDef, UserAchievement, SignalMessage } from './types';
 import { WORKER_URL, DEFAULT_DOWNLOAD_LINK, CURRENT_VERSION } from './utils/constants';
 import { compareVersions, calculateElo, calculateNewRating, getAiRating, getRankBadge } from './utils/helpers';
 import { logEvent } from './utils/logger';
@@ -171,21 +172,47 @@ const App: React.FC = () => {
         logEvent('app_start');
 
         supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            if (session) fetchProfile(session.user.id);
+            if (session) {
+                setSession(session);
+                fetchProfile(session.user.id);
+            } else {
+                // [New] Check TapTap Persistence
+                const savedTapId = localStorage.getItem('taptap_user_id');
+                if (savedTapId) {
+                    restoreTapTapSession(savedTapId);
+                }
+            }
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
             if (session) {
+                setSession(session);
                 fetchProfile(session.user.id);
                 setShowLoginModal(false);
             } else {
-                setUserProfile(null);
+                // Only clear if not in TapTap mode
+                if (localStorage.getItem('is_taptap_user') !== 'true') {
+                    setSession(null);
+                    setUserProfile(null);
+                }
             }
         });
         return () => subscription.unsubscribe();
     }, []);
+
+    const restoreTapTapSession = async (tapId: string) => {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('taptap_id', tapId).single();
+        if (profile) {
+            setSession({
+                user: { id: profile.id, email: '', app_metadata: {}, user_metadata: {}, aud: '', created_at: '' } as any,
+                access_token: 'taptap-mock-token',
+                refresh_token: '',
+                expires_in: 3600,
+                token_type: 'bearer'
+            });
+            setUserProfile({ nickname: profile.nickname, elo: profile.elo_rating });
+        }
+    };
 
     const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -236,12 +263,101 @@ const App: React.FC = () => {
         setUserProfile(null);
     };
 
+    const handleTapTapLogin = async () => {
+        const tapRes = await tapLogin();
+        console.log('[App] TapTap Login Result:', tapRes);
+
+        // 1. Identify User
+        let tapId: string | null = null;
+        if (typeof tapRes === 'string' && tapRes.length > 0) {
+            tapId = tapRes;
+        } else if (tapRes && typeof tapRes === 'object') {
+            tapId = tapRes.unionId || tapRes.union_id || tapRes.unionid ||
+                    tapRes.openid || tapRes.openId || tapRes.open_id ||
+                    tapRes.userId || tapRes.user_id || tapRes.id ||
+                    tapRes.playerId || tapRes.player_id ||
+                    tapRes.user?.unionId || tapRes.user?.openid || tapRes.user?.id ||
+                    tapRes.code;
+        }
+
+        if (!tapId) {
+            console.log('[App] No ID in login result, attempting getTapPlayerId fallback...');
+            tapId = await getTapPlayerId();
+        }
+
+        if (!tapId) {
+            const keys = (tapRes && typeof tapRes === 'object') ? Object.keys(tapRes).join(',') : (typeof tapRes);
+            const msg = (tapRes as any)?.errMsg || (tapRes as any)?.message || 'none';
+            setToastMsg(`TapTap 登录失败: 无法获取标识符 (${keys}, ${msg})`);
+            setTimeout(() => setToastMsg(null), 8000);
+            return;
+        }
+
+        // 2. Profile Lookup
+        console.log('[App] Searching for profile with taptap_id:', tapId);
+        let { data: profile, error: searchError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('taptap_id', tapId)
+            .single();
+
+        if (searchError && searchError.code !== 'PGRST116') {
+            console.error('[App] Supabase profile search error:', searchError);
+            setToastMsg(`查询账户失败: ${searchError.message}`);
+            setTimeout(() => setToastMsg(null), 8000);
+            return;
+        }
+
+        // 3. Profile Creation (if missing)
+        if (!profile) {
+            console.log('[App] No profile found, creating new one...');
+            const newProfile = {
+                id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36),
+                taptap_id: tapId,
+                nickname: `玩家_${tapId.substring(0, 6)}`,
+                elo_rating: 1200
+            };
+            const { data, error: insertError } = await supabase.from('profiles').insert([newProfile]).select().single();
+            if (insertError) {
+                console.error('[App] Failed to create TapTap profile:', insertError);
+                setToastMsg(`档案创建失败: ${insertError.message}`);
+                setTimeout(() => setToastMsg(null), 8000);
+                return;
+            }
+            profile = data;
+            setToastMsg('欢迎来到 Cute-Go！');
+        }
+
+        // 4. Finalized Session
+        if (profile) {
+            setSession({
+                user: { id: profile.id, email: '', app_metadata: {}, user_metadata: {}, aud: '', created_at: '' } as any,
+                access_token: 'taptap-mock-token',
+                refresh_token: '',
+                expires_in: 3600,
+                token_type: 'bearer'
+            });
+            setUserProfile({ nickname: profile.nickname, elo: profile.elo_rating });
+            localStorage.setItem('is_taptap_user', 'true');
+            localStorage.setItem('taptap_user_id', tapId);
+            setToastMsg('TapTap 登录成功');
+            setShowLoginModal(false);
+        } else {
+            setToastMsg('未知登录错误，请联系开发者');
+            setTimeout(() => setToastMsg(null), 8000);
+        }
+    };
+
     const handleSignOut = async () => {
         if (isSigningOutRef.current) return;
         isSigningOutRef.current = true;
         try {
             supabase.auth.stopAutoRefresh?.();
-            clearSupabaseLocalSession();
+            await supabase.auth.signOut();
+            setSession(null);
+            setUserProfile(null);
+            localStorage.removeItem('is_taptap_user'); // Clear TapTap flag
+            localStorage.removeItem('taptap_user_id');
         } finally {
             isSigningOutRef.current = false;
         }
@@ -1035,8 +1151,19 @@ const App: React.FC = () => {
                 const winnerNewElo = calculateElo(userProfile.elo, opponentProfile.elo, 'win');
                 const loserNewElo = calculateElo(opponentProfile.elo, userProfile.elo, 'loss');
                 await supabase.rpc('update_game_elo', { winner_id: session.user.id, loser_id: opponentProfile.id, winner_new_elo: winnerNewElo, loser_new_elo: loserNewElo });
+                
+                // [TapTap Sync]
+                if (localStorage.getItem('is_taptap_user') === 'true') {
+                    submitTapTapElo(winnerNewElo);
+                }
+
                 fetchProfile(session.user.id);
             } else {
+                // If I lost, the winnerNewElo already includes my loss from their perspective? 
+                // No, my new Elo is calculated locally too.
+                if (localStorage.getItem('is_taptap_user') === 'true') {
+                    submitTapTapElo(newElo);
+                }
                 setTimeout(() => fetchProfile(session.user.id), 2000);
             }
         } 
@@ -1057,7 +1184,13 @@ const App: React.FC = () => {
             }
             setEloDiffText(diffText);
             await supabase.from('profiles').update({ elo_rating: newElo }).eq('id', session.user.id);
-            fetchProfile(session.user.id);
+      
+      // [TapTap Sync]
+      if (localStorage.getItem('is_taptap_user') === 'true') {
+        submitTapTapElo(newElo);
+      }
+
+      fetchProfile(session.user.id);
         }
     };
 
@@ -1344,7 +1477,7 @@ const App: React.FC = () => {
          const findOpponent = async (attempt: number): Promise<any> => {
            const range = attempt === 1 ? 100 : (attempt === 2 ? 300 : 9999);
            const activeSince = new Date(Date.now() - 15000).toISOString();
-           const { data: opponents } = await supabase.from('matchmaking_queue').select('*').eq('game_type', settings.gameType).eq('board_size', sizeToMatch).neq('user_id', session!.user.id).gte('last_seen', activeSince).gte('elo_rating', myElo - range).lte('elo_rating', myElo + range).limit(1);
+           const { data: opponents } = await supabase.from('matchmaking_queue').select('*').eq('game_type', settings.gameType).eq('board_size', sizeToMatch).neq('user_id', session!.user.id).gte('last_seen', activeSince).lte('elo_rating', myElo + range).limit(1);
            return opponents && opponents.length > 0 ? opponents[0] : null;
         };
         let opponent = await findOpponent(1);
@@ -1607,9 +1740,9 @@ const App: React.FC = () => {
                            showTerritory={showTerritory}
                            stoneSkin={settings.stoneSkin}
                            boardSkin={settings.boardSkin}
-                       />
-                   </div>
-               </div>
+                        />
+                    </div>
+                </div>
                {showThinkingStatus && (
                    <div className="absolute top-4 left-4 bg-white/80 px-4 py-2 rounded-full text-xs font-bold text-[#5c4033] animate-pulse border-2 border-[#e3c086] shadow-sm z-20">
                        {isElectronAvailable ? 'KataGo 正在计算...' : 'AI 正在思考...'}
@@ -1666,14 +1799,14 @@ const App: React.FC = () => {
                     whiteCaptures={gameState.whiteCaptures}
                     gameType={settings.gameType}
                     isThinking={isThinking}
-                    showWinRate={settings.showWinRate && (settings.gameMode !== 'PvAI' || settings.gameType === 'Gomoku')}
+                    showWinRate={settings.showWinRate && (settings.gameMode !== 'PvAI' || settings.gameType === 'Gomoku' || settings.difficulty === 'Easy')}
                     appMode={gameState.appMode}
                     gameOver={gameState.gameOver}
                     userColor={settings.userColor}
                     displayWinRate={displayWinRate}
                 />
 
-                {gameState.appMode === 'playing' && settings.gameMode === 'PvAI' && settings.showWinRate && settings.gameType === 'Go' && (
+                {gameState.appMode === 'playing' && settings.gameMode === 'PvAI' && settings.showWinRate && settings.gameType === 'Go' && settings.difficulty !== 'Easy' && (
                     <AnalysisPanel 
                         winRate={displayWinRate}
                         lead={displayLead}
@@ -1790,7 +1923,7 @@ const App: React.FC = () => {
                 isElectronAvailable={isElectronAvailable}
            />
 
-           <SkinShopModal
+           <SkinShopModal 
                 isOpen={showSkinShop}
                 onClose={() => setShowSkinShop(false)}
                 currentBoardSkin={settings.boardSkin}
@@ -1820,8 +1953,9 @@ const App: React.FC = () => {
                userProfile={userProfile}
                achievementsList={achievementsList}
                userAchievements={userAchievements}
-               onLoginClick={() => { setShowLoginModal(true); setShowUserPage(false); }}
+                onLoginClick={() => { setShowLoginModal(true); setShowUserPage(false); }}
                onSignOutClick={handleSignOut}
+               onTapTapLeaderboardClick={openTapTapLeaderboard}
            />
 
            <SkinShopModal 
@@ -1955,8 +2089,9 @@ const App: React.FC = () => {
            <LoginModal 
                isOpen={showLoginModal}
                onClose={() => setShowLoginModal(false)}
-               onLogin={handleLogin}
+                onLogin={handleLogin}
                onRegister={handleRegister}
+               onTapTapLogin={handleTapTapLogin}
            />
 
            <AboutModal 

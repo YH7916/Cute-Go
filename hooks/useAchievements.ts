@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabaseClient'; 
 import { DisplayAchievement, AchievementDef } from '../types';
 import { BoardState, Player } from '../types';
+import { unlockTapTapAchievement } from '../utils/tapTapBridge';
 
 // 定义硬编码的成就列表 (为了减少 DB 读取，也可以选择从 DB 拉取)
 const ACHIEVEMENTS_LIST: AchievementDef[] = [
@@ -74,8 +75,14 @@ export const useAchievements = (userId: string | undefined) => {
 
     if (!error && unlocked) {
       setNewUnlocked({ ...def, progress: { ...current, is_unlocked: true } });
-      // 可以在这里播放特定的音效
-      const audio = new Audio('/achievement.mp3'); // 需要准备这个音效
+      
+      // [New] Sync to TapTap if applicable
+      const isTapTapUser = localStorage.getItem('is_taptap_user') === 'true';
+      if (isTapTapUser) {
+        unlockTapTapAchievement(code);
+      }
+
+      const audio = new Audio('/achievement.mp3');
       audio.play().catch(() => {});
     }
   }, [userId, userAchievements]);
@@ -153,6 +160,13 @@ export const useAchievements = (userId: string | undefined) => {
         // 为了体验，如果是第3天，只弹 COMPANION_3。如果是第10天，只弹 COMPANION_10。不会同时满足两个刚解锁的情况。
         if (isNewUnlock) {
             setNewUnlocked({ ...def, progress: { current_value: newStreak, is_unlocked: true, achievement_code: code, unlocked_at: new Date().toISOString() } });
+            
+            // [New] Sync to TapTap if applicable
+            const isTapTapUser = localStorage.getItem('is_taptap_user') === 'true';
+            if (isTapTapUser) {
+              unlockTapTapAchievement(code);
+            }
+
             const audio = new Audio('/achievement.mp3');
             audio.play().catch(() => {});
         }
