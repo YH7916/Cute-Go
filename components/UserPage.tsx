@@ -9,12 +9,13 @@ interface UserPageProps {
     isOpen: boolean;
     onClose: () => void;
     session: Session | null;
-    userProfile: { nickname: string; elo: number } | null;
+    userProfile: { nickname: string; elo: number; avatar_url?: string | null } | null;
     achievementsList: AchievementDef[];
     userAchievements: Record<string, any>; // using Record<string, any> to avoid strict type issues if UserAchievement structure varies slightly or use UserAchievement
     onLoginClick: () => void;
     onSignOutClick: () => void;
     onTapTapLeaderboardClick?: () => void;
+    onUpdateNickname?: (newNickname: string) => void;
 }
 
 export const UserPage: React.FC<UserPageProps> = ({
@@ -26,9 +27,26 @@ export const UserPage: React.FC<UserPageProps> = ({
     userAchievements,
     onLoginClick,
     onSignOutClick,
-    onTapTapLeaderboardClick
+    onTapTapLeaderboardClick,
+    onUpdateNickname
 }) => {
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [tempNickname, setTempNickname] = React.useState(userProfile?.nickname || '');
+
+    React.useEffect(() => {
+        if (userProfile?.nickname) {
+            setTempNickname(userProfile.nickname);
+        }
+    }, [userProfile?.nickname]);
+
     if (!isOpen) return null;
+
+    const handleSave = () => {
+        if (tempNickname.trim() && onUpdateNickname) {
+            onUpdateNickname(tempNickname.trim());
+            setIsEditing(false);
+        }
+    };
 
     return (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -45,11 +63,32 @@ export const UserPage: React.FC<UserPageProps> = ({
                 <div className="flex flex-col gap-6 landscape:gap-4">
                     <div className="bg-[#fff]/60 p-4 rounded-2xl border border-[#e3c086] flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-[#5c4033] rounded-full flex items-center justify-center text-[#fcf6ea] border-2 border-[#8c6b38]">
-                                <UserIcon size={24} />
+                            <div className="w-14 h-14 bg-[#5c4033] rounded-full flex items-center justify-center text-[#fcf6ea] border-2 border-[#8c6b38] overflow-hidden">
+                                {userProfile?.avatar_url ? (
+                                    <img src={userProfile.avatar_url} alt="头像" className="w-full h-full object-cover" />
+                                ) : (
+                                    <UserIcon size={24} />
+                                )}
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-sm font-black text-[#5c4033]">{userProfile?.nickname || '未登录'}</span>
+                            <div className="flex flex-col flex-1">
+                                <div className="flex items-center gap-2">
+                                    {isEditing ? (
+                                        <div className="flex items-center gap-1 w-full">
+                                            <input 
+                                                type="text" 
+                                                value={tempNickname}
+                                                onChange={(e) => setTempNickname(e.target.value)}
+                                                className="bg-white border-2 border-[#e3c086] rounded px-2 py-0.5 text-xs font-bold text-[#5c4033] w-full focus:outline-none focus:border-[#8c6b38]"
+                                                maxLength={20}
+                                                autoFocus
+                                            />
+                                            <button onClick={handleSave} className="p-1 hover:bg-green-100 text-green-600 border-2 border-green-200 rounded transition-colors"><Check size={12} /></button>
+                                            <button onClick={() => { setIsEditing(false); setTempNickname(userProfile?.nickname || ''); }} className="p-1 hover:bg-red-100 text-red-600 border-2 border-red-200 rounded transition-colors"><X size={12} /></button>
+                                        </div>
+                                    ) : (
+                                        <span className="text-sm font-black text-[#5c4033]">{userProfile?.nickname || '未登录'}</span>
+                                    )}
+                                </div>
                                 <span className="text-xs font-bold text-[#8c6b38] bg-[#e3c086]/20 px-2 py-0.5 rounded inline-flex items-center gap-1">
                                     <Shield size={12} /> Rating: {userProfile?.elo ?? '—'}
                                 </span>
@@ -73,6 +112,9 @@ export const UserPage: React.FC<UserPageProps> = ({
 
                         {session ? (
                             <div className="flex flex-col gap-2">
+                                <button onClick={() => setIsEditing(true)} className="btn-retro w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-[#ffcc66] border-[#e3b044] text-[#5c4033]">
+                                    <UserIcon size={16}/> 修改昵称
+                                </button>
                                 <button onClick={onSignOutClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
                                     <LogOut size={16}/> 退出登录
                                 </button>

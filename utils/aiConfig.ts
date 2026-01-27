@@ -15,7 +15,7 @@ export function getAIConfig(difficulty: string): AIConfig {
     // Easy (18k equivalent)
     if (difficulty === 'Easy') {
         return {
-            useModel: true,
+            useModel: false, // Use local Alpha-Beta algorithm, no model loading required
             simulations: 1, 
             randomness: 0,
             temperature: 2.0, // High variety (Mistakes likely)

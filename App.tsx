@@ -31,7 +31,9 @@ import { useAudio } from './hooks/useAudio';
 
 // Utils
 import { supabase } from './utils/supabaseClient';
-import { tapLogin, getTapPlayerId, submitTapTapElo, openTapTapLeaderboard } from './utils/tapTapBridge';
+import { 
+    tapLogin, getTapPlayerId, submitTapTapElo, openTapTapLeaderboard, isTapTapEnv, getAccountInfo, getTapUserInfo, disconnectTap, tapRequirePrivacyAuthorize, tapGetSetting, tapOpenPrivacyContract, tapGetPrivacySetting, tapCreateUserInfoButton 
+} from './utils/tapTapBridge';
 import { BoardState, Player, Stone, GameMode, GameType, Difficulty, AchievementDef, UserAchievement, SignalMessage } from './types';
 import { WORKER_URL, DEFAULT_DOWNLOAD_LINK, CURRENT_VERSION } from './utils/constants';
 import { compareVersions, calculateElo, calculateNewRating, getAiRating, getRankBadge } from './utils/helpers';
@@ -102,6 +104,7 @@ const App: React.FC = () => {
     const [session, setSession] = useState<Session | null>(null);
     const [userProfile, setUserProfile] = useState<{ nickname: string; elo: number } | null>(null);
     const [showLoginModal, setShowLoginModal] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     
     // Online State
     const [showOnlineMenu, setShowOnlineMenu] = useState(false);
@@ -210,7 +213,11 @@ const App: React.FC = () => {
                 expires_in: 3600,
                 token_type: 'bearer'
             });
-            setUserProfile({ nickname: profile.nickname, elo: profile.elo_rating });
+            setUserProfile({ 
+                nickname: profile.nickname, 
+                elo: profile.elo_rating,
+                avatar_url: profile.avatar_url 
+            });
         }
     };
 
@@ -262,33 +269,77 @@ const App: React.FC = () => {
         setSession(null);
         setUserProfile(null);
     };
-
     const handleTapTapLogin = async () => {
-        const tapRes = await tapLogin();
-        console.log('[App] TapTap Login Result:', tapRes);
+        const tap = (window as any).tap;
+        if (tap) {
+            console.log('[App] tap object keys:', Object.keys(tap).join(', '));
+            // Trigger privacy authorization check/prompt before login
+            await tapRequirePrivacyAuthorize();
+            const privacySetting = await tapGetPrivacySetting();
+            console.log('[App] Privacy Settings:', JSON.stringify(privacySetting));
+            const settings = await tapGetSetting();
+            console.log('[App] Current Tap Settings:', JSON.stringify(settings));
+        }
 
-        // 1. Identify User
+        const tapRes = await tapLogin();
+        console.log('[App] TapTap Login Full Result:', JSON.stringify(tapRes, null, 2));
+
+        // Attempt to get profile info (this might now trigger authorize via the bridge)
+        const profileInfo = await getTapUserInfo();
+        console.log('[App] Extra Profile Info:', JSON.stringify(profileInfo));
+
+        // 1. Identify User & Basic Profile Info
         let tapId: string | null = null;
+        let tapNickname: string | null = null;
+        let tapAvatar: string | null = null;
+
         if (typeof tapRes === 'string' && tapRes.length > 0) {
             tapId = tapRes;
         } else if (tapRes && typeof tapRes === 'object') {
             tapId = tapRes.unionId || tapRes.union_id || tapRes.unionid ||
                     tapRes.openid || tapRes.openId || tapRes.open_id ||
-                    tapRes.userId || tapRes.user_id || tapRes.id ||
                     tapRes.playerId || tapRes.player_id ||
-                    tapRes.user?.unionId || tapRes.user?.openid || tapRes.user?.id ||
-                    tapRes.code;
+                    tapRes.user?.unionId || tapRes.user?.openid || tapRes.user?.id;
+            
+            tapNickname = tapRes.nickName || tapRes.nickname || tapRes.user?.nickName || tapRes.user?.nickname;
+            tapAvatar = tapRes.avatarUrl || tapRes.avatar_url || tapRes.user?.avatarUrl || tapRes.user?.avatar_url;
+        }
+
+        // Merge extra profile info (e.g. from getUserInfo or getAccountInfoSync)
+        if (profileInfo) {
+            tapNickname = tapNickname || profileInfo.nickName || profileInfo.nickname;
+            tapAvatar = tapAvatar || profileInfo.avatarUrl || profileInfo.avatar_url;
+            tapId = tapId || profileInfo.openid || profileInfo.unionid || profileInfo.playerId;
+        }
+
+        // 2. High Priority Fallback: OnlineBattleManager (stable playerId)
+        if (!tapId || tapId.length > 50) { 
+            console.log('[App] No stable ID in login result, fetching playerId via connect()...');
+            const stableId = await getTapPlayerId();
+            if (stableId) tapId = stableId;
         }
 
         if (!tapId) {
-            console.log('[App] No ID in login result, attempting getTapPlayerId fallback...');
-            tapId = await getTapPlayerId();
+            console.log('[App] Still no ID, trying getAccountInfoSync or transient fields...');
+            const acctInfo = getAccountInfo();
+            if (acctInfo) {
+                console.log('[App] getAccountInfoSync result:', JSON.stringify(acctInfo));
+                tapId = acctInfo.openid || acctInfo.unionid || acctInfo.playerId;
+            }
+            
+            // If REALLY nothing else, use the OAuth code (temporary session)
+            if (!tapId && tapRes && typeof tapRes === 'object' && tapRes.code) {
+                console.warn('[App] Falling back to transient OAuth code. This ID WILL change every login!');
+                tapId = tapRes.code;
+            }
         }
 
+        console.log('[App] Final Identification - tapId:', tapId, 'Nickname:', tapNickname, 'Avatar:', tapAvatar ? 'Yes' : 'No');
+        
         if (!tapId) {
             const keys = (tapRes && typeof tapRes === 'object') ? Object.keys(tapRes).join(',') : (typeof tapRes);
             const msg = (tapRes as any)?.errMsg || (tapRes as any)?.message || 'none';
-            setToastMsg(`TapTap 登录失败: 无法获取标识符 (${keys}, ${msg})`);
+            setToastMsg(`TapTap 登录失败: 无法获取任何标识符 (${keys}, ${msg})`);
             setTimeout(() => setToastMsg(null), 8000);
             return;
         }
@@ -308,13 +359,14 @@ const App: React.FC = () => {
             return;
         }
 
-        // 3. Profile Creation (if missing)
+        // 3. Profile Creation or Incremental Update
         if (!profile) {
             console.log('[App] No profile found, creating new one...');
             const newProfile = {
                 id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36),
                 taptap_id: tapId,
-                nickname: `玩家_${tapId.substring(0, 6)}`,
+                nickname: tapNickname || `玩家_${tapId.substring(0, 6)}`,
+                avatar_url: tapAvatar || null,
                 elo_rating: 1200
             };
             const { data, error: insertError } = await supabase.from('profiles').insert([newProfile]).select().single();
@@ -326,6 +378,21 @@ const App: React.FC = () => {
             }
             profile = data;
             setToastMsg('欢迎来到 Cute-Go！');
+        } else {
+            // [Incremental Sync] Update nickname/avatar if they changed in TapTap
+            const needsUpdate = (tapNickname && profile.nickname !== tapNickname) || (tapAvatar && profile.avatar_url !== tapAvatar);
+            if (needsUpdate) {
+                const { data: updatedProfile } = await supabase
+                    .from('profiles')
+                    .update({ 
+                        nickname: tapNickname || profile.nickname, 
+                        avatar_url: tapAvatar || profile.avatar_url 
+                    })
+                    .eq('id', profile.id)
+                    .select()
+                    .single();
+                if (updatedProfile) profile = updatedProfile;
+            }
         }
 
         // 4. Finalized Session
@@ -337,7 +404,11 @@ const App: React.FC = () => {
                 expires_in: 3600,
                 token_type: 'bearer'
             });
-            setUserProfile({ nickname: profile.nickname, elo: profile.elo_rating });
+            setUserProfile({ 
+                nickname: profile.nickname, 
+                elo: profile.elo_rating,
+                avatar_url: profile.avatar_url // Pass the avatar URL to the profile state
+            });
             localStorage.setItem('is_taptap_user', 'true');
             localStorage.setItem('taptap_user_id', tapId);
             setToastMsg('TapTap 登录成功');
@@ -348,6 +419,31 @@ const App: React.FC = () => {
         }
     };
 
+    const handleUpdateNickname = async (newNickname: string) => {
+        if (!session?.user?.id) return;
+        
+        setToastMsg('正在更新昵称...');
+        const { data: updated, error } = await supabase
+            .from('profiles')
+            .update({ nickname: newNickname })
+            .eq('id', session.user.id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('[App] Nickname update failed:', error);
+            setToastMsg(`更新失败: ${error.message}`);
+        } else if (updated) {
+            setUserProfile({
+                nickname: updated.nickname,
+                elo: updated.elo_rating,
+                avatar_url: updated.avatar_url
+            });
+            setToastMsg('昵称修改成功！');
+        }
+        setTimeout(() => setToastMsg(null), 3000);
+    };
+
     const handleSignOut = async () => {
         if (isSigningOutRef.current) return;
         isSigningOutRef.current = true;
@@ -356,8 +452,9 @@ const App: React.FC = () => {
             await supabase.auth.signOut();
             setSession(null);
             setUserProfile(null);
-            localStorage.removeItem('is_taptap_user'); // Clear TapTap flag
+            localStorage.removeItem('is_taptap_user');
             localStorage.removeItem('taptap_user_id');
+            disconnectTap();
         } finally {
             isSigningOutRef.current = false;
         }
@@ -1955,7 +2052,13 @@ const App: React.FC = () => {
                userAchievements={userAchievements}
                 onLoginClick={() => { setShowLoginModal(true); setShowUserPage(false); }}
                onSignOutClick={handleSignOut}
-               onTapTapLeaderboardClick={openTapTapLeaderboard}
+               onTapTapLeaderboardClick={() => {
+                   if (userProfile?.elo) {
+                       submitTapTapElo(userProfile.elo);
+                   }
+                   openTapTapLeaderboard();
+               }}
+                onUpdateNickname={handleUpdateNickname}
            />
 
            <SkinShopModal 
