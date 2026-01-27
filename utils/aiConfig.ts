@@ -34,14 +34,14 @@ export function getAIConfig(difficulty: string): AIConfig {
         };
     }
 
-    // Legacy Fallback (Migration)
-    if (difficulty.includes('k')) {
-        const k = parseInt(difficulty);
-        if (k >= 6) return getAIConfig('Easy'); // 18k-6k -> Easy
-        return getAIConfig('Medium'); // 5k-1k -> Medium
+    // Legacy Fallback (Migration for strings like "5k", "1d")
+    if (/^\d+k$/i.test(difficulty)) {
+        const kValue = parseInt(difficulty);
+        if (kValue >= 6) return getAIConfig('Easy'); 
+        return getAIConfig('Medium'); 
     }
-    if (difficulty.includes('d')) {
-        return getAIConfig('Hard'); // 1d-9d -> Hard
+    if (/^\d+d$/i.test(difficulty)) {
+        return getAIConfig('Hard'); 
     }
 
     // Hard (1d equivalent or higher)
