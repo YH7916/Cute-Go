@@ -1314,11 +1314,11 @@ const App: React.FC = () => {
                   if (useCloud) {
                       // Cloud Mode - Optimized for Speed
                       // Use aiConfig simulations.
-                      // [Fix] Minimum 15 visits to prevent KataGo from returning empty moves/passing due to low search.
-                      // 15 visits is still instant (~20ms on GPU).
+                      // [Fix] Reduce visits to lower difficulty as requested.
+                      // 8 visits is enough for a decent move but significantly weaker than 15.
                       let sims = aiConfig.simulations;
-                      sims = Math.max(15, sims * 2);
-                      if (sims > 100) sims = 100; // Cap at 100 for Hard
+                      sims = Math.max(8, Math.floor(sims * 1.2)); 
+                      if (sims > 100) sims = 100; // Cap at 100 for Hard to prevent server overload
                       
                       const komi = settings.boardSize === 9 ? 6.5 : 7.5;
                       requestCloudAiMove(
