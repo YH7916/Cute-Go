@@ -38,7 +38,7 @@
             }
 
             container.innerHTML = `
-                <div id="debug-toggle-btn" class="debug-toggle-btn" style="position:fixed;bottom:20px;right:20px;width:12px;height:12px;background:#00ff00;border-radius:50%;z-index:10000;cursor:pointer;box-shadow:0 0 10px rgba(0,255,0,0.5);">
+                <div id="debug-toggle-btn" class="debug-toggle-btn" style="display:none;position:fixed;top:20px;right:20px;padding:3px 8px;background:#e3c086;color:#5c4033;font-weight:bold;font-size:10px;font-family:system-ui,-apple-system,sans-serif;border-radius:6px;z-index:10000;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:2px solid #8c6b38;transition:all 0.2s;">dev
                 </div>
 
                 <div id="debug-panel" class="debug-panel" style="display:none;position:fixed;bottom:40px;right:20px;width:320px;height:400px;background:rgba(0,0,0,0.85);color:#fff;font-family:monospace;font-size:12px;z-index:9999;border-radius:8px;flex-direction:column;box-shadow:0 0 20px rgba(0,0,0,0.5);border:1px solid #444;overflow:hidden;">
@@ -58,6 +58,7 @@
                 const style = document.createElement('style');
                 style.id = 'debug-logger-styles';
                 style.innerHTML = `
+                    .debug-toggle-btn:hover { background: #d4b57a; transform: scale(1.05); }
                     .debug-log-item { margin-bottom: 4px; border-left: 3px solid #00ff00; padding-left: 6px; word-break: break-all; font-size: 11px; }
                     .debug-log-warn { border-left-color: #ffaa00; color: #ffaa00; }
                     .debug-log-error { border-left-color: #ff4444; color: #ff4444; }
