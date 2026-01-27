@@ -32,12 +32,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 其它静态资源缓存优先
+  // 其它静态资源缓存优先 (仅限 GET 请求)
   event.respondWith(
     caches.match(request).then((response) => {
       if (response) return response;
       return fetch(request).then((networkResponse) => {
-        if (networkResponse && networkResponse.ok) {
+        if (networkResponse && networkResponse.ok && request.method === 'GET') {
           const copy = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         }

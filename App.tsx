@@ -1752,52 +1752,47 @@ const App: React.FC = () => {
         } catch (e) { setUpdateMsg('检查失败'); } finally { setCheckingUpdate(false); }
     };
     
-    // Win Rate Calculation for Display
     // Win Rate Calculation for Display (Normalized to Black Win %)
-    let displayWinRate = calculateWinRate(gameState.board); // Default Heuristic (Already Black%)
-
-     if (settings.showWinRate && !gameState.gameOver && gameState.appMode === 'playing' && settings.gameType === 'Go') {
-          const aiColor = settings.userColor === 'black' ? 'white' : 'black';
-          
-          if (useCloud && cloudWinRate !== 50) {
-              displayWinRate = (aiColor === 'white') ? (100 - cloudWinRate) : cloudWinRate;
-          }
-          else if (isElectronAvailable && electronWinRate !== 50) {
-              // Electron AI (Assume relative to AI color)
-              displayWinRate = (aiColor === 'white') ? (100 - electronWinRate) : electronWinRate;
-          } 
-          else if (!isElectronAvailable && isWorkerReady && settings.gameMode === 'PvAI' && webWinRate !== 50) {
-              // Web AI (Returns WinRate for Current AI Mover)
-              // If AI is White, it returns White%. We convert to Black%.
-              displayWinRate = (aiColor === 'white') ? (100 - webWinRate) : webWinRate;
-          }
-    }
-
-    // [Fix] Gomoku Win Rate
-     if (settings.showWinRate && !gameState.gameOver && gameState.appMode === 'playing' && settings.gameType === 'Gomoku') {
-         // Use strict heuristic win rate
-         displayWinRate = calculateGomokuWinRate(gameState.board);
-     }
-
+    const displayWinRate = useMemo(() => {
+        let rate = calculateWinRate(gameState.board); // Default Heuristic
+        if (settings.showWinRate && !gameState.gameOver && gameState.appMode === 'playing' && settings.gameType === 'Go') {
+            const aiColor = settings.userColor === 'black' ? 'white' : 'black';
+            if (useCloud && cloudWinRate !== 50) {
+                rate = (aiColor === 'white') ? (100 - cloudWinRate) : cloudWinRate;
+            }
+            else if (isElectronAvailable && electronWinRate !== 50) {
+                rate = (aiColor === 'white') ? (100 - electronWinRate) : electronWinRate;
+            } 
+            else if (!isElectronAvailable && isWorkerReady && settings.gameMode === 'PvAI' && webWinRate !== 50) {
+                rate = (aiColor === 'white') ? (100 - webWinRate) : webWinRate;
+            }
+        }
+        if (settings.showWinRate && !gameState.gameOver && gameState.appMode === 'playing' && settings.gameType === 'Gomoku') {
+            rate = calculateGomokuWinRate(gameState.board);
+        }
+        return rate;
+    }, [gameState.board, settings.showWinRate, gameState.gameOver, gameState.appMode, settings.gameType, settings.userColor, useCloud, cloudWinRate, isElectronAvailable, electronWinRate, isWorkerReady, settings.gameMode, webWinRate]);
 
     // Lead Calculation (Normalized to Black Lead)
-    let displayLead: number | null = null;
-    const aiColor = settings.userColor === 'black' ? 'white' : 'black';
-    
-    if (settings.gameMode === 'PvAI') {
-         if (useCloud && cloudLead !== null) {
-              displayLead = (aiColor === 'white') ? -cloudLead : cloudLead;
-         }
-         else if (!isElectronAvailable && webLead !== null && isWorkerReady) {
-              // Web Lead is relative to Mover (AI).
-              // If AI is White, Lead +5 means White leads by 5. Black Lead = -5.
-              displayLead = (aiColor === 'white') ? -webLead : webLead;
-         }
-    }
+    const displayLead = useMemo(() => {
+        let lead: number | null = null;
+        const aiColor = settings.userColor === 'black' ? 'white' : 'black';
+        if (settings.gameMode === 'PvAI') {
+            if (useCloud && cloudLead !== null) {
+                lead = (aiColor === 'white') ? -cloudLead : cloudLead;
+            }
+            else if (!isElectronAvailable && webLead !== null && isWorkerReady) {
+                lead = (aiColor === 'white') ? -webLead : webLead;
+            }
+        }
+        return lead;
+    }, [settings.gameMode, useCloud, cloudLead, settings.userColor, isElectronAvailable, webLead, isWorkerReady]);
 
     // Territory Calculation (Ownership)
-    let displayTerritory = null;
-    if (settings.gameMode === 'PvAI') {
+    const displayTerritory = useMemo(() => {
+        if (settings.gameMode !== 'PvAI') return null;
+        const aiColor = settings.userColor === 'black' ? 'white' : 'black';
+        
         if (useCloud && cloudTerritory) {
             // Flip territory if AI is White (since Cloud results are likely relative to the mover)
             if (aiColor === 'white') {
@@ -1805,14 +1800,14 @@ const App: React.FC = () => {
                 for (let i = 0; i < cloudTerritory.length; i++) {
                     flipped[i] = -cloudTerritory[i];
                 }
-                displayTerritory = flipped;
-            } else {
-                displayTerritory = cloudTerritory;
+                return flipped;
             }
+            return cloudTerritory;
         } else if (!isElectronAvailable) {
-            displayTerritory = webTerritory;
+            return webTerritory;
         }
-    }
+        return null;
+    }, [settings.gameMode, settings.userColor, useCloud, cloudTerritory, isElectronAvailable, webTerritory]);
 
 
 
@@ -1842,7 +1837,12 @@ const App: React.FC = () => {
                    onOpenImport={() => setShowImportModal(true)}
                    onOpenSettings={() => setShowMenu(true)}
                    onOpenAbout={() => setShowAboutModal(true)}
-                   onStartSetup={() => { setShowStartScreen(false); resetGame(false); gameState.setAppMode('setup'); }}
+                   onStartSetup={() => { 
+                        setShowStartScreen(false); 
+                        settings.setGameMode('PvP'); // [Fix] Prevent carrying over Tsumego mode
+                        resetGame(false); 
+                        gameState.setAppMode('setup'); 
+                    }}
                    onOpenUserPage={() => setShowUserPage(true)}
                     onOpenSkinShop={() => setShowSkinShop(true)}
                />

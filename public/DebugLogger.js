@@ -26,6 +26,13 @@
             this.createUI();
             this.bindEvents();
             this.interceptConsole();
+            
+            // Only show dev button if debug_enabled is set in localStorage
+            if (localStorage.getItem('debug_enabled') === 'true') {
+                const toggle = document.getElementById('debug-toggle-btn');
+                if (toggle) toggle.style.display = 'block';
+            }
+
             window.Debug = this;
         }
 
@@ -38,7 +45,7 @@
             }
 
             container.innerHTML = `
-                <div id="debug-toggle-btn" class="debug-toggle-btn" style="display:none;position:fixed;top:20px;right:20px;padding:3px 8px;background:#e3c086;color:#5c4033;font-weight:bold;font-size:10px;font-family:system-ui,-apple-system,sans-serif;border-radius:6px;z-index:10000;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:2px solid #8c6b38;transition:all 0.2s;">dev
+                <div id="debug-toggle-btn" class="debug-toggle-btn" style="display:none;position:fixed;top:10px;right:10px;padding:3px 8px;background:#e3c086;color:#5c4033;font-weight:bold;font-size:10px;font-family:system-ui,-apple-system,sans-serif;border-radius:6px;z-index:10000;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:2px solid #8c6b38;transition:all 0.2s;opacity:0.6;">dev
                 </div>
 
                 <div id="debug-panel" class="debug-panel" style="display:none;position:fixed;bottom:40px;right:20px;width:320px;height:400px;background:rgba(0,0,0,0.85);color:#fff;font-family:monospace;font-size:12px;z-index:9999;border-radius:8px;flex-direction:column;box-shadow:0 0 20px rgba(0,0,0,0.5);border:1px solid #444;overflow:hidden;">

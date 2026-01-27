@@ -179,7 +179,7 @@ export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign }: UseCloudKataG
             abortControllerRef.current = null;
         }
 
-    }, [isThinking, onAiMove, onAiPass, onAiResign]);
+    }, [onAiMove, onAiPass, onAiResign]); // Removed isThinking from deps to prevent infinite re-trigger loop
 
     const stopThinking = useCallback(() => {
         if (abortControllerRef.current) {
