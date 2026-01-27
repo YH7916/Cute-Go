@@ -112,7 +112,7 @@ export const UserPage: React.FC<UserPageProps> = ({
 
                         {session ? (
                             <div className="flex flex-col gap-2">
-                                <button onClick={() => setIsEditing(true)} className="btn-retro w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-[#ffcc66] border-[#e3b044] text-[#5c4033]">
+                                <button onClick={() => setIsEditing(true)} className="btn-retro w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-[#e3c086] border-[#c4ae88] text-[#5c4033]">
                                     <UserIcon size={16}/> 修改昵称
                                 </button>
                                 <button onClick={onSignOutClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">

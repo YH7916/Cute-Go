@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, RotateCcw, Palette } from 'lucide-react';
+import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, RotateCcw, Palette, FileUp } from 'lucide-react';
 import { BoardSize, GameType, GameMode, Player, ExtendedDifficulty } from '../types';
 import { getSliderBackground, getCalculatedVisits } from '../utils/helpers';
 import { sliderToVisits, visitsToSlider } from '../hooks/useKataGo';
@@ -283,6 +283,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 <span className="text-xs font-bold">气</span>
                             </button>
                         </div>
+
+                        {/* Import/Export Button */}
+                        <button 
+                            onClick={() => { onOpenImport(); onClose(); }}
+                            className="btn-retro bg-[#fff] border-[#e3c086] text-[#8c6b38] hover:text-[#5c4033] hover:border-[#8c6b38] w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all"
+                        >
+                            <FileUp size={18} />
+                            <span className="text-sm">导入 / 导出棋谱</span>
+                        </button>
 
                         {/* Skin Shop Button */}
                         <button 

@@ -100,6 +100,11 @@ const App: React.FC = () => {
         }
     }, []);
 
+    // [DEBUG] Monitor showStartScreen changes
+    useEffect(() => {
+        console.log('[App] showStartScreen changed to:', showStartScreen);
+    }, [showStartScreen]);
+
     // Auth & Profile
     const [session, setSession] = useState<Session | null>(null);
     const [userProfile, setUserProfile] = useState<{ nickname: string; elo: number } | null>(null);
@@ -490,6 +495,7 @@ const App: React.FC = () => {
         isThinking: isCloudThinking,
         aiWinRate: cloudWinRate,
         aiLead: cloudLead,
+        aiTerritory: cloudTerritory, // Extract territory from cloud engine
         requestCloudAiMove,
         errorMsg: cloudErrorMsg 
     } = cloudAiEngine;
@@ -695,6 +701,12 @@ const App: React.FC = () => {
 
     // --- Start Screen Handler ---
     const handleStartGame = (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local') => {
+        console.log('[handleStartGame] Called with mode:', mode, 'aiType:', aiType);
+        console.log('[handleStartGame] Before: showStartScreen =', showStartScreen);
+        
+        // [FIX] Hide StartScreen FIRST to prevent UI blocking
+        setShowStartScreen(false);
+        
         settings.setGameMode(mode);
         
         // Reset Logic
@@ -709,6 +721,7 @@ const App: React.FC = () => {
                  if (!isElectronAvailable) {
                      const aiConfig = getAIConfig(settings.difficulty);
                      if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                         console.log('[handleStartGame] Initializing AI...');
                          webAiEngine.initializeAI();
                      }
                  }
@@ -719,7 +732,7 @@ const App: React.FC = () => {
              setUseCloud(false); // irrelevant for PvP but keep clean
         }
         
-        setShowStartScreen(false);
+        console.log('[handleStartGame] showStartScreen set to false');
         vibrate(20);
     };
 
@@ -1782,6 +1795,25 @@ const App: React.FC = () => {
          }
     }
 
+    // Territory Calculation (Ownership)
+    let displayTerritory = null;
+    if (settings.gameMode === 'PvAI') {
+        if (useCloud && cloudTerritory) {
+            // Flip territory if AI is White (since Cloud results are likely relative to the mover)
+            if (aiColor === 'white') {
+                const flipped = new Float32Array(cloudTerritory.length);
+                for (let i = 0; i < cloudTerritory.length; i++) {
+                    flipped[i] = -cloudTerritory[i];
+                }
+                displayTerritory = flipped;
+            } else {
+                displayTerritory = cloudTerritory;
+            }
+        } else if (!isElectronAvailable) {
+            displayTerritory = webTerritory;
+        }
+    }
+
 
 
 
@@ -1833,18 +1865,18 @@ const App: React.FC = () => {
                            gameType={settings.gameType}
                            gameMode={settings.gameMode}
                            showCoordinates={settings.showCoordinates}
-                           territory={settings.gameMode === 'PvAI' ? webTerritory : null}
+                            territory={displayTerritory}
                            showTerritory={showTerritory}
                            stoneSkin={settings.stoneSkin}
                            boardSkin={settings.boardSkin}
                         />
                     </div>
                 </div>
-               {showThinkingStatus && (
-                   <div className="absolute top-4 left-4 bg-white/80 px-4 py-2 rounded-full text-xs font-bold text-[#5c4033] animate-pulse border-2 border-[#e3c086] shadow-sm z-20">
-                       {isElectronAvailable ? 'KataGo 正在计算...' : 'AI 正在思考...'}
-                   </div>
-               )}
+                {showThinkingStatus && (
+                    <div className="absolute top-4 left-4 bg-white/80 px-4 py-2 rounded-full text-xs font-bold text-[#5c4033] animate-pulse border-2 border-[#e3c086] shadow-sm z-20">
+                        {useCloud ? '云端 AI 正在计算...' : (isElectronAvailable ? 'KataGo 正在计算...' : 'AI 正在思考...')}
+                    </div>
+                )}
                <PassConfirmationModal 
                    consecutivePasses={gameState.consecutivePasses} 
                    gameOver={gameState.gameOver} 
