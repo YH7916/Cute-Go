@@ -374,7 +374,7 @@
           />
         </filter>
 
-        <!-- 3. Jelly Filter (Default) -->
+        <!-- 3. Jelly Filter (Default and Global Variants) -->
         <filter id="jelly-default" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
           <feColorMatrix
@@ -393,13 +393,34 @@
           >
             <fePointLight x="-100" y="-100" z="100" />
           </feSpecularLighting>
-          <feComposite
-            in="specular"
-            in2="blob"
-            operator="in"
-            result="specularInBlob"
-          />
+          <feComposite in="specular" in2="blob" operator="in" result="specularInBlob" />
           <feComposite in="specularInBlob" in2="blob" operator="over" />
+        </filter>
+
+        <filter id="global-jelly-black" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />
+          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="blob" />
+          <feGaussianBlur in="blob" stdDeviation="2" result="blurBlob"/>
+          <feSpecularLighting in="blurBlob" surfaceScale="5" specularConstant="0.8" specularExponent="20" lighting-color="#ffffff" result="specular">
+            <fePointLight x="-500" y="-500" z="300" />
+          </feSpecularLighting>
+          <feComposite in="specular" in2="blob" operator="in" result="specularInBlob" />
+          <feDropShadow dx="0" dy="3.5" stdDeviation="1.75" flood-color="#000000" flood-opacity="0.5" in="blob" result="shadow" />
+          <feComposite in="shadow" in2="blob" operator="over" result="shadowedBlob"/>
+          <feComposite in="specularInBlob" in2="shadowedBlob" operator="over" />
+        </filter>
+
+        <filter id="global-jelly-white" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />
+          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="blob" />
+          <feGaussianBlur in="blob" stdDeviation="2" result="blurBlob"/>
+          <feSpecularLighting in="blurBlob" surfaceScale="5" specularConstant="1.2" specularExponent="15" lighting-color="#ffffff" result="specular">
+            <fePointLight x="-500" y="-500" z="300" />
+          </feSpecularLighting>
+          <feComposite in="specular" in2="blob" operator="in" result="specularInBlob" />
+          <feDropShadow dx="0" dy="3.5" stdDeviation="1.75" flood-color="#5c4033" flood-opacity="0.3" in="blob" result="shadow" />
+          <feComposite in="shadow" in2="blob" operator="over" result="shadowedBlob"/>
+          <feComposite in="specularInBlob" in2="shadowedBlob" operator="over" />
         </filter>
 
         <!-- 4. Gradients -->

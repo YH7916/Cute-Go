@@ -120,13 +120,16 @@ export class MicroBoard {
 
         // Check captures
         const deadGroups: number[][] = [];
+        const deadStoneIndices = new Set<number>();
+        
         for (const n of neighbors) {
             if (!this.isValid(n.x, n.y)) continue;
             const nIdx = this.idx(n.x, n.y);
-            if (this.board[nIdx] === opponent) {
+            if (this.board[nIdx] === opponent && !deadStoneIndices.has(nIdx)) {
                 const group = this.getGroup(n.x, n.y);
                 if (group && group.liberties.length === 0) {
                     deadGroups.push(group.stones);
+                    group.stones.forEach(sIdx => deadStoneIndices.add(sIdx));
                 }
             }
         }

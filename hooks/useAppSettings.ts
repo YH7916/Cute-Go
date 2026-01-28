@@ -34,6 +34,9 @@ export const useAppSettings = () => {
   const [boardSkin, setBoardSkin] = useState<string>(() => loadState('boardSkin', 'wood'));
   const [stoneSkin, setStoneSkin] = useState<string>(() => loadState('stoneSkin', 'classic'));
 
+  // Start Screen Preference
+  const [skipStartScreen, setSkipStartScreen] = useState<boolean>(() => loadState('skipStartScreen', false));
+
   // 监听状态变化并自动保存
   useEffect(() => {
     localStorage.setItem('boardSize', JSON.stringify(boardSize));
@@ -51,9 +54,11 @@ export const useAppSettings = () => {
     
     localStorage.setItem('boardSkin', JSON.stringify(boardSkin));
     localStorage.setItem('stoneSkin', JSON.stringify(stoneSkin));
+    
+    localStorage.setItem('skipStartScreen', JSON.stringify(skipStartScreen));
   }, [boardSize, gameType, gameMode, difficulty, maxVisits, userColor, 
       showQi, showWinRate, showCoordinates, musicVolume, hapticEnabled,
-      boardSkin, stoneSkin]); // Added deps
+      boardSkin, stoneSkin, skipStartScreen]); // Added deps
 
   return {
     boardSize, setBoardSize,
@@ -68,6 +73,7 @@ export const useAppSettings = () => {
     musicVolume, setMusicVolume,
     hapticEnabled, setHapticEnabled,
     boardSkin, setBoardSkin,
-    stoneSkin, setStoneSkin
+    stoneSkin, setStoneSkin,
+    skipStartScreen, setSkipStartScreen
   };
 };

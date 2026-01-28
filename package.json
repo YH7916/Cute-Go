@@ -63,6 +63,7 @@
   "dependencies": {
     "@capacitor/android": "^8.0.1",
     "@capacitor/app": "^8.0.0",
+    "@capacitor/haptics": "^8.0.0",
     "@sabaki/immutable-gametree": "^1.9.4",
     "@sabaki/sgf": "^3.4.7",
     "@supabase/supabase-js": "^2.90.1",

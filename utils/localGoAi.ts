@@ -98,15 +98,15 @@ export class LocalGoAI {
                 const multiplier = stone === aiColor ? 1 : -1;
                 
                 // 1. Material (Stone Count)
-                score += 10 * multiplier;
+                score += 20 * multiplier;
 
                 // 2. Liberties (Crucial for Go)
                 const liberties = board.getLiberties(x, y);
-                score += liberties * 2 * multiplier;
+                score += liberties * 4 * multiplier;
 
                 // 3. Position Weights
-                if (this.isCorner(x, y)) score += 5 * multiplier;
-                else if (this.isEdge(x, y)) score += 2 * multiplier;
+                if (this.isCorner(x, y)) score += 10 * multiplier;
+                else if (this.isEdge(x, y)) score += 5 * multiplier;
             }
         }
 

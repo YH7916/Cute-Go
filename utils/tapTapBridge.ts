@@ -330,3 +330,45 @@ export const tapOpenPrivacyContract = async () => {
     }
     return false;
 };
+
+/**
+ * TapTap Vibration - Short
+ * @param type 'heavy' | 'medium' | 'light'
+ */
+export const tapVibrateShort = (type: 'heavy' | 'medium' | 'light' = 'medium') => {
+    const tap = getTap();
+    if (tap && tap.vibrateShort) {
+        try {
+            console.log('[TapTapBridge] Triggering short vibration:', type);
+            tap.vibrateShort({
+                type,
+                success: () => console.log('[TapTapBridge] Short vibration success'),
+                fail: (err: any) => console.warn('[TapTapBridge] Short vibration failed:', err)
+            });
+            return true;
+        } catch (e) {
+            console.warn('[TapTapBridge] vibrateShort error:', e);
+        }
+    }
+    return false;
+};
+
+/**
+ * TapTap Vibration - Long
+ */
+export const tapVibrateLong = () => {
+    const tap = getTap();
+    if (tap && tap.vibrateLong) {
+        try {
+            console.log('[TapTapBridge] Triggering long vibration');
+            tap.vibrateLong({
+                success: () => console.log('[TapTapBridge] Long vibration success'),
+                fail: (err: any) => console.warn('[TapTapBridge] Long vibration failed:', err)
+            });
+            return true;
+        } catch (e) {
+            console.warn('[TapTapBridge] vibrateLong error:', e);
+        }
+    }
+    return false;
+};

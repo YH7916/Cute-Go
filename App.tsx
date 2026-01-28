@@ -78,7 +78,7 @@ const App: React.FC = () => {
     const [isThinking, setIsThinking] = useState(false); 
     const [useCloud, setUseCloud] = useState(true); // [New] Cloud AI Toggle
     const [toastMsg, setToastMsg] = useState<string | null>(null);
-    const [showStartScreen, setShowStartScreen] = useState(true);
+    const [showStartScreen, setShowStartScreen] = useState(!settings.skipStartScreen);
     const [showSkinShop, setShowSkinShop] = useState(false);
 
     // --- Tsumego State ---
@@ -1302,16 +1302,17 @@ const App: React.FC = () => {
         
       if (gameState.currentPlayer === aiColor) {
           if (aiTurnLock.current) return;
-          // [Fix] Correctly check if we should use the Neural Network (WebAI or Electron)
-          const aiConfig = getAIConfig(settings.difficulty);
-          // Now ALL ranks use Model for Go (except Gomoku)
-          const shouldUseHighLevelAI = settings.gameType === 'Go' && (aiConfig.useModel || isElectronAvailable); 
+          // [Fix] All Go games now use the high-level path (Worker or Electron) for robust Ko handling
+          // Only Gomoku stays in the local main-thread logic.
+          const shouldUseHighLevelAI = settings.gameType === 'Go'; 
     
           if (shouldUseHighLevelAI) {
+              const aiConfig = getAIConfig(settings.difficulty);
               if (!aiTurnLock.current) {
                   aiTurnLock.current = true; 
                   
-                  if (useCloud) {
+                  const isEasyMode = settings.difficulty === 'Easy';
+                  if (useCloud && !isEasyMode) {
                       // Cloud Mode - Optimized for Speed
                       // Use aiConfig simulations.
                       // [Fix] Reduce visits to lower difficulty as requested.
@@ -1955,7 +1956,7 @@ const App: React.FC = () => {
                     handleUndo={handleUndo}
                     handlePass={handlePass}
                     resetGame={(k) => resetGame(k)}
-                    isThinking={isThinking}
+                    isThinking={showThinkingStatus}
                     gameOver={gameState.gameOver}
                     onlineStatus={onlineStatus}
                     currentPlayer={gameState.currentPlayer}
@@ -2032,6 +2033,7 @@ const App: React.FC = () => {
                 musicVolume={settings.musicVolume} setMusicVolume={settings.setMusicVolume}
                 hapticEnabled={settings.hapticEnabled} setHapticEnabled={settings.setHapticEnabled}
                 vibrate={vibrate}
+                skipStartScreen={settings.skipStartScreen} setSkipStartScreen={settings.setSkipStartScreen}
                 onStartSetup={() => { resetGame(false); gameState.setAppMode('setup'); setShowMenu(false); }}
                 onOpenImport={() => { setShowImportModal(true); setShowMenu(false); }}
                 onOpenOnline={() => setShowOnlineMenu(true)}

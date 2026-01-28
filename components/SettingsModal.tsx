@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, RotateCcw, Palette, FileUp } from 'lucide-react';
+import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, RotateCcw, Palette, FileUp, Home } from 'lucide-react';
 import { BoardSize, GameType, GameMode, Player, ExtendedDifficulty } from '../types';
 import { getSliderBackground, getCalculatedVisits } from '../utils/helpers';
 import { sliderToVisits, visitsToSlider } from '../hooks/useKataGo';
@@ -34,6 +34,8 @@ interface SettingsModalProps {
     hapticEnabled: boolean;
     setHapticEnabled: (val: boolean) => void;
     vibrate: (pattern: number | number[]) => void;
+    skipStartScreen: boolean;
+    setSkipStartScreen: (val: boolean) => void;
 
     // Navigation
     onStartSetup: () => void;
@@ -58,6 +60,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     musicVolume, setMusicVolume,
     hapticEnabled, setHapticEnabled,
     vibrate,
+    skipStartScreen, setSkipStartScreen,
     onStartSetup,
     onOpenImport,
     onOpenOnline,
@@ -331,6 +334,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 <span className="text-xs font-bold">振动</span>
                             </button>
                         </div>
+
+                        {/* Skip Start Screen Toggle */}
+                        <button 
+                            onClick={() => setSkipStartScreen(!skipStartScreen)}
+                            className={`btn-retro w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition-all ${skipStartScreen ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38] hover:text-[#5c4033] hover:border-[#8c6b38]'}`}
+                        >
+                            <Home size={18} />
+                            <span className="text-sm">{skipStartScreen ? '开局直接进游戏 ✓' : '开局显示主页'}</span>
+                        </button>
                     </div>
 
 

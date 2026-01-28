@@ -183,15 +183,85 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
       };
   }, [isAudioUnlocked]);
 
-  // Vibrate Safer
+  // Vibrate with Multi-Platform Support
   const vibrate = useCallback((pattern: number | number[]) => {
       if (!hapticEnabled) return;
-      try {
-          if (navigator.vibrate) navigator.vibrate(pattern);
-      } catch (e) {
-          // Ignore vibration errors
+      
+      console.log('[Vibrate] Attempting vibration with pattern:', pattern);
+      
+      // 1. Try TapTap Minigame API (小游戏环境)
+      if (typeof window !== 'undefined' && (window as any).tap) {
+          const tap = (window as any).tap;
+          try {
+              // TapTap 小游戏振动 API
+              if (tap.vibrateShort) {
+                  console.log('[Vibrate] Using TapTap vibrateShort API');
+                  tap.vibrateShort({
+                      type: 'medium', // 'heavy' | 'medium' | 'light'
+                      success: () => console.log('[Vibrate] TapTap vibration success'),
+                      fail: (err: any) => console.warn('[Vibrate] TapTap vibration failed:', err)
+                  });
+                  return;
+              } else if (tap.vibrateLong) {
+                  console.log('[Vibrate] Using TapTap vibrateLong API');
+                  tap.vibrateLong({
+                      success: () => console.log('[Vibrate] TapTap vibration success'),
+                      fail: (err: any) => console.warn('[Vibrate] TapTap vibration failed:', err)
+                  });
+                  return;
+              }
+          } catch (e) {
+              console.warn('[Vibrate] TapTap vibration error:', e);
+          }
       }
+      
+      // 2. Try Capacitor Haptics (原生应用)
+      if (typeof window !== 'undefined' && (window as any).Capacitor) {
+          try {
+              const { Capacitor } = window as any;
+              // Check if running on native platform
+              if (Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+                  // Dynamically import Haptics plugin
+                  import('@capacitor/haptics').then(({ Haptics, ImpactStyle }) => {
+                      console.log('[Vibrate] Using Capacitor Haptics API');
+                      // Convert pattern to impact
+                      const duration = Array.isArray(pattern) ? pattern[0] : pattern;
+                      const style = duration > 50 ? ImpactStyle.Heavy : 
+                                   duration > 20 ? ImpactStyle.Medium : ImpactStyle.Light;
+                      
+                      Haptics.impact({ style })
+                          .then(() => console.log('[Vibrate] Capacitor vibration success'))
+                          .catch((err) => console.warn('[Vibrate] Capacitor vibration failed:', err));
+                  }).catch((err) => {
+                      console.warn('[Vibrate] Capacitor Haptics import failed:', err);
+                      // Fallback to Web API
+                      tryWebVibration(pattern);
+                  });
+                  return;
+              }
+          } catch (e) {
+              console.warn('[Vibrate] Capacitor check error:', e);
+          }
+      }
+      
+      // 3. Fallback to Web Vibration API (标准浏览器)
+      tryWebVibration(pattern);
   }, [hapticEnabled]);
+
+  // Helper function for Web Vibration API
+  const tryWebVibration = (pattern: number | number[]) => {
+      try {
+          if (navigator.vibrate) {
+              console.log('[Vibrate] Using Web Vibration API');
+              const success = navigator.vibrate(pattern);
+              console.log('[Vibrate] Web vibration result:', success);
+          } else {
+              console.warn('[Vibrate] No vibration API available');
+          }
+      } catch (e) {
+          console.warn('[Vibrate] Web vibration error:', e);
+      }
+  };
 
   return { playSfx, vibrate };
 };

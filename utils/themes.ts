@@ -1,5 +1,5 @@
 export type BoardThemeId = 'wood';
-export type StoneThemeId = 'classic';
+export type StoneThemeId = 'classic' | 'minimal';
 
 export interface BoardTheme {
   id: BoardThemeId;
@@ -45,5 +45,14 @@ export const STONE_THEMES: Record<StoneThemeId, StoneTheme> = {
     whiteColor: '#f0f0f0',
     blackBorder: '#000000',
     whiteBorder: '#dcdcdc'
+  },
+  minimal: {
+    id: 'minimal',
+    name: '兼容模式',
+    blackColor: '#2a2a2a',
+    whiteColor: '#f0f0f0',
+    blackBorder: '#000000',
+    whiteBorder: '#dcdcdc',
+    filter: 'none'
   }
 };

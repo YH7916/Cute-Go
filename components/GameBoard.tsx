@@ -692,53 +692,56 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       );
   };
 
-    const renderSolidBody = (color: Player) => {
+    const renderStoneBody = (color: Player) => {
         const theme = STONE_THEMES[stoneSkin as StoneThemeId] || STONE_THEMES['classic'];
         const baseColor = color === 'black' ? theme.blackColor : theme.whiteColor;
         const borderColor = color === 'black' ? theme.blackBorder : theme.whiteBorder;
         const isGomoku = gameType === 'Gomoku';
-        // Use theme filter if available, else default jelly
+        
+        // Unified filter id for the fused body
         const filterId = theme.filter ? undefined : (color === 'black' ? 'url(#jelly-black)' : 'url(#jelly-white)');
         const styleFilter = theme.filter ? { filter: theme.filter } : undefined;
-    
-        const orthoWidth = gameType === 'Gomoku' ? CELL_SIZE * 0.2 : CELL_SIZE * 0.95;
+
+        const orthoWidth = isGomoku ? CELL_SIZE * 0.2 : CELL_SIZE * 0.95;
 
         return (
-                <g filter={!theme.filter && !isGomoku ? filterId : undefined}>
-           {!isGomoku && (
-             <g>
-               {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => (
-                    <line 
-                        key={`${color}-body-ortho-${i}`}
-                        x1={GRID_PADDING + c.x1 * CELL_SIZE}
-                        y1={GRID_PADDING + c.y1 * CELL_SIZE}
-                        x2={GRID_PADDING + c.x2 * CELL_SIZE}
-                        y2={GRID_PADDING + c.y2 * CELL_SIZE}
-                        stroke={baseColor}
-                        strokeWidth={orthoWidth}
-                        strokeLinecap="round"
+            <g filter={!theme.filter && !isGomoku ? filterId : undefined}>
+                {/* 1. Direct Connections (Fused Body) */}
+                {!isGomoku && (
+                    <g>
+                        {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => (
+                            <line 
+                                key={`${color}-body-ortho-${i}`}
+                                x1={GRID_PADDING + c.x1 * CELL_SIZE}
+                                y1={GRID_PADDING + c.y1 * CELL_SIZE}
+                                x2={GRID_PADDING + c.x2 * CELL_SIZE}
+                                y2={GRID_PADDING + c.y2 * CELL_SIZE}
+                                stroke={baseColor}
+                                strokeWidth={orthoWidth}
+                                strokeLinecap="round"
+                                style={styleFilter}
+                            />
+                        ))}
+                    </g>
+                )}
+
+                {/* 2. Stone Bodies */}
+                {stones.filter(s => s.color === color).map(s => (
+                    <circle
+                        key={`${color}-body-${s.id}`}
+                        cx={GRID_PADDING + s.x * CELL_SIZE}
+                        cy={GRID_PADDING + s.y * CELL_SIZE}
+                        r={STONE_RADIUS}
+                        fill={baseColor}
+                        stroke={borderColor}
+                        strokeWidth={isGomoku ? 1 : 0} 
+                        className="stone-enter"
                         style={styleFilter}
                     />
-               ))}
-             </g>
-           )}
-                     {stones.filter(s => s.color === color).map(s => (
-                        <circle
-                            key={`${color}-body-base-${s.id}`}
-                            cx={GRID_PADDING + s.x * CELL_SIZE}
-                            cy={GRID_PADDING + s.y * CELL_SIZE}
-                            r={STONE_RADIUS}
-                            fill={baseColor}
-                            stroke={borderColor}
-                            strokeWidth={isGomoku ? 1 : 0.5}
-                            filter={isGomoku ? filterId : undefined}
-                            className="stone-enter"
-                            style={styleFilter}
-                        />
-                    ))}
-        </g>
-    );
-  };
+                ))}
+            </g>
+        );
+    };
 
     const renderLooseSilk = (color: Player) => {
         const theme = STONE_THEMES[stoneSkin as StoneThemeId] || STONE_THEMES['classic'];
@@ -750,52 +753,44 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         const opacity = isGomoku ? 0.4 : 0.65;
     
         return (
-                <g opacity={opacity} filter={filterId}>
-                     <g className={groupClass}>
-                         {connections.filter(c => c.color === color && c.type === 'loose').map((c, i) => {
-                  const x1 = GRID_PADDING + c.x1 * CELL_SIZE;
-                  const y1 = GRID_PADDING + c.y1 * CELL_SIZE;
-                  const x2 = GRID_PADDING + c.x2 * CELL_SIZE;
-                  const y2 = GRID_PADDING + c.y2 * CELL_SIZE;
+            <g opacity={opacity} filter={filterId}>
+                <g className={groupClass}>
+                    {connections.filter(c => c.color === color && c.type === 'loose').map((c, i) => {
+                        const x1 = GRID_PADDING + c.x1 * CELL_SIZE;
+                        const y1 = GRID_PADDING + c.y1 * CELL_SIZE;
+                        const x2 = GRID_PADDING + c.x2 * CELL_SIZE;
+                        const y2 = GRID_PADDING + c.y2 * CELL_SIZE;
 
-                  if (!isGomoku) {
-                      return (
-                          <line 
-                              key={`${color}-loose-${i}`}
-                              x1={x1}
-                              y1={y1}
-                              x2={x2}
-                              y2={y2}
-                              stroke={baseColor}
-                              strokeWidth={CELL_SIZE * 0.12}
-                              strokeLinecap="round"
-                          />
-                      );
-                  }
+                        const strokeWidth = isGomoku ? CELL_SIZE * 0.1 : CELL_SIZE * 0.12;
 
-                  const dx = x2 - x1;
-                  const dy = y2 - y1;
-                  const len = Math.hypot(dx, dy) || 1;
-                  const ux = dx / len;
-                  const uy = dy / len;
+                        if (isGomoku) {
+                            const dx = x2 - x1;
+                            const dy = y2 - y1;
+                            const len = Math.hypot(dx, dy) || 1;
+                            const ux = dx / len;
+                            const uy = dy / len;
+                            return (
+                                <line 
+                                    key={`${color}-loose-${i}`}
+                                    x1={x1 + ux * trim} y1={y1 + uy * trim}
+                                    x2={x2 - ux * trim} y2={y2 - uy * trim}
+                                    stroke={baseColor} strokeWidth={strokeWidth} strokeLinecap="round"
+                                />
+                            );
+                        }
 
-                  return (
-                      <line 
-                          key={`${color}-loose-${i}`}
-                          x1={x1 + ux * trim}
-                          y1={y1 + uy * trim}
-                          x2={x2 - ux * trim}
-                          y2={y2 - uy * trim}
-                          stroke={baseColor}
-                          strokeWidth={CELL_SIZE * 0.1}
-                          strokeLinecap="round"
-                      />
-                  );
-             })}
-           </g>
-        </g>
-    );
-  };
+                        return (
+                            <line 
+                                key={`${color}-loose-${i}`}
+                                x1={x1} y1={y1} x2={x2} y2={y2}
+                                stroke={baseColor} strokeWidth={strokeWidth} strokeLinecap="round"
+                            />
+                        );
+                    })}
+                </g>
+            </g>
+        );
+    };
 
   return (
     <div 
@@ -942,8 +937,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             {renderLooseSilk('black')}
             {renderLooseSilk('white')}
 
-            {renderSolidBody('black')}
-            {renderSolidBody('white')}
+            {renderStoneBody('black')}
+            {renderStoneBody('white')}
 
             <g>
             {groupFaces.map(face => (
