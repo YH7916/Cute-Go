@@ -232,6 +232,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                               move: null, 
                               winRate: result.rootInfo.winrate,
                               lead: result.rootInfo.lead,
+                              scoreStdev: result.rootInfo.scoreStdev,
                               ownership: result.rootInfo.ownership
                           } 
                       });
@@ -242,6 +243,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                               move: { x: best.x, y: best.y }, 
                               winRate: result.rootInfo.winrate,
                               lead: result.rootInfo.lead,
+                              scoreStdev: result.rootInfo.scoreStdev,
                               ownership: result.rootInfo.ownership
                           } 
                       });

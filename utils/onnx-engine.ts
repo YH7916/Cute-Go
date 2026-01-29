@@ -356,17 +356,16 @@ export class OnnxEngine {
             // Parse outputs
             const moveInfos = this.extractMoves(finalPolicy, size, board, color, options.temperature ?? 0);
             
-            // [Territory-based Calculation]
-            // --- Post Processing ---
-            let winrate = 50;
-            let lead = 0;
+            // [KataGo Internal Analysis]
+            // 2. Extract Winrate and Lead directly from model output!
+            // value: [log_win, log_loss, log_no_result]
+            // misc: [score_mean, score_stdev, lead, ...]
+            let winrate = this.processWinrate(value);
+            let lead = misc[0]; // Score Mean
+            const scoreStdev = misc[1] || 0;
 
-            if (finalOwnership) {
-                 // 2. Calculate Score Lead (Relative to Current Player)
-                 // Using the Absolute Ownership map
-                 lead = this.calculateTerritoryScore(finalOwnership, komi, size, color); 
-                 winrate = this.deriveWinRateFromScore(lead);
-            }
+            // Note: We still keep finalOwnership for territory visualization but no longer derive stats from it.
+            // This is "Winrate Direct Integration" as requested.
 
 
 
@@ -393,7 +392,7 @@ export class OnnxEngine {
                 rootInfo: {
                     winrate: winrate,
                     lead: lead,
-                    scoreStdev: 0,
+                    scoreStdev: scoreStdev,
                     ownership: finalOwnership // Return Normalized Absolute Data
                 },
                 moves: resultMoves

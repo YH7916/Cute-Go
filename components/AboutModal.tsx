@@ -139,7 +139,37 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 
                 <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
 
-                
+                {/* Donation */}
+                <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086] relative">
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                         <div className="h-px bg-[#e3c086]/50 flex-1"></div>
+                         <span className="text-xs font-bold text-[#8c6b38]">点击图标复制 ID</span>
+                         <div className="h-px bg-[#e3c086]/50 flex-1"></div>
+                    </div>
+                    
+                    <div className="flex justify-around px-2">
+                         <button onClick={() => copySocial('1245921330', 'B站')} className="flex flex-col items-center gap-2 group">
+                             <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#23ade5] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
+                                 <img src="./bili.jpg" alt="Bili" className="w-full h-full object-cover" />
+                             </div>
+                             <span className="text-[10px] font-bold text-[#5c4033]">Bilibili</span>
+                         </button>
+
+                         <button onClick={() => copySocial('7848618811', '小红书')} className="flex flex-col items-center gap-2 group">
+                             <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#ff2442] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
+                                 <img src="./rednote.jpg" alt="RedNote" className="w-full h-full object-cover" />
+                             </div>
+                             <span className="text-[10px] font-bold text-[#5c4033]">小红书</span>
+                         </button>
+
+                         <button onClick={() => copySocial('47891107161', '抖音')} className="flex flex-col items-center gap-2 group">
+                             <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#1c1c1c] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
+                                  <img src="./douyin.jpg" alt="Douyin" className="w-full h-full object-cover" />
+                             </div>
+                             <span className="text-[10px] font-bold text-[#5c4033]">抖音</span>
+                         </button>
+                    </div>
+                </div>
 
             </div>
           </div>

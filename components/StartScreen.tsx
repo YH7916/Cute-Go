@@ -54,7 +54,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
         <div className="max-w-4xl w-full flex flex-col items-center gap-6 my-auto">
             
             {/* Main Game Modes (Responsive Grid) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full lg:w-4/5">
+            <div className="grid grid-cols-1 gap-3 w-full lg:w-4/5">
             
             <button 
                 onClick={() => onStartGame('PvP')}
@@ -76,7 +76,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                 <span className="text-lg font-black tracking-wide">联机对战</span>
             </button>
 
-            <button 
+{/* <button 
                 onClick={() => onStartGame('PvAI', 'cloud')}
                 className="btn-retro bg-[#92cdf7] border-[#63b3ed] text-[#1e40af] hover:bg-[#7bc0f5] hover:border-[#4299e1] h-16 rounded-xl flex flex-row items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
             >
@@ -84,7 +84,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                     <Cloud size={20} strokeWidth={2.5} />
                 </div>
                 <span className="text-lg font-black tracking-wide">云端 AI（试运行至1.29）</span>
-            </button>
+            </button> */}
 
             <button 
                 onClick={() => onStartGame('PvAI', 'local')}
@@ -93,7 +93,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                 <div className="p-2 rounded-full bg-[#5c4033]/10 text-[#5c4033] group-hover:scale-110 transition-transform shrink-0">
                     <Cpu size={20} strokeWidth={2.5} />
                 </div>
-                <span className="text-lg font-black tracking-wide">本地 AI</span>
+                <span className="text-lg font-black tracking-wide">AI对战</span>
             </button>
 
             </div>

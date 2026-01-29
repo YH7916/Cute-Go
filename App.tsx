@@ -79,7 +79,7 @@ const App: React.FC = () => {
     const [showTutorial, setShowTutorial] = useState(false); 
     const [showTsumegoList, setShowTsumegoList] = useState(false); // [New] Tsumego Modal
     const [isThinking, setIsThinking] = useState(false); 
-    const [useCloud, setUseCloud] = useState(true); // [New] Cloud AI Toggle
+    const [useCloud, setUseCloud] = useState(false); // [New] Cloud AI Toggle (Changed default to Local)
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
     // --- [New] Tsumego Refactor States ---
@@ -634,6 +634,7 @@ const App: React.FC = () => {
         } else if (!isElectronAvailable) {
             webAiEngine.resetAI(); // [Fix] Clear WebAI state
         }
+        cloudAiEngine.resetAI();
 
         if (keepOnline && shouldBroadcast && onlineStatusRef.current === 'connected' && dataChannelRef.current?.readyState === 'open') {
             dataChannelRef.current.send(JSON.stringify({ type: 'RESTART' }));
@@ -1541,6 +1542,13 @@ const App: React.FC = () => {
         
       if (gameState.currentPlayer === aiColor) {
           if (aiTurnLock.current) return;
+          
+          // [New Fix] Wait for AI to be ready if in Go mode
+          // This prevents "AI requested but not ready" errors and missed moves on startup
+          if (settings.gameType === 'Go' && !useCloud) {
+              if (isElectronAvailable && electronAiEngine.isInitializing) return;
+              if (!isElectronAvailable && !webAiEngine.isWorkerReady) return;
+          }
           // [Fix] All Go games now use the high-level path (Worker or Electron) for robust Ko handling
           // Only Gomoku stays in the local main-thread logic.
           const shouldUseHighLevelAI = settings.gameType === 'Go'; 
@@ -1646,7 +1654,7 @@ const App: React.FC = () => {
             // User turn, ensure lock is free
             if (gameState.currentPlayer === settings.userColor) aiTurnLock.current = false;
         }
-    }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable, isPageVisible, useCloud, requestCloudAiMove]);
+    }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable, isPageVisible, useCloud, requestCloudAiMove, webAiEngine.isWorkerReady, electronAiEngine.isInitializing, showStartScreen]);
 
 
 
@@ -2111,8 +2119,8 @@ const App: React.FC = () => {
                     blackCaptures={gameState.blackCaptures}
                     whiteCaptures={gameState.whiteCaptures}
                     gameType={settings.gameType}
-                    isThinking={isThinking}
-                    showWinRate={settings.showWinRate && (settings.gameMode !== 'PvAI' || settings.gameType === 'Gomoku' || settings.difficulty === 'Easy')}
+                    isThinking={showThinkingStatus}
+                    showWinRate={settings.showWinRate && (settings.gameMode !== 'PvAI' || settings.gameType === 'Go' || settings.difficulty === 'Easy')}
                     appMode={gameState.appMode}
                     gameOver={gameState.gameOver}
                     userColor={settings.userColor}
@@ -2123,7 +2131,7 @@ const App: React.FC = () => {
                     <AnalysisPanel 
                         winRate={displayWinRate}
                         lead={displayLead}
-                        isThinking={isThinking}
+                        isThinking={showThinkingStatus}
                         showTerritory={showTerritory}
                         onToggleTerritory={() => setShowTerritory(prev => !prev)}
                         userColor={settings.userColor}

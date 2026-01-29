@@ -18,6 +18,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
     const [initStatus, setInitStatus] = useState<string>('');
     const [aiWinRate, setAiWinRate] = useState(50);
     const [aiLead, setAiLead] = useState<number | null>(null);
+    const [aiScoreStdev, setAiScoreStdev] = useState<number | null>(null);
     const [aiTerritory, setAiTerritory] = useState<Float32Array | null>(null);
     
     const workerRef = useRef<Worker | null>(null);
@@ -132,9 +133,10 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
                     if (!expectingResponseRef.current) return;
                     if (timeoutRef.current) clearTimeout(timeoutRef.current);
                     
-                    const { move, winRate, lead, ownership } = msg.data;
+                    const { move, winRate, lead, scoreStdev, ownership } = msg.data;
                     setAiWinRate(winRate);
                     setAiLead(lead ?? null);
+                    setAiScoreStdev(scoreStdev ?? null);
                     if (ownership) setAiTerritory(new Float32Array(ownership));
                     setIsThinking(false);
                     expectingResponseRef.current = false;
@@ -316,7 +318,12 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
     const resetAI = useCallback(() => {
         setAiWinRate(50);
         setAiLead(null);
+        setAiScoreStdev(null);
         setAiTerritory(null);
+        setIsThinking(false);
+        setIsLoading(false);
+        setInitStatus('');
+        expectingResponseRef.current = false;
     }, []);
 
     // Page Visibility (Battery Save)
@@ -342,6 +349,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
         initStatus,    
         aiWinRate,
         aiLead,
+        aiScoreStdev,
         aiTerritory,
         requestWebAiMove,
         stopThinking,
