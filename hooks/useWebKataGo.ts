@@ -57,7 +57,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
             baseUrl = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
         }
 
-        const modelUrl = new URL('models/kata1-b18c384nbt-s9996604416-d4316597426.uint8.onnx', baseUrl).href;
+        const modelUrl = new URL('models/kata1_b6.onnx', baseUrl).href;
         const wasmUrl = new URL('wasm/', baseUrl).href;
 
         // --- 2. Worker config ---
@@ -75,13 +75,22 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
             workerRef.current = worker;
 
             // Watchdog for Init
+            const watchdogTime = options.needModel ? 60000 : 15000; // 15s for Rule Engine, 60s for Full AI
             const initWatchdog = setTimeout(() => {
-                if (initializingRef.current && !isWorkerReady) {
-                    console.warn("[WebAI] Worker Init Timeout!");
-                    setInitStatus("AI 启动超时 (网络/设备过慢)");
+                if (initializingRef.current && !isWorkerReadyRef.current) {
+                    console.warn(`[WebAI] Worker Init Timeout! (after ${watchdogTime}ms)`);
+                    setInitStatus(options.needModel ? "AI 启动超时 (网络/设备过慢)" : "规则引擎启动超时");
                     setIsInitializing(false);
+                    setIsLoading(false);
+                    initializingRef.current = false; // [Fix] Unlock
+                    
+                    // Terminate the stuck worker if it's really dead
+                    if (workerRef.current) {
+                         workerRef.current.terminate();
+                         workerRef.current = null;
+                    }
                 }
-            }, 60000); // 60s watchdog (Mobile can be slow)
+            }, watchdogTime);
 
             worker.onerror = (err) => {
                 console.error("Worker Error:", err);
@@ -164,18 +173,12 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
 
             // Send Init
             isThinWorkerRef.current = !options.needModel;
-            const modelParts = [
-                modelUrl + '.part1',
-                modelUrl + '.part2',
-                modelUrl + '.part3',
-                modelUrl + '.part4'
-            ];
 
             worker.postMessage({ 
                 type: 'init',
                 payload: { 
                     modelPath: modelUrl,
-                    modelParts: modelParts,
+                    // modelParts removed
                     wasmPath: wasmUrl,
                     numThreads: numThreads,
                     onlyRules: isThinWorkerRef.current
@@ -244,7 +247,9 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
             if (!isInitializing && !workerRef.current) {
                  console.log("[WebAI] Auto-initializing for request...");
                  pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature };
-                 const needModel = difficulty !== 'Easy';
+                 // [Fix] AI mode always needs model for analysis. 
+                 // Tsumego hints also need model for search.
+                 const needModel = true; 
                  initializeAI({ needModel });
             } else if (isInitializing) {
                  // Just Queue
@@ -254,7 +259,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
         }
 
         // [Upgrade] If worker is ready but only in 'Thin' mode and we now need a model
-        const needFullModel = difficulty !== 'Easy';
+        const needFullModel = true; 
         if (isWorkerReadyRef.current && needFullModel && isThinWorkerRef.current && !isLoading) {
              console.log("[WebAI] Upgrading from Thin to Full Mode (Model Required for Difficulty)...");
              pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature };

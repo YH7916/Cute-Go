@@ -1,0 +1,6 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[11]CA[gb2312]HA[0]AB[cj][di][dh][eh][fh][eg][gj][hj]AW[bj][ci][bh][cg][dg][de][ef][fg][gg][gh][ih][ji][ij]
+
+(;B[fj]C[1并，要点。正解];W[ck];B[ek]C[3尖，好手];W[dj];B[ej]C[活棋])
+(;B[fj];W[hk]C[变化：白2扳];B[ck]C[3立，活棋])
+(;B[ej]C[黑1虎，第一感。错着！];W[fi]C[2扳，好];B[gi];W[ck];B[fj];W[hk]C[6扳，好];B[dk];W[dj]C[8提，劫，不如正解])
+(;B[ek]C[错误：黑1下在一路，更不行];W[fj]C[白2靠，好];B[fk];W[fi];B[gi];W[hi]C[黑净死]))

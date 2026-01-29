@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[11]CA[gb2312]HA[0]AB[dh][ci][cj][ei][gi][gj][hj]AW[bj][bi][ch][cg][ce][ef][fh][gh][hi][ii][ij]
+
+(;B[ck]C[正解图：1立，好];W[hk];B[ek];W[dj];B[gk];W[fj];B[fi];W[ej];B[di]C[双活])
+(;B[fi]C[失败图];W[dj]C[2好];B[ck];W[ej];B[di];W[hk];B[gk];W[ek]C[8好，黑死])
+(;B[ek]C[失败图2：黑1容易想到];W[ck]C[2扳，好。黑死]))

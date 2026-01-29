@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[13]CA[gb2312]HA[0]AB[ck][cl][cm][dj][ej][fj][gj][fk][hk]AW[bm][bl][bk][bj][ci][ei][fi][gi][hi][hj][jj][jl][il][gl][ek][dl][dm]C[变化图]
+
+(;B[fm]C[正解];W[fl];B[dk];W[hl];B[el])
+(;B[fm];W[fl];B[dk];W[el]C[4接，错着];B[hl];W[hm];B[gm]C[接不归，白损失更大])
+(;B[fl]C[错误图：1挡，容易想到];W[fm];B[em];W[el];B[dk];W[gm];B[em];W[el];B[dl];W[dm]C[劫，不是正解]))

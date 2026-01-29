@@ -1,0 +1,4 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[11]CA[gb2312]HA[0]AB[dj][ej][ei][fh][gh][gi][gj][hj]AW[dk][cj][di][dh][eh][fg][gg][hh][hi][ij][ji]
+
+(;B[ci]C[黑1断，好。正解];W[bi];B[ch]C[3多弃一子，好];W[cg];B[bj]C[5打，好];W[bh];B[bk]C[7妙];W[aj];B[hk];W[fk];B[fj]C[白，接不归。黑，活！])
+(;B[hk]C[黑1，先立，次序错误];W[fk];B[ci];W[bi];B[ch];W[cg];B[bj];W[bh];B[bk];W[fj]C[10破眼，好];B[ck];W[ci]C[黑死]))

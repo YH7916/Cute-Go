@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[bh][bg][cf][df][ef][ff][gf][dh]AW[bf][be][ce][de][ee][fe][he][hf][hg][fg][eg][fh]C[参考图]
+
+(;W[dg]C[正解图];B[cg];W[di];B[ei];W[ci];B[eh];W[ag];B[ah];W[bi])
+(;W[dg]C[变化图];B[cg];W[di];B[ei];W[ci];B[bi];W[eh]C[卡眼，黑任死])
+(;W[dg];B[cg];W[ci]C[3点，错着];B[bi];W[di];B[eh];W[ei];B[ch]C[白接不归，失败]))

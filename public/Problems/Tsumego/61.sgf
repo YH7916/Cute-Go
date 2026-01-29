@@ -1,0 +1,6 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[bg][dg][dh][bf][ei]AW[be][cf][de][ef][eg][eh][gh]
+
+(;B[ah]C[Õı½âÍ¼£º1¼â£¬ºÃÊÖ];W[bi];B[af]C[ºÚ»î])
+(;B[af]C[Ê§°ÜÍ¼1];W[cg];B[ch];W[ah]C[4µã£¬ºÚËÀ])
+(;B[bi]C[Ê§°ÜÍ¼2:1Ìø£¬ËæÊÖ];W[cg];B[ch];W[ah]C[ºÚËÀ])
+(;B[cg]C[Ê§°ÜÍ¼3];W[af]C[2°â£¬ºÚËÀ]))

@@ -1,6 +1,6 @@
 import { OnnxEngine, type AnalysisResult } from '../utils/onnx-engine';
 import { MicroBoard, type Sign } from '../utils/micro-board';
-import { LocalGoAI } from '../utils/localGoAi';
+
 
 // Define message types
 type WorkerMessage = 
@@ -27,6 +27,15 @@ type WorkerMessage =
 
 let engine: OnnxEngine | null = null;
 let initPromise: Promise<void> | null = null;
+let initWatchdog: any = null;
+const WATCHDOG_TIMEOUT = 30000; // 30s safety net
+
+const clearWatchdog = () => {
+    if (initWatchdog) {
+        clearTimeout(initWatchdog);
+        initWatchdog = null;
+    }
+};
 
 const ctx: Worker = self as any;
 
@@ -54,10 +63,22 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             engine = null;
 
             if (onlyRules) {
-                console.log("[AI Worker] Initialization Complete (Rule-only Mode)");
-                ctx.postMessage({ type: 'init-complete' });
+                console.log("[AI Worker] Initialization Start (Rule-only Mode)");
+                // Minor delay to ensure message order
+                setTimeout(() => {
+                    console.log("[AI Worker] Initialization Complete (Rule-only Mode)");
+                    ctx.postMessage({ type: 'init-complete' });
+                }, 50);
                 return;
             }
+
+            console.log("[AI Worker] Initializing OnnxEngine...");
+            clearWatchdog();
+            initWatchdog = setTimeout(() => {
+                console.error("[AI Worker] Initialization Watchdog Triggered (Timeout)");
+                ctx.postMessage({ type: 'error', message: 'Worker 初始化超时 (30s)' });
+                initPromise = null;
+            }, WATCHDOG_TIMEOUT);
 
             engine = new OnnxEngine({
                 modelPath: modelPath,
@@ -74,7 +95,9 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             
             await initPromise;
             initPromise = null; // Unlock
+            clearWatchdog();
 
+            console.log("[AI Worker] Initialization Completed successfully.");
             ctx.postMessage({ type: 'init-complete' });
 
         } else if (msg.type === 'release') {
@@ -116,12 +139,19 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     debug: true
                 });
                 
+                clearWatchdog();
+                initWatchdog = setTimeout(() => {
+                    ctx.postMessage({ type: 'error', message: 'Worker 重新初始化超时' });
+                    initPromise = null;
+                }, WATCHDOG_TIMEOUT);
+
                 initPromise = engine.initialize((statusMsg) => {
                      // Be less verbose on re-init
                      if (statusMsg.includes('启动')) ctx.postMessage({ type: 'status', message: statusMsg });
                 });
                 await initPromise;
                 initPromise = null;
+                clearWatchdog();
             }
             // If engine exists and no promise, we assume it is ready.
             ctx.postMessage({ type: 'init-complete' });
@@ -129,11 +159,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         } else if (msg.type === 'compute') {
             const { board: boardState, history: gameHistory, color, size, komi, difficulty, temperature } = msg.data;
             
-            if (!engine && difficulty !== 'Easy') {
-                // [Fix] Auto-recover if engine is missing (Race Condition safety)
+            if (!engine) {
+                // [Fix] If engine is missing, we cannot analyze.
+                // We should check if we can auto-recover or if we should fail.
                 const config = (self as any).aiConfig;
-                if (config) {
-                     console.warn("[AI Worker] Engine missing for compute (Race Condition detected). Auto-recovering...");
+                if (config && !config.onlyRules) {
+                     console.warn("[AI Worker] Engine missing for compute. Attempting Auto-recovery...");
                      engine = new OnnxEngine({
                         modelPath: config.modelPath,
                         modelParts: config.modelParts,
@@ -143,7 +174,8 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     });
                     await engine.initialize();
                 } else {
-                    throw new Error('Engine not initialized');
+                    const mode = config?.onlyRules ? "Rule-only Mode" : "Engine NOT initialized";
+                    throw new Error(`AI Engine unavailable (${mode}). Cannot compute move.`);
                 }
             }
 
@@ -181,41 +213,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             }
             
             // 3. Run Analysis
-            let result: AnalysisResult;
-            if (difficulty === 'Easy') {
-                // LOCAL AI BRANCH (Alpha-Beta Search)
-                // Use static import to avoid worker build issues
-                const localAi = new LocalGoAI(size);
-                const move = localAi.getBestMove(board, pla);
-                
-                // Simulate a KataGo-like result for UI compatibility
-                const score = localAi['evaluate'](board, pla); // Peek at score for winrate simulation
-                const simulatedWinrate = 1 / (1 + Math.exp(-score / 200)); 
-                
-                result = {
-                    moves: move ? [{ 
-                        x: move.x, y: move.y, u: 0, prior: 1, winrate: simulatedWinrate, 
-                        scoreMean: score / 10, scoreStdev: 0, lead: score / 10, vists: 100 
-                    }] : [{ 
-                        x: -1, y: -1, u: 0, prior: 1, winrate: simulatedWinrate, 
-                        scoreMean: score / 10, scoreStdev: 0, lead: score / 10, vists: 100 
-                    }],
-                    rootInfo: {
-                        winrate: simulatedWinrate, 
-                        lead: score / 10,
-                        scoreStdev: 0,
-                        ownership: new Float32Array(size * size).fill(0)
-                    }
-                };
-            } else {
-                // KATAGO BRANCH
-                result = await engine.analyze(board, pla, {
+                const result = await engine.analyze(board, pla, {
                     history: historyMoves,
                     komi: komi ?? 7.5,
                     difficulty: difficulty,
                     temperature: temperature
                 });
-            }
 
             // 4. Send Response
             // Select best move

@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[bh][bf][cf][df][ef]AW[be][ce][de][ee][ff][fg][dh]
+
+(;B[eh]C[正解图];W[eg];B[dg]C[1,3跨断，常用手法];W[ch];B[ci]C[5好];W[fh];B[cg];W[ei];B[ag]C[黑活])
+(;B[eh]C[参考图];W[eg];B[dg];W[ch];B[ci];W[fh];B[cg];W[af]C[8打];B[di];W[ah];B[ag];W[bg];B[ai];W[bi];B[ag]C[成连环劫，黑活得更大])
+(;B[ch]C[失败图：1如果并];W[dg];B[cg];W[ag];B[af];W[ci]C[黑死]))

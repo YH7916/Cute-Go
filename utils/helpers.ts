@@ -34,28 +34,10 @@ export const calculateNewRating = (
 };
 
 export const getAiRating = (diff: ExtendedDifficulty): number => {
-    // Legacy support
     if (diff === 'Easy') return 800;
     if (diff === 'Medium') return 1200;
     if (diff === 'Hard') return 1800;
     if (diff === 'Custom') return 1800;
-
-    // Rank support
-    const kyuMatch = diff.match(/(\d+)k/);
-    if (kyuMatch) {
-        const k = parseInt(kyuMatch[1]);
-        // 18k -> 800, 1k -> 1250
-        // Linear: 450 range / 17 steps = 26 per step
-        return Math.round(1250 - (k - 1) * 26);
-    }
-    
-    const danMatch = diff.match(/(\d+)d/);
-    if (danMatch) {
-        const d = parseInt(danMatch[1]);
-        // 1d -> 1300, 9d -> 2100
-        // Linear: 800 range / 8 steps = 100 per step
-        return Math.round(1300 + (d - 1) * 100);
-    }
     
     return 1300; // Default
 };

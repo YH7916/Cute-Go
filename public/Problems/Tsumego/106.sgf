@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[bg][cf][dg][dh][eh]AW[bf][be][cd][de][df][eg][fh][gg]C[黑先劫活]
+
+(;B[ei]C[1立，唯一的要点];W[ci];B[bi];W[bh];B[ah];W[ai]C[成劫])
+(;B[bi]C[参考图：1跳，错着];W[ah];B[ag];W[ei];B[di];W[ch];B[cg];W[bh]C[黑死])
+(;B[bh]C[参考图2：黑1并，仍是坏棋];W[ag]C[2扳，好。黑死]))

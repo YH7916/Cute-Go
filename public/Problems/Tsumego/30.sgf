@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[bi][bh][cg][dg][ef][ff][fg][fh]AW[ah][bg][bf][cf][df][ee][fe][gf][hf][gh][hh]C[变化图]
+
+(;W[eh]C[正解图];B[di];W[fi];B[ei];W[dh];B[ch];W[ci];B[ei];W[di];B[eg];W[ei];B[gi];W[di])
+(;W[eh];B[fi];W[dh];B[ch];W[di]C[白仍死])
+(;W[dh]C[失败图];B[ch];W[eh];B[di];W[ei];B[fi]C[胀死牛，黑活]))

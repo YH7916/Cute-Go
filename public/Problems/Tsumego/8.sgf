@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[11]CA[gb2312]HA[0]AB[aj][bj][ci][di][fi][fj]AW[bi][bh][cg][dh][eh][fh][gi][gj][ij]
+
+(;W[dk]C[正解图：白1要点];B[ej]C[黑2只好曲];W[bk]C[3必然];B[cj];W[fk]C[5先扳，是次序];B[ek];W[ei];B[gk];W[ck]C[断头曲四，黑死])
+(;W[fk]C[参考：1先扳，错棋];B[dk]C[黑2占据好点];W[ei];B[ej]C[黑活])
+(;W[ck]C[1位点，也不行];B[bk]C[2团眼，好棋，黑已活]))

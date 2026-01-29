@@ -175,6 +175,8 @@ export class OnnxEngine {
                 (modelData as any) = null; 
 
                 console.log(`[OnnxEngine] Model loaded successfully (${preferredBackend})`);
+                console.log(`[OnnxEngine] Inputs: ${this.session.inputNames.join(', ')}`);
+                console.log(`[OnnxEngine] Outputs: ${this.session.outputNames.join(', ')}`);
             } catch (e) {
                 console.warn(`[OnnxEngine] ${preferredBackend} failed, falling back to WASM... Error: ${(e as Error).message}`);
                 
@@ -229,11 +231,13 @@ export class OnnxEngine {
         console.log(`[OnnxEngine] Starting analysis...`); // Reduced logging
 
         // 1. Prepare Input Tensors (NCHW)
-        // [Batch, Channels, Height, Width] -> [1, 22, 19, 19]
-        const binInputData = new Float32Array(22 * size * size);
+        // [Batch, Channels, Height, Width] -> Always use 19x19 for this fixed model
+        const modelBoardSize = 19;
+        const binInputData = new Float32Array(22 * modelBoardSize * modelBoardSize);
         const globalInputData = new Float32Array(19);
 
-        this.fillBinInput(board, color, komi, history, binInputData, size);
+        // Fill with padding if size < 19
+        this.fillBinInput(board, color, komi, history, binInputData, size, modelBoardSize);
         this.fillGlobalInput(history, komi, color, globalInputData);
 
         // Keep track of tensors to dispose
@@ -244,7 +248,7 @@ export class OnnxEngine {
         let results: ort.InferenceSession.OnnxValueMapType | null = null;
 
         try {
-            binInputTensor = new ort.Tensor('float32', binInputData, [1, 22, size, size]);
+            binInputTensor = new ort.Tensor('float32', binInputData, [1, 22, modelBoardSize, modelBoardSize]);
             globalInputTensor = new ort.Tensor('float32', globalInputData, [1, 19]);
             
             tensorsToDispose.push(binInputTensor);
@@ -252,60 +256,119 @@ export class OnnxEngine {
 
             // 2. Run Inference
             const feeds: Record<string, ort.Tensor> = {};
-            feeds['bin_input'] = binInputTensor;
-            feeds['global_input'] = globalInputTensor;
+            feeds['input_binary'] = binInputTensor;
+            feeds['input_global'] = globalInputTensor;
 
             results = await this.session.run(feeds);
             if (!isMobile) console.timeEnd('[OnnxEngine] Inference');
 
             // Process Results
-            const policy = results.policy ? results.policy.data as Float32Array : null;
-            const value = results.value ? results.value.data as Float32Array : null;
-            const misc = results.miscvalue ? results.miscvalue.data as Float32Array : null;
-            // [New] Ownership (Territory)
-            const ownership = results.ownership ? results.ownership.data as Float32Array : null;
+            // Map ONNX output names from the model (b6)
+            const policyTensor = results['output_policy'];
+            const valueTensor = results['output_value'];
+            const miscTensor = results['output_miscvalue'];
+            const ownershipTensor = results['output_ownership'];
 
-            if (!policy || !value || !misc) {
-                throw new Error('Model output missing policy, value, or miscvalue');
+            const policyData = policyTensor ? policyTensor.data as Float32Array : null;
+            const value = valueTensor ? valueTensor.data as Float32Array : null;
+            const misc = miscTensor ? miscTensor.data as Float32Array : null;
+            const ownershipRaw = ownershipTensor ? ownershipTensor.data as Float32Array : null;
+            
+            if (!policyData || !value || !misc) {
+                throw new Error('Model output missing required tensors');
             }
 
-            // Handle multi-channel policy (e.g. [1, 6, 82])
-            // We only need the first channel (Move Probabilities)
-            const numMoves = size * size + 1;
-            let finalPolicy = policy;
+            // [Masking Fix] Map 19x19 Policy/Ownership back to Actual Board Size
+            // Model (19x19) -> Pass is at 361.
+            // Actual (Size) -> Pass is at Size*Size.
+            const modelPassIndex = modelBoardSize * modelBoardSize;
+            const actualPassIndex = board.size * board.size;
             
-            if (results.policy.dims && results.policy.dims.length > 2 && results.policy.dims[1] > 1) {
-                 // Assuming format [Batch, Channels, Moves]
-                 // Take the first channel
-                 finalPolicy = policy.subarray(0, numMoves);
+            // 1. Remap Policy
+            // Create policy for actual size + 1 (Pass)
+            const finalPolicy = new Float32Array(actualPassIndex + 1);
+            
+            // Helper to get index
+            const getModelIdx = (x: number, y: number) => y * modelBoardSize + x;
+            const getActualIdx = (x: number, y: number) => y * board.size + x;
+
+            // Copy valid spots
+            for (let y = 0; y < board.size; y++) {
+                for (let x = 0; x < board.size; x++) {
+                    const mIdx = getModelIdx(x, y);
+                    const aIdx = getActualIdx(x, y);
+                    finalPolicy[aIdx] = policyData[mIdx];
+                }
+            }
+            // Copy Pass
+            finalPolicy[actualPassIndex] = policyData[modelPassIndex];
+
+
+            // [DEBUG] Find Global Max in Raw Policy
+            let maxRaw = -Infinity;
+            let maxRawIdx = -1;
+            for(let i=0; i<361; i++) {
+                if (policyData[i] > maxRaw) {
+                    maxRaw = policyData[i];
+                    maxRawIdx = i;
+                }
+            }
+            const rX = maxRawIdx % 19;
+            const rY = Math.floor(maxRawIdx / 19);
+            console.log(`[OnnxEngine] RAW BEST MOVE: (${rX}, ${rY}) Val=${maxRaw}`);
+            if (rX >= board.size || rY >= board.size) {
+                 // Common when mapping 9x9 -> 19x19 model with padding
+                 if (this.config.debug) console.log("[OnnxEngine] AI predicted move outside board (likely padding artifact). Ignored.");
+            }
+
+            // [DEBUG] Check if we have valid policy data for small board
+            let nonzero = 0;
+            let sum = 0;
+            for(let i=0; i<finalPolicy.length; i++) {
+                if (finalPolicy[i] > -1000) nonzero++; // Check for non-masked values (log space, so small negative or positive)
+                // Actually ONNX policy is usually logits, so they can be negative. 
+                // But usually we check if they are not ridiculously low if softmaxed? 
+                // Wait, output_policy is logits or probs? 
+                // KataGo usually outputs logits.
+                // Let's just count.
+            }
+            console.log(`[OnnxEngine] 9x9 Mapping Debug: PassIndex=${actualPassIndex} (Model=${modelPassIndex}).`);
+            console.log(`[OnnxEngine] FinalPolicy (Size ${finalPolicy.length}): First few=${finalPolicy.slice(0,5).join(',')}`);
+            console.log(`[OnnxEngine] ModelPolicy (Size ${policyData.length}): First few=${policyData.slice(0,5).join(',')}`);
+
+
+            // 2. Remap Ownership (if exists) -> NCHW or NHW? Usually [1, 1, 19, 19] or [19*19]
+            let finalOwnership: Float32Array | null = null;
+            if (ownershipRaw) {
+                 finalOwnership = new Float32Array(board.size * board.size);
+                 for (let y = 0; y < board.size; y++) {
+                    for (let x = 0; x < board.size; x++) {
+                        const mIdx = getModelIdx(x, y);
+                        const aIdx = getActualIdx(x, y);
+                        // Flip color if needed (Relative -> Absolute)
+                        // If Color=Black(1), Raw is Absolute. If Color=White(-1), Raw is Inverted.
+                        const rawVal = ownershipRaw[mIdx];
+                        finalOwnership[aIdx] = (color === 1) ? rawVal : -rawVal;
+                    }
+                }
             }
 
             // Parse outputs
-                        const moveInfos = this.extractMoves(finalPolicy, size, board, color, options.temperature ?? 0);
+            const moveInfos = this.extractMoves(finalPolicy, size, board, color, options.temperature ?? 0);
             
             // [Territory-based Calculation]
             // --- Post Processing ---
             let winrate = 50;
             let lead = 0;
-            let finalOwnership: Float32Array | null = null;
 
-            if (ownership) {
-                // 1. Normalize Model Output to Absolute (+1=Black, -1=White)
-                // Note: Current model B18 output is Relative (Pla-dependent).
-                // If Pla = Black: Output is Absolute.
-                // If Pla = White: Output is Relative (Inverted). Need to flip to get Absolute.
-                finalOwnership = new Float32Array(ownership.length);
-                if (color === 1) { 
-                    finalOwnership.set(ownership);
-                } else { 
-                    for(let i=0; i<ownership.length; i++) finalOwnership[i] = -ownership[i];
-                }
-
-                // 2. Calculate Score Lead (Relative to Current Player)
-                // Using the Absolute Ownership map
-                lead = this.calculateTerritoryScore(finalOwnership, komi, size, color); 
-                winrate = this.deriveWinRateFromScore(lead);
+            if (finalOwnership) {
+                 // 2. Calculate Score Lead (Relative to Current Player)
+                 // Using the Absolute Ownership map
+                 lead = this.calculateTerritoryScore(finalOwnership, komi, size, color); 
+                 winrate = this.deriveWinRateFromScore(lead);
             }
+
+
 
             // Fallback if ownership missing? (Rare)
             // lead/winrate initialized to 0/50 above.
@@ -365,24 +428,48 @@ export class OnnxEngine {
         komi: number,
         history: { color: Sign; x: number; y: number }[],
         data: Float32Array,
-        size: number
+        actualSize: number,
+        modelSize: number
     ) {
         const opp: Sign = pla === 1 ? -1 : 1;
         
-        // Reference Implementation (Kaya) Layout:
-        // 0: Ones
-        // 1: Pla
-        // 2: Opp
-        
-        // Helper to set NCHW: Channel, Y, X
+        // Helper to set NCHW: Channel, Y, X in the Model's coordinate system (19x19)
         const set = (c: number, y: number, x: number, val: number) => {
-             data[c * size * size + y * size + x] = val;
+             data[c * modelSize * modelSize + y * modelSize + x] = val;
         };
 
-        for (let y = 0; y < size; y++) {
-            for (let x = 0; x < size; x++) {
-                // Feature 0: Ones (Restored)
-                set(0, y, x, 1.0);
+        // [Fix] MOAT STRATEGY (2-Pixel Gap).
+        // Strict Masking (all 0s) kills the Global Pooling signal -> AI Passes.
+        // Full Padding (all 1s) hides the edge -> AI plays 4-4 (thinks it's 19x19).
+        // Solution: A 2-pixel wide "Moat" of 0s to define the edge, followed by 1s.
+        // This gives the ConvNet a clear "End of Board" signal while keeping ample "Ones"
+        // in the far background to satisfy global activation thresholds.
+        for (let y = 0; y < modelSize; y++) {
+            for (let x = 0; x < modelSize; x++) {
+                 // Check if on actual board
+                 if (x < actualSize && y < actualSize) {
+                     set(0, y, x, 1.0);
+                     continue;
+                 }
+
+                 // Calculate distance from board edge
+                 const dx = x < actualSize ? 0 : x - actualSize + 1;
+                 const dy = y < actualSize ? 0 : y - actualSize + 1;
+                 const dist = Math.max(dx, dy);
+
+                 // Moat Width 2: Indices size and size+1 are 0.0. Further is 1.0.
+                 if (dist <= 2) {
+                     set(0, y, x, 0.0);
+                 } else {
+                     set(0, y, x, 1.0); 
+                 }
+            }
+        }
+
+        // Only iterate over the ACTUAL board area for stones/libs
+        for (let y = 0; y < actualSize; y++) {
+            for (let x = 0; x < actualSize; x++) {
+                // Feature 0: Ones (Already set above)
 
                 const c = board.get(x, y);
                 // Model expects [Ones, Pla, Opp]
@@ -411,7 +498,7 @@ export class OnnxEngine {
         const setHistory = (turnsAgo: number, channel: number) => {
             if (len >= turnsAgo) {
                 const h = history[len - turnsAgo];
-                if (h.x >= 0 && h.x < size && h.y >= 0 && h.y < size) {
+                if (h.x >= 0 && h.x < actualSize && h.y >= 0 && h.y < actualSize) {
                      set(channel, h.y, h.x, 1.0);
                 }
             }
@@ -554,6 +641,8 @@ export class OnnxEngine {
                              vists: 0,
                              u: 0, scoreMean: 0, scoreStdev: 0, lead: 0
                           });
+                     } else {
+                         // console.log(`[Debug] Illegal move skipped: ${x},${y} (Prob: ${p})`);
                      }
                  }
             }

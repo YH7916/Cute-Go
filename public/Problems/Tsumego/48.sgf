@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[13]CA[gb2312]HA[0]AB[bk][cj][dj][ek]AW[bj][bi][ci][di][ej][fj][gj][hk][jk]
+
+(;B[bl]C[正解图：1并，好手];W[el];B[dl];W[dk];B[ck];W[fl];B[dm]C[7立，好，曲四活棋])
+(;B[fl]C[失败图1：];W[bl]C[2夹，好];B[cl];W[ak];B[ck];W[dl];B[dm]C[劫])
+(;B[cl]C[失败图2：黑1虎，第一感，随手];W[dk];B[dl];W[el];B[ck];W[fl]C[黑死]))

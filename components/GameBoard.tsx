@@ -694,53 +694,150 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
     const renderStoneBody = (color: Player) => {
         const theme = STONE_THEMES[stoneSkin as StoneThemeId] || STONE_THEMES['classic'];
-        const baseColor = color === 'black' ? theme.blackColor : theme.whiteColor;
-        const borderColor = color === 'black' ? theme.blackBorder : theme.whiteBorder;
+        const isMinimal = theme.id === 'minimal';
         const isGomoku = gameType === 'Gomoku';
-        
-        // Unified filter id for the fused body
-        const filterId = theme.filter ? undefined : (color === 'black' ? 'url(#jelly-black)' : 'url(#jelly-white)');
-        const styleFilter = theme.filter ? { filter: theme.filter } : undefined;
 
-        const orthoWidth = isGomoku ? CELL_SIZE * 0.2 : CELL_SIZE * 0.95;
+        // Helper to render the actual shapes (Lines + Circles + Fillers)
+        // We pass color/width override to allow drawing "Shadow/Highlight" layers
+        // [Refactor] Add opacity support for layered rendering
+        const renderShapes = (drawColor: string, isMainLayer: boolean, opacity: number = 1.0) => {
+            // [Fix] Ortho connection width should match stone diameter (2 * 0.45 = 0.9)
+            // previously 0.95 caused "bulge", and mismatch caused gaps with borders.
+            const orthoWidth = isGomoku ? CELL_SIZE * 0.2 : CELL_SIZE * 0.9;
+            
+            // Unified filter for standard themes
+            const filterId = (!isMinimal && !isGomoku) 
+                ? (theme.filter ? undefined : (color === 'black' ? 'url(#jelly-black)' : 'url(#jelly-white)'))
+                : undefined;
+            
+            const styleFilter = theme.filter ? { filter: theme.filter } : undefined;
+            const borderColor = color === 'black' ? theme.blackBorder : theme.whiteBorder;
+            const strokeW = isGomoku ? 1 : 0;
 
-        return (
-            <g filter={!theme.filter && !isGomoku ? filterId : undefined}>
-                {/* 1. Direct Connections (Fused Body) */}
-                {!isGomoku && (
-                    <g>
-                        {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => (
-                            <line 
-                                key={`${color}-body-ortho-${i}`}
-                                x1={GRID_PADDING + c.x1 * CELL_SIZE}
-                                y1={GRID_PADDING + c.y1 * CELL_SIZE}
-                                x2={GRID_PADDING + c.x2 * CELL_SIZE}
-                                y2={GRID_PADDING + c.y2 * CELL_SIZE}
-                                stroke={baseColor}
-                                strokeWidth={orthoWidth}
-                                strokeLinecap="round"
-                                style={styleFilter}
-                            />
-                        ))}
+            // [Fix] For minimal theme, main body should NOT have a stroke to allow fusion
+            // The edge definition comes from the shadow/highlight layers
+            const effectiveStroke = (isMinimal && isMainLayer) ? 'none' : (isMainLayer ? borderColor : 'none');
+            const effectiveStrokeWidth = (isMinimal && isMainLayer) ? 0 : (isMainLayer ? strokeW : 0);
+
+            // [Refine] Detect 2x2 quads to fill the center hole
+            // This ensures 2x2 blocks look like a solid chunk without a tiny hole in the middle
+            // Only necessary for Minimal theme (Compatibility mode) where we do fusion
+            const fillers = [];
+            if (isMinimal && !isGomoku) {
+                 const myStones = new Set(stones.filter(s => s.color === color).map(s => `${s.x},${s.y}`));
+                 // Naive scan is fast enough for 19x19
+                 for (let x = 0; x < boardSize - 1; x++) {
+                     for (let y = 0; y < boardSize - 1; y++) {
+                         if (
+                             myStones.has(`${x},${y}`) &&
+                             myStones.has(`${x+1},${y}`) &&
+                             myStones.has(`${x},${y+1}`) &&
+                             myStones.has(`${x+1},${y+1}`)
+                         ) {
+                             fillers.push({ x, y });
+                         }
+                     }
+                 }
+            }
+
+            return (
+                <g filter={filterId} style={styleFilter} opacity={opacity}>
+                     {/* 1. Direct Connections (Fused Body) */}
+                     {!isGomoku && (
+                        <g>
+                            {connections.filter(c => c.color === color && c.type === 'ortho').map((c, i) => (
+                                <line 
+                                    key={`${color}-ortho-${i}-${drawColor}`}
+                                    x1={GRID_PADDING + c.x1 * CELL_SIZE}
+                                    y1={GRID_PADDING + c.y1 * CELL_SIZE}
+                                    x2={GRID_PADDING + c.x2 * CELL_SIZE}
+                                    y2={GRID_PADDING + c.y2 * CELL_SIZE}
+                                    stroke={drawColor}
+                                    strokeWidth={orthoWidth}
+                                    strokeLinecap="round"
+                                />
+                            ))}
+                        </g>
+                    )}
+
+                    {/* 2. Filler Quads (Close the gap in 2x2 blocks) */}
+                    {fillers.map((f, i) => (
+                         <rect
+                            key={`${color}-filler-${i}-${drawColor}`}
+                            x={GRID_PADDING + (f.x + 0.5) * CELL_SIZE - CELL_SIZE * 0.15}
+                            y={GRID_PADDING + (f.y + 0.5) * CELL_SIZE - CELL_SIZE * 0.15}
+                            width={CELL_SIZE * 0.3}
+                            height={CELL_SIZE * 0.3}
+                            fill={drawColor}
+                         />
+                    ))}
+
+                    {/* 3. Stone Bodies */}
+                    {stones.filter(s => s.color === color).map(s => (
+                        <circle
+                            key={`${color}-stone-${s.id}-${drawColor}`}
+                            cx={GRID_PADDING + s.x * CELL_SIZE}
+                            cy={GRID_PADDING + s.y * CELL_SIZE}
+                            r={STONE_RADIUS}
+                            fill={drawColor}
+                            // Only draw stroke on the MAIN layer
+                            stroke={effectiveStroke}
+                            strokeWidth={effectiveStrokeWidth} 
+                            className="stone-enter"
+                        />
+                    ))}
+                </g>
+            );
+        };
+
+        if (isMinimal) {
+            // [Fix] Refined Skeuomorphic Bevel for Compatibility Mode
+            // 4 Layers for "Ceramic/Jade" feel without SVG filters
+            // Using small, fixed offsets creates a tighter, more precise 3D look
+            const mainColor = color === 'black' ? theme.blackColor : theme.whiteColor;
+            
+            // Tone-on-Tone Shadow/Highlight colors
+            // Black: Dark Grey highlight, Pure Black shadow
+            // White: Pure White highlight, Grey shadow
+            const highlightColor = color === 'black' ? '#505050' : '#ffffff'; 
+            const bodyShadowColor = color === 'black' ? '#000000' : '#999999';
+            const dropShadowColor = '#000000'; 
+            
+            // Sub-pixel offsets for "Exquisite" look
+            const off1 = 1.0; // Rim Highlight (Sharp)
+            const off2 = 0.8; // Body Shadow (Soft)
+            const off3 = 1.5; // Drop Shadow (Depth)
+
+            return (
+                <g>
+                    {/* Layer 1: Drop Shadow (Soft depth on board) */}
+                    <g transform={`translate(${off3}, ${off3})`}>
+                        {renderShapes(dropShadowColor, false, 0.2)}
                     </g>
-                )}
+                    
+                    {/* Layer 2: Body Shadow (Volume on bottom-right) */}
+                    <g transform={`translate(${off2}, ${off2})`}>
+                        {renderShapes(bodyShadowColor, false, 0.5)} 
+                    </g>
 
-                {/* 2. Stone Bodies */}
-                {stones.filter(s => s.color === color).map(s => (
-                    <circle
-                        key={`${color}-body-${s.id}`}
-                        cx={GRID_PADDING + s.x * CELL_SIZE}
-                        cy={GRID_PADDING + s.y * CELL_SIZE}
-                        r={STONE_RADIUS}
-                        fill={baseColor}
-                        stroke={borderColor}
-                        strokeWidth={isGomoku ? 1 : 0} 
-                        className="stone-enter"
-                        style={styleFilter}
-                    />
-                ))}
-            </g>
-        );
+                    {/* Layer 3: Main Body (Center) */}
+                     <g>
+                        {renderShapes(mainColor, true)}
+                    </g>
+
+                    {/* Layer 4: Specular Highlight (Rim light on top-left) */}
+                    {/* Rendered ON TOP of body to create "Inner Bevel" look */}
+                    <g transform={`translate(${-off1}, ${-off1})`} style={{ mixBlendMode: 'screen' }}>
+                         {/* Note: We use 'screen' blend mode if supported, or just opacity */}
+                        {renderShapes(highlightColor, false, 0.4)}
+                    </g>
+                </g>
+            );
+        } else {
+            // Standard Rendering
+            const baseColor = color === 'black' ? theme.blackColor : theme.whiteColor;
+            return renderShapes(baseColor, true);
+        }
     };
 
     const renderLooseSilk = (color: Player) => {
@@ -920,6 +1017,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     <stop offset="50%" stopColor="#e1f5fe" stopOpacity="1" />
                     <stop offset="100%" stopColor="#4fc3f7" stopOpacity="0.6" />
                 </linearGradient>
+
+                {/* [新增] 兼容模式(简约)的高光渐变 - 黑色棋子 (叠加层) */}
+                <radialGradient id="compat-black-gradient" cx="35%" cy="35%" r="60%">
+                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
+                    <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+                </radialGradient>
+
+                {/* [新增] 兼容模式(简约)的高光渐变 - 白色棋子 (叠加层) */}
+                <radialGradient id="compat-white-gradient" cx="70%" cy="70%" r="65%">
+                    <stop offset="0%" stopColor="#000000" stopOpacity="0.1" />
+                    <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+                </radialGradient>
             </defs>
             
             <g>{renderGridLines()}</g>

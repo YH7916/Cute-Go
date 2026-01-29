@@ -58,8 +58,9 @@ import { TsumegoListModal, TsumegoSet } from './components/TsumegoListModal';
 import TsumegoResultModal from './components/TsumegoResultModal';
 import { parseSGFToTree, SGFNode } from './utils/sgfParser';
 import { StartScreen } from './components/StartScreen';
-import { TsumegoLevelSelector } from './components/TsumegoLevelSelector';
-import { TSUMEGO_DATA, TsumegoLevel, getTsumegoLevelById } from './utils/tsumegoData';
+import { TsumegoHub } from './components/Tsumego/TsumegoHub';
+import { TsumegoLevel, TsumegoCategory, fetchProblemManifest, fetchProblemSGF, getLevelsFromCategory } from './utils/tsumegoData';
+
 import { SkinShopModal } from './components/SkinShopModal';
 import { BOARD_THEMES, BoardThemeId } from './utils/themes';
 
@@ -102,6 +103,15 @@ const App: React.FC = () => {
     const [tsumegoCollection, setTsumegoCollection] = useState<SGFNode[] | null>(null);
     const [tsumegoSetTitle, setTsumegoSetTitle] = useState<string>("");
     
+    const [tsumegoCategories, setTsumegoCategories] = useState<TsumegoCategory[]>([]); // [New]
+    
+    // Load Manifest
+    useEffect(() => {
+        fetchProblemManifest().then(data => {
+            setTsumegoCategories(data.filter(c => c.id === 'life_death'));
+        });
+    }, []);
+
     const [showTsumegoResult, setShowTsumegoResult] = useState(false);
     const [tsumegoIsCorrect, setTsumegoIsCorrect] = useState(false);
     const [tsumegoResultMsg, setTsumegoResultMsg] = useState("");
@@ -617,6 +627,7 @@ const App: React.FC = () => {
         gameState.setAppMode('playing');
         setEloDiffText(null);
         setEloDiffStyle(null);
+        setTsumegoCurrentNode(null); // [Fix] Clear tsumego state on reset
 
         if (isElectronAvailable && settings.gameType === 'Go') {
             electronAiEngine.resetAI(sizeToUse, 7.5);
@@ -685,8 +696,8 @@ const App: React.FC = () => {
                         console.log("[App] Mobile: Deferring AI Init to first move.");
                     }
                 } else if (!aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
-                     console.log("[App] Triggering Thin AI Init (Easy Mode)...");
-                     webAiEngine.initializeAI({ needModel: false });
+                     console.log("[App] Triggering AI Init (Thin config, but loading model for safety)...");
+                     webAiEngine.initializeAI({ needModel: true });
                 }
                     
                     // AI Move will be requested when init completes? 
@@ -719,7 +730,8 @@ const App: React.FC = () => {
             return;
         }
 
-        if (!isElectronAvailable && settings.gameMode === 'PvAI' && !useCloud && settings.gameType === 'Go') {
+        // [Fix] Auto-trigger Local AI for Easy mode even if Cloud is enabled (since Cloud Easy now redirects to Local)
+        if (!isElectronAvailable && settings.gameMode === 'PvAI' && (!useCloud || settings.difficulty === 'Easy') && settings.gameType === 'Go') {
              const aiConfig = getAIConfig(settings.difficulty);
              if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
                  const needModel = aiConfig.useModel;
@@ -745,6 +757,15 @@ const App: React.FC = () => {
         if (mode === 'PvAI') {
              if (aiType === 'cloud') {
                  setUseCloud(true);
+                 // [Fix] If Easy, we use Local AI, so we must init it.
+                 if (settings.difficulty === 'Easy' && !isElectronAvailable) {
+                      const aiConfigLocal = getAIConfig(settings.difficulty);
+                      if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                          const needModel = aiConfigLocal.useModel;
+                          console.log(`[handleStartGame] Initializing Local AI for Cloud-Easy override...`);
+                          webAiEngine.initializeAI({ needModel });
+                      }
+                 }
              } else {
                  setUseCloud(false);
                  // Auto Init Lazy AI if needed
@@ -855,27 +876,75 @@ const App: React.FC = () => {
         setTsumegoRoot(root); // Keep original root for reference
         setTsumegoCurrentNode(currentNode); // Set effective start node
 
+        // --- Helper: Parse Point or Range ---
+        const parseSGFPointOrRange = (val: string): {x: number, y: number}[] => {
+            if (val.length < 2) return [];
+            
+            // Handle compressed range "aa:cc"
+            if (val.includes(':')) {
+                const parts = val.split(':');
+                if (parts.length !== 2) return [];
+                
+                const p1 = parts[0];
+                const p2 = parts[1];
+                if (p1.length < 2 || p2.length < 2) return [];
+
+                const x1 = p1.charCodeAt(0) - 97;
+                const y1 = p1.charCodeAt(1) - 97;
+                const x2 = p2.charCodeAt(0) - 97;
+                const y2 = p2.charCodeAt(1) - 97;
+
+                const minX = Math.min(x1, x2);
+                const maxX = Math.max(x1, x2);
+                const minY = Math.min(y1, y2);
+                const maxY = Math.max(y1, y2);
+
+                const points = [];
+                for (let ix = minX; ix <= maxX; ix++) {
+                    for (let iy = minY; iy <= maxY; iy++) {
+                        points.push({x: ix, y: iy});
+                    }
+                }
+                return points;
+            } else {
+                // Single point
+                const x = val.charCodeAt(0) - 97;
+                const y = val.charCodeAt(1) - 97;
+                return [{x, y}];
+            }
+        };
+
         // --- Apply Stones ---
         const newBoard = createBoard(size as BoardSize);
         
         if (combinedProps['AB']) {
             combinedProps['AB'].forEach(val => {
-                if (val.length < 2) return;
-                const x = val.charCodeAt(0) - 97;
-                const y = val.charCodeAt(1) - 97;
-                if (x>=0 && x<size && y>=0 && y<size) {
-                    newBoard[y][x] = { color: 'black', x, y, id: `setup-b-${x}-${y}` };
-                }
+                const points = parseSGFPointOrRange(val);
+                points.forEach(p => {
+                    if (p.x >= 0 && p.x < size && p.y >= 0 && p.y < size) {
+                        newBoard[p.y][p.x] = { color: 'black', x: p.x, y: p.y, id: `setup-b-${p.x}-${p.y}` };
+                    }
+                });
             });
         }
         if (combinedProps['AW']) {
              combinedProps['AW'].forEach(val => {
-                if (val.length < 2) return;
-                const x = val.charCodeAt(0) - 97;
-                const y = val.charCodeAt(1) - 97;
-                if (x>=0 && x<size && y>=0 && y<size) {
-                    newBoard[y][x] = { color: 'white', x, y, id: `setup-w-${x}-${y}` };
-                }
+                const points = parseSGFPointOrRange(val);
+                points.forEach(p => {
+                    if (p.x >= 0 && p.x < size && p.y >= 0 && p.y < size) {
+                         newBoard[p.y][p.x] = { color: 'white', x: p.x, y: p.y, id: `setup-w-${p.x}-${p.y}` };
+                    }
+                });
+            });
+        }
+        if (combinedProps['AE']) {
+            combinedProps['AE'].forEach(val => {
+                const points = parseSGFPointOrRange(val);
+                points.forEach(p => {
+                    if (p.x >= 0 && p.x < size && p.y >= 0 && p.y < size) {
+                        newBoard[p.y][p.x] = null;
+                    }
+                });
             });
         }
         
@@ -887,6 +956,14 @@ const App: React.FC = () => {
         if (combinedProps['PL']) {
              const pl = combinedProps['PL'][0];
              firstPlayer = (pl.toLowerCase() === 'w' || pl === '2') ? 'white' : 'black';
+        } else if (currentNode.children.length > 0) {
+             // Auto-detect based on first move color
+             const firstChild = currentNode.children[0];
+             if (firstChild.properties['W'] && !firstChild.properties['B']) {
+                 firstPlayer = 'white';
+             } else if (firstChild.properties['B']) {
+                 firstPlayer = 'black';
+             }
         }
         
         gameState.setCurrentPlayer(firstPlayer);
@@ -905,24 +982,111 @@ const App: React.FC = () => {
         setShowTsumegoResult(false);
     };
 
-    const handleNextTsumego = () => {
+    const handleNextTsumego = async () => {
         if (!currentTsumegoLevel) return;
-        const chapter = TSUMEGO_DATA.find(c => c.id === currentTsumegoLevel.chapterId);
-        if (!chapter) return;
-        const currentIndex = chapter.levels.findIndex(l => l.id === currentTsumegoLevel.id);
-        if (currentIndex !== -1 && currentIndex < chapter.levels.length - 1) {
-            const nextLevel = chapter.levels[currentIndex + 1];
-            setCurrentTsumegoLevel(nextLevel);
-            setTsumegoLives(2);
-            const nodes = parseSGFToTree(nextLevel.sgf);
-            if (nodes && nodes.length > 0) {
-                startTsumego(nodes[0]);
+        const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
+        if (!cat) return;
+        
+        let fileList: string[] = [];
+        const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
+        
+        if (currentTsumegoLevel.groupName) {
+            const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
+            if (group && (group as any).files) {
+                 fileList = (group as any).files;
             }
+        } else {
+             fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
+        }
+
+        const cleanCurrent = currentFilename.startsWith(cat.dirName + '/') 
+            ? currentFilename.slice(cat.dirName.length + 1) 
+            : currentFilename;
+
+        const idx = fileList.indexOf(cleanCurrent);
+        
+        if (idx !== -1 && idx < fileList.length - 1) {
+             const nextFile = fileList[idx + 1];
+             const nextFull = `${cat.dirName}/${nextFile}`;
+             const nextLevel: TsumegoLevel = {
+                 id: `${cat.id}/${nextFile}`,
+                 title: `Problem ${idx + 2}`,
+                 category: cat.id,
+                 groupName: currentTsumegoLevel.groupName, // Preserve group
+                 filename: nextFull,
+                 difficulty: 1,
+             };
+             
+             try {
+                setToastMsg("加载下一关...");
+                const sgf = await fetchProblemSGF(nextLevel.filename);
+                setCurrentTsumegoLevel(nextLevel);
+                // setTsumegoLives(99); // Infinite lives
+                
+                const nodes = parseSGFToTree(sgf);
+                if (nodes && nodes.length > 0) startTsumego(nodes[0]);
+                setToastMsg(null);
+            } catch(e) {
+                setToastMsg("加载失败");
+            }
+        } else {
+             setToastMsg("本章已完成！");
         }
     };
 
     const handleRetryTsumego = () => {
         if (tsumegoRoot) startTsumego(tsumegoRoot);
+        // setShowTsumegoResult(false);
+    };
+
+    // --- Tsumego Status Helpers ---
+    const tsumegoKeywords = {
+        correct: ['正解', 'correct', 'right', 'success', 'succeed', '活', 'win', '手筋', '官子', '优'],
+        wrong: ['错', 'wrong', 'fail', 'failure', 'die', 'dead', '失败']
+    };
+
+    const hasSuccessDescendant = (node: SGFNode): boolean => {
+        const comment = node.properties['C'] ? node.properties['C'][0].toLowerCase() : '';
+        const isCorrect = tsumegoKeywords.correct.some(k => comment.includes(k));
+        const isWrong = tsumegoKeywords.wrong.some(k => comment.includes(k));
+        
+        if (isCorrect && !isWrong) return true;
+        if (isWrong) return false;
+        
+        // Recursive check
+        return node.children.some(child => hasSuccessDescendant(child));
+    };
+
+    const checkTsumegoStatus = (node: SGFNode | null) => {
+        if (!node) return;
+        
+        const comment = node.properties['C'] ? node.properties['C'][0] : '';
+        if (!comment) return;
+
+        // User Request: Filter out "参考图" as meaningless
+        if (comment.includes('参考图')) return;
+
+        const isCorrect = tsumegoKeywords.correct.some(k => comment.toLowerCase().includes(k));
+        const isWrong = tsumegoKeywords.wrong.some(k => comment.toLowerCase().includes(k));
+
+        if (isCorrect && !isWrong) {
+             if (node.children.length > 0) {
+                 // Has follow-up (opponent moves), so don't end yet.
+                 setToastMsg(`✅ ${comment} (继续落子...)`);
+             } else {
+                 setToastMsg(`✅ ${comment}`);
+                 setTimeout(() => {
+                     setTsumegoIsCorrect(true);
+                     setTsumegoResultMsg(comment);
+                     setShowTsumegoResult(true);
+                 }, 500);
+             }
+        } else if (isWrong) {
+             // User requested to remove red 'X' prompt
+             setToastMsg(`${comment}`);
+        } else {
+             setToastMsg(comment);
+        }
     };
 
     const handleTsumegoMove = (x: number, y: number) => {
@@ -931,40 +1095,60 @@ const App: React.FC = () => {
         const playerProp = gameState.currentPlayer === 'black' ? 'B' : 'W';
         const coordStr = String.fromCharCode(x + 97) + String.fromCharCode(y + 97);
         
-        // Find if any child matches user move
         const nextNode = tsumegoCurrentNode.children.find((child: SGFNode) => {
             const prop = child.properties[playerProp];
-            return prop && prop[0] === coordStr;
+            // [Robustness] Trim space, just in case 'B[aa ]'
+            return prop && prop[0].trim() === coordStr;
         });
 
         if (nextNode) {
-            // Correct move
             setTsumegoCurrentNode(nextNode);
             
-             if (nextNode.properties['C']) {
-                setToastMsg(nextNode.properties['C'][0]);
-                setTimeout(() => setToastMsg(null), 3000);
+            // User Move Status
+            checkTsumegoStatus(nextNode);
+
+            // Trigger Opponent Response
+            if (nextNode.children.length > 0 && !showTsumegoResult) {
+                 setTimeout(() => {
+                     // Check again if game ended
+                     
+                     const opponentNode = nextNode.children[0]; 
+                     const oppColor = gameState.currentPlayer === 'black' ? 'white' : 'black';
+                     const oppProp = oppColor === 'black' ? 'B' : 'W';
+                     
+                     if (opponentNode.properties[oppProp]) {
+                         const moveStr = opponentNode.properties[oppProp][0].trim();
+                         if (moveStr && moveStr.length >= 2) { // Allow 'tt'(pass) or 'aa'
+                             const ox = moveStr.charCodeAt(0) - 97;
+                             const oy = moveStr.charCodeAt(1) - 97;
+                             
+                             // Use REF to get latest board state!
+                             const currentBoard = gameState.boardRef.current;
+                             const attempt = attemptMove(currentBoard, ox, oy, oppColor);
+                             
+                             if (attempt) {
+                                  gameState.setBoard(attempt.newBoard);
+                                  gameState.setLastMove({x: ox, y: oy});
+                                  gameState.setCurrentPlayer(oppColor === 'black' ? 'white' : 'black');
+                                  
+                                  if (oppColor === 'black') gameState.setWhiteCaptures(c => c + attempt.captured);
+                                  else gameState.setBlackCaptures(c => c + attempt.captured);
+                                  
+                                  if (attempt.captured > 0) playSfx('capture');
+                                  else playSfx('place');
+                                  
+                                  setTsumegoCurrentNode(opponentNode);
+                                  checkTsumegoStatus(opponentNode);
+                             }
+                         }
+                     }
+                 }, 500);
             }
-            
             return true;
         } else {
-            // Incorrect Move
-            setTsumegoLives(prev => {
-                const newLives = prev - 1;
-                if (newLives <= 0) {
-                    setTsumegoResultMsg("体力耗尽，关卡重置 (Out of Lives)");
-                    setTsumegoIsCorrect(false);
-                    setShowTsumegoResult(true);
-                    playSfx('lose');
-                    vibrate([100, 50, 100]);
-                } else {
-                    setToastMsg("答案错误 (Incorrect)");
-                    setTimeout(() => setToastMsg(null), 1500);
-                    playSfx('lose'); // or 'failure'
-                    vibrate(50);
-                }
-                return Math.max(0, newLives);
-            });
+            console.log(`[Tsumego] Failed Move: ${coordStr} (${x},${y})`);
+            setToastMsg("答案错误 (再试一次)");
+            vibrate(50);
             return false;
         }
     };
@@ -1020,20 +1204,8 @@ const App: React.FC = () => {
                                return next;
                            });
 
-                           // Unlock next level in chapter
-                           const chapter = TSUMEGO_DATA.find(c => c.id === currentTsumegoLevel.chapterId);
-                           if (chapter) {
-                               const currentIndex = chapter.levels.findIndex(l => l.id === currentTsumegoLevel.id);
-                               if (currentIndex !== -1 && currentIndex < chapter.levels.length - 1) {
-                                   const nextLevelId = chapter.levels[currentIndex + 1].id;
-                                   setUnlockedLevelIds(prev => {
-                                       if (prev.includes(nextLevelId)) return prev;
-                                       const next = [...prev, nextLevelId];
-                                       localStorage.setItem('unlocked_tsumego_levels', JSON.stringify(next));
-                                       return next;
-                                   });
-                               }
-                           }
+                           // Unlock logic is now derived from completion history in LevelGrid
+                           // No need to manually update unlockedLevelIds
                       }
                       
                       vibrate(isSuccess ? 100 : 200);
@@ -1163,7 +1335,7 @@ const App: React.FC = () => {
             prevHash = getBoardHash(gameState.history[gameState.history.length - 1].board);
         }
         
-        if (settings.gameMode === 'Tsumego' && !isRemote) {
+        if (settings.gameMode === 'Tsumego' && !isRemote && tsumegoCurrentNode) {
              const isValid = handleTsumegoMove(x, y);
              if (!isValid) return; 
         }
@@ -1363,7 +1535,7 @@ const App: React.FC = () => {
 
     // --- AI Turn Trigger ---
     useEffect(() => {
-        if (!isPageVisible) return;
+        if (!isPageVisible || showStartScreen) return;
         if (gameState.appMode !== 'playing' || gameState.gameOver || showPassModal || settings.gameMode !== 'PvAI') return;
         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
         
@@ -1379,14 +1551,21 @@ const App: React.FC = () => {
                   aiTurnLock.current = true; 
                   
                   const isEasyMode = settings.difficulty === 'Easy';
+                  // [Fix] Redirect "Cloud Easy" to Local AI
+                  // If difficulty is Easy, we skip this block and fall through to Local Web/Electron AI
                   if (useCloud && !isEasyMode) {
                       // Cloud Mode - Optimized for Speed
                       // Use aiConfig simulations.
                       // [Fix] Reduce visits to lower difficulty as requested.
-                      // 8 visits is enough for a decent move but significantly weaker than 15.
                       let sims = aiConfig.simulations;
-                      sims = Math.max(8, Math.floor(sims * 1.2)); 
-                      if (sims > 100) sims = 100; // Cap at 100 for Hard to prevent server overload
+                      
+                      if (isEasyMode) {
+                          sims = 1; // Explicit 1 iteration for Easy + Cloud
+                      } else {
+                          // Medium/Hard
+                          sims = Math.max(8, Math.floor(sims * 1.2)); 
+                          if (sims > 100) sims = 100; // Cap at 100 for Hard
+                      }
                       
                       const komi = settings.boardSize === 9 ? 6.5 : 7.5;
                       requestCloudAiMove(
@@ -1400,10 +1579,8 @@ const App: React.FC = () => {
                   else if (isElectronAvailable) {
                       electronAiEngine.requestAiMove(aiColor, settings.difficulty, settings.maxVisits, getResignThreshold(settings.difficulty));
                   } else {
-                      // Web AI Request
-                      // Precise Rank Mode (18k-9d) Support 
-                      // 18k-6k: 1 sim + Temperature
-                      let sims = aiConfig.simulations;
+                       // Web AI Request
+                       let sims = aiConfig.simulations;
                       
                       // Safety Check for Mobile? (Already handled in aiConfig)
                       if (sims < 1) sims = 1;
@@ -1471,57 +1648,6 @@ const App: React.FC = () => {
         }
     }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable, isPageVisible, useCloud, requestCloudAiMove]);
 
-    /*
-    // --- Web AI Turn (Worker) - REDUNDANT / MERGED ABOVE ---
-    // Merged into the main AI Trigger effect to avoid race conditions and double-firing.
-    useEffect(() => {
-        if (gameState.appMode !== 'playing' || gameState.gameOver || showPassModal || settings.gameMode !== 'PvAI') return;
-        const aiColor = settings.userColor === 'black' ? 'white' : 'black';
-
-        if (gameState.currentPlayer === aiColor && !isElectronAvailable && isWorkerReady && !isThinking) {
-            if (aiTurnLock.current) return; // Prevent re-triggering
-
-            const aiConfig = getAIConfig(settings.difficulty);
-            
-            if (aiConfig.useModel) {
-                // High Rank: Use Web Worker
-                aiTurnLock.current = true;
-                setIsThinking(true);
-                // Determine Komi
-                const komi = settings.boardSize === 9 ? 6.5 : 7.5;
-                
-                // Cap simulations for Web performance & Weaken for lower levels
-                // b18 model with 1 sim is already strong (Dan level intuition).
-                // To support "Easy" on H5, we must limit calculation to minimum.
-                let sims = aiConfig.simulations;
-                
-                if (settings.difficulty === 'Easy' || settings.difficulty === 'Medium' || settings.difficulty === 'Hard') {
-                    // Fallback for old settings values
-                    sims = settings.difficulty === 'Easy' ? 1 : (settings.difficulty === 'Medium' ? 3 : 10);
-                } else {
-                    // Precise Rank Mode (18k-9d)
-                    // We now use the aggressive low values from aiConfig directly.
-                    // 5k=1 sim, 1d=5 sims, 9d=13 sims.
-                    // This ensures "Instant Play" feel on mobile.
-                    sims = aiConfig.simulations;
-                    if (sims < 1) sims = 1;
-                }
-
-                requestWebAiMove(
-                    gameState.boardRef.current, 
-                    gameState.currentPlayerRef.current, 
-                    gameState.historyRef.current,
-                    sims,
-                    komi,
-                    settings.difficulty 
-                );
-            } else {
-                // Low Rank: Logic handled by the "Computer Move" effect below
-                // (which calls getAIMove directly)
-            }
-        }
-    }, [gameState.currentPlayer, settings.gameMode, isElectronAvailable, isWorkerReady, isThinking, requestWebAiMove, settings.difficulty, showPassModal, gameState.appMode, settings.userColor, gameState.gameOver]);
-    */
 
 
     // --- Online Logic (Simplified & kept in App) ---
@@ -2032,42 +2158,136 @@ const App: React.FC = () => {
                     
                     // Tsumego Props
                     isTsumego={settings.gameMode === 'Tsumego'}
-                    hasPrevProblem={tsumegoCollection && tsumegoRoot && tsumegoCollection.indexOf(tsumegoRoot) > 0}
-                    hasNextProblem={tsumegoCollection && tsumegoRoot && tsumegoCollection.indexOf(tsumegoRoot) < tsumegoCollection.length - 1}
+                    hasPrevProblem={useMemo(() => {
+                        if (!currentTsumegoLevel) return false;
+                        const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
+                        if (!cat) return false;
+                        const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
+                        let fileList: string[] = [];
+                        if (currentTsumegoLevel.groupName) {
+                            const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
+                            if (group && (group as any).files) fileList = (group as any).files;
+                        } else {
+                            fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
+                        }
+                        const cleanCurrent = currentFilename.startsWith(cat.dirName + '/') 
+                            ? currentFilename.slice(cat.dirName.length + 1) 
+                            : currentFilename;
+                        const idx = fileList.indexOf(cleanCurrent);
+                        return idx > 0;
+                    }, [currentTsumegoLevel, tsumegoCategories])}
+                    
+                    hasNextProblem={useMemo(() => {
+                        if (!currentTsumegoLevel) return false;
+                        const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
+                        if (!cat) return false;
+                        const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
+                        let fileList: string[] = [];
+                        if (currentTsumegoLevel.groupName) {
+                            const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
+                            if (group && (group as any).files) fileList = (group as any).files;
+                        } else {
+                            fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
+                        }
+                        const cleanCurrent = currentFilename.startsWith(cat.dirName + '/') 
+                            ? currentFilename.slice(cat.dirName.length + 1) 
+                            : currentFilename;
+                        const idx = fileList.indexOf(cleanCurrent);
+                        return idx !== -1 && idx < fileList.length - 1;
+                    }, [currentTsumegoLevel, tsumegoCategories])}
+
                     handlePrevProblem={() => {
-                         if (!tsumegoCollection || !tsumegoRoot) return;
-                         const idx = tsumegoCollection.indexOf(tsumegoRoot);
-                         if (idx > 0) startTsumego(tsumegoCollection[idx - 1]);
+                        // Logic similar to Next but index - 1
+                        if (!currentTsumegoLevel) return;
+                        const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
+                        if (!cat) return;
+                        const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
+                        let fileList: string[] = [];
+                        if (currentTsumegoLevel.groupName) {
+                            const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
+                            if (group) fileList = (group as any).files;
+                        } else {
+                            fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
+                        }
+                        const cleanCurrent = currentFilename.startsWith(cat.dirName + '/') 
+                            ? currentFilename.slice(cat.dirName.length + 1) 
+                            : currentFilename;
+                        const idx = fileList.indexOf(cleanCurrent);
+                        
+                        if (idx > 0) {
+                             const prevFile = fileList[idx - 1];
+                             const prevFull = `${cat.dirName}/${prevFile}`;
+                             const prevLevel: TsumegoLevel = {
+                                 id: `${cat.id}/${prevFile}`,
+                                 title: `Problem ${idx}`, // idx + 1 - 1
+                                 category: cat.id,
+                                 groupName: currentTsumegoLevel.groupName, 
+                                 filename: prevFull,
+                                 difficulty: 1,
+                             };
+                             setToastMsg("加载上一关...");
+                             fetchProblemSGF(prevLevel.filename).then(sgf => {
+                                setCurrentTsumegoLevel(prevLevel);
+                                const nodes = parseSGFToTree(sgf);
+                                if (nodes && nodes.length > 0) startTsumego(nodes[0]);
+                                setToastMsg(null);
+                             }).catch(() => setToastMsg("加载失败"));
+                        }
                     }}
-                    handleNextProblem={() => {
-                         if (!tsumegoCollection || !tsumegoRoot) return;
-                         const idx = tsumegoCollection.indexOf(tsumegoRoot);
-                         if (idx < tsumegoCollection.length - 1) startTsumego(tsumegoCollection[idx + 1]);
-                    }}
+                    handleNextProblem={handleNextTsumego}
                     handleHint={() => {
                          if (!tsumegoCurrentNode) return;
-                         // Find the correct next move (Child node that has B or W property matching player color is NOT what we want if we want the SOLUTION)
-                         // Actually, in Tsumego SGFs, the 'correct' branch usually continues.
-                         // But often there are multiple branches. We need to find the one marked with 'Correct' or just the first one?
-                         // Usually the main branch or one with 'C' containing 'Correct'/'Right'.
-                         // Simple heuristic: Take the first child that represents a move for the current player.
-                         
+                         // Hint Logic
                          const playerProp = gameState.currentPlayer === 'black' ? 'B' : 'W';
+                         const playerColor = gameState.currentPlayer;
                          
-                         const correctChild = tsumegoCurrentNode.children.find(c => {
-                             // Check if it's a move for current player
-                             return c.properties[playerProp];
-                             // In a real robust solver we'd check if this path leads to 'success'
+                         // 1. First, look for immediate nodes marked "Correct"
+                         let hintChild = tsumegoCurrentNode.children.find(c => {
+                             const comment = c.properties['C'] ? c.properties['C'][0].toLowerCase() : '';
+                             return tsumegoKeywords.correct.some(k => comment.includes(k));
                          });
+                         
+                         // 2. [New] Recursive Search: Does any branch lead to success?
+                         if (!hintChild) {
+                             hintChild = tsumegoCurrentNode.children.find(c => hasSuccessDescendant(c));
+                         }
 
-                         if (correctChild && correctChild.properties[playerProp]) {
-                             const moveStr = correctChild.properties[playerProp][0];
+                         // Fallback Logic:
+                         if (!hintChild) {
+                             // Filter out known "Wrong" paths
+                             const candidates = tsumegoCurrentNode.children.filter(c => {
+                                 if (!c.properties[playerProp]) return false;
+                                 const comment = c.properties['C'] ? c.properties['C'][0].toLowerCase() : '';
+                                 const isWrong = tsumegoKeywords.wrong.some(k => comment.includes(k));
+                                 return !isWrong;
+                             });
+                             
+                             if (candidates.length > 0) {
+                                 hintChild = candidates[0];
+                             } else {
+                                 hintChild = tsumegoCurrentNode.children.find(c => c.properties[playerProp]);
+                             }
+                         }
+
+                         if (hintChild && hintChild.properties[playerProp]) {
+                             const moveStr = hintChild.properties[playerProp][0];
                              if (moveStr && moveStr.length >= 2) {
-                                  const x = moveStr.charCodeAt(0) - 97;
-                                  const y = moveStr.charCodeAt(1) - 97;
+                                  // Trim strictly to avoid issues
+                                  const trimmed = moveStr.trim();
+                                  const x = trimmed.charCodeAt(0) - 97;
+                                  const y = trimmed.charCodeAt(1) - 97;
                                   
-                                  // Directly execute move
-                                  executeMove(x, y, false);
+                                  // 1. Place Stone (Visual)
+                                  const attempt = attemptMove(gameState.boardRef.current, x, y, playerColor);
+                                  if (attempt) {
+                                      gameState.setBoard(attempt.newBoard);
+                                      gameState.setLastMove({x, y});
+                                      gameState.setCurrentPlayer(playerColor === 'black' ? 'white' : 'black');
+                                      playSfx('place');
+                                      
+                                      // 2. Trigger Tsumego Logic
+                                      handleTsumegoMove(x, y); 
+                                  }
                              }
                          } else {
                              setToastMsg("无更多提示 / 已是最后一步");
@@ -2299,19 +2519,6 @@ const App: React.FC = () => {
                vibrate={vibrate}
            />
 
-           {/* Web AI Loading Modal - Optimized UI */}
-            {/* Loading Modal (Shared for Electron & Web Lazy Load) */}
-            <OfflineLoadingModal 
-                isInitializing={isInitializing || isWebInitializing} 
-                isElectronAvailable={isElectronAvailable || isWebInitializing} // Force show if web init
-                isFirstRun={isFirstRun && isElectronAvailable} // Only show "First Run" hardware text for Local KataGo
-                onClose={() => {
-                     // For web, maybe allow closing? 
-                     // But initialization is heavy. Better wait.
-                }}
-                message={isWebInitializing ? webInitStatus : undefined}
-            />
-
             {/* Tsumego Result Modal */}
              <TsumegoResultModal 
                 isOpen={showTsumegoResult}
@@ -2322,34 +2529,59 @@ const App: React.FC = () => {
                 onClose={() => setShowTsumegoResult(false)}
                 hasNext={useMemo(() => {
                     if (!currentTsumegoLevel) return false;
-                    const chapter = TSUMEGO_DATA.find(c => c.id === currentTsumegoLevel.chapterId);
-                    if (!chapter) return false;
-                    const currentIndex = chapter.levels.findIndex(l => l.id === currentTsumegoLevel.id);
-                    return currentIndex !== -1 && currentIndex < chapter.levels.length - 1;
-                }, [currentTsumegoLevel])}
+                    const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
+                    if (!cat) return false;
+                    
+                    let fileList: string[] = [];
+                    const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
+                    
+                    if (currentTsumegoLevel.groupName) {
+                        const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
+                        if (group && (group as any).files) {
+                             fileList = (group as any).files;
+                        }
+                    } else {
+                         fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
+                    }
+
+                    const cleanCurrent = currentFilename.startsWith(cat.dirName + '/') 
+                        ? currentFilename.slice(cat.dirName.length + 1) 
+                        : currentFilename;
+
+                    const idx = fileList.indexOf(cleanCurrent);
+                    return idx !== -1 && idx < fileList.length - 1;
+                }, [currentTsumegoLevel, tsumegoCategories])}
              />
 
-            {/* Tsumego Level Selector */}
+            {/* Tsumego Hub (New) */}
             {showTsumegoLevelSelector && (
-                <TsumegoLevelSelector 
+                <TsumegoHub 
                     onClose={() => setShowTsumegoLevelSelector(false)}
-                    unlockedLevelIds={unlockedLevelIds}
                     completedLevelIds={completedLevelIds}
-                    onSelectLevel={(level) => {
-                        setCurrentTsumegoLevel(level);
-                        setShowTsumegoLevelSelector(false);
-                        setShowStartScreen(false); // [Fix] Hide start screen when level starts
-                        settings.setGameMode('Tsumego');
-                        
-                         // Setup level
-                        const nodes = parseSGFToTree(level.sgf);
-                        if (!nodes || nodes.length === 0) return;
-                        const root = nodes[0];
-                        
-                        setTsumegoLives(2);
-                        startTsumego(root); // Use the robust setup function
-                        
-                        vibrate(20);
+                    onSelectLevel={async (level) => {
+                        try {
+                            setToastMsg("正在加载...");
+                            const sgf = await fetchProblemSGF(level.filename);
+                            
+                            setCurrentTsumegoLevel(level);
+                            setShowTsumegoLevelSelector(false);
+                            setShowStartScreen(false);
+                            settings.setGameMode('Tsumego');
+                            
+                            const nodes = parseSGFToTree(sgf);
+                            if (!nodes || nodes.length === 0) throw new Error("Invalid SGF");
+                            const root = nodes[0];
+                            
+                            // setTsumegoLives(level.category === 'life_death' ? 2 : 99); // Remove lives
+                            startTsumego(root);
+                            
+                            vibrate(20);
+                            setToastMsg(null);
+                        } catch (e) {
+                            console.error(e);
+                            setToastMsg("加载失败");
+                            setTimeout(() => setToastMsg(null), 2000);
+                        }
                     }}
                 />
             )}

@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[11]CA[gb2312]HA[0]AB[bk][cj][ci][ch][dh][eh][fh][fi][fj]AW[bj][bi][bh][bg][cf][ef][gg][gh][gi][gj][ij]
+
+(;B[dj]C[正解：从有“扳”的一侧”曲“];W[ck];B[ei];W[ek];B[fk])
+(;B[dj];W[ei]C[变化图];B[ck];W[ek];B[fk];W[ej]C[双活])
+(;B[ej]C[失败图：从另一侧”曲“];W[fk]C[2扳，黑死]))

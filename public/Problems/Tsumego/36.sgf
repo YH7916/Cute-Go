@@ -1,0 +1,6 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[cg][dg][dh][bf][ce][de]AW[be][bd][cd][dd][ee][fe][eg][eh][gg]
+
+(;W[bh]C[1点，攻击要点];B[df];W[af];B[ag];W[bg];B[ae];W[ah]C[黑死])
+(;W[bh]C[变化图];B[ah]C[黑2托的变化];W[bg];B[ag];W[bi]C[5立，要点];B[di];W[df];B[cf];W[ch]C[刀五，聚杀])
+(;W[bh]C[变化2：];B[bg]C[黑2如果团];W[df];B[bi];W[ah]C[5立，要点];B[di];W[af];B[ag];W[ch]C[黑仍死])
+(;W[bh]C[变化3：];B[bi]C[黑2在下边托];W[ah]C[3立，好];B[af];W[di];B[ci];W[df]C[黑仍死]))

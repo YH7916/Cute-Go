@@ -1,0 +1,7 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[df][bf][cf][dg][dh]AW[be][ce][de][ef][eg][eh][hg][bc]C[此形为“小曲尺”，变化很多，结果为白先劫]
+
+(;W[bh]C[1点是要点];B[ah]C[2托，要点];W[ch];B[di];W[af];B[ag];W[ae];B[bg];W[ci];B[bi]C[成劫])
+(;W[bh]C[变化图];B[bg]C[2顶，错着];W[ch];B[di];W[ah]C[黑死])
+(;W[bh]C[变化图2：];B[ah];W[bg]C[3在这边顶];B[ag];W[di];B[ch];W[ci];B[bi]C[仍然成劫])
+(;W[bh]C[变化图3];B[ah];W[di]C[3扳];B[ch];W[ci];B[bi]C[仍然成劫])
+(;W[bh]C[变化图4];B[ah];W[di];B[ci]C[4打，错着];W[ch];B[ei];W[bg];B[ag];W[bi]C[刀把五，黑死]))

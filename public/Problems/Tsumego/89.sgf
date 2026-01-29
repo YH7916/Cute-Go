@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[cf][bf][ae][dg][dh][ei]AW[be][ce][de][bc][ef][eg][eh][gh]
+
+(;W[bh]C[正解];B[bg]C[2顶，好];W[ch];B[ah];W[bi];B[af];W[di];B[ci]C[黑，先手劫])
+(;W[bh]C[参考图];B[ah]C[2托];W[bg];B[bi]C[4扳，紧要];W[ag];B[ch];W[ai];B[af];W[ci];B[di];W[ad];B[cg];W[fi];B[bi]C[成劫])
+(;W[bh]C[参考图2];B[ah];W[bg];B[ag]C[4退，随手];W[bi]C[5立，黑死]))

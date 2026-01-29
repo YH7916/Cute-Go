@@ -1,0 +1,8 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[11]CA[gb2312]HA[0]AB[bi][bh][ci][ei][ej]AW[bg][cf][ch][dh][fh][fi][fj][ii]
+
+(;W[ek]C[正解：1扳，要点];B[dk]C[2打，只此一手];W[bk];B[di];W[fk];B[ah];W[dj];B[cj];W[ck];B[aj];W[dj]C[白先手劫])
+(;W[ek]C[参考图1];B[dj]C[2退];W[ah]C[3扳，好，黑死])
+(;W[ek]C[参考图2];B[ck]C[2跳，仍是错着];W[ah]C[3仍然扳，黑死])
+(;W[ek]C[参考图3];B[dk];W[bk];B[di];W[fk];B[ah];W[dj];B[cj];W[ck];B[dj]C[10粘，错着];W[aj]C[11盘角曲四，黑死])
+(;W[ek]C[参考图4];B[dk];W[dj]C[3断];B[di];W[ck];B[bk];W[bj];B[cj];W[ak]C[也是劫，但黑若胜，白损官子])
+(;W[ek]C[参考图5];B[dk];W[di]C[3冲];B[dj]C[4挡，黑净活]))

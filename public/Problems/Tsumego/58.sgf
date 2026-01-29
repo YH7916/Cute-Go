@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[13]CA[gb2312]HA[0]AB[dk][cl][dm][ek][fk][hl][il][jm]AW[bl][bk][ck][dj][ci][ej][gj][hk][ik][jk][jl][im]
+
+(;B[gk]C[正解图：准备弃掉两子，是唯一的思路];W[gl];B[hm];W[gm];B[fl];W[im];B[fm];W[km];B[el])
+(;B[gl]C[失败图：1退，一毛不拔];W[fm]C[2点，好];B[em];W[bm];B[fl];W[dl]C[黑死])
+(;B[gl]C[失败图2：];W[fm];B[bm]C[3若扳];W[el]C[4尖，好，成断头曲四，黑死]))

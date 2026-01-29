@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[bg][cg][dg][eg][fg]AW[bf][cf][df][ef][cc][gf][gg][gh]
+
+(;W[di]C[大飞，错误];B[ei];W[eh];B[fh];W[fi];B[ci];W[bi];B[dh];W[ch];B[ei]C[劫，白失败];W[gi];B[bh]C[11坏棋，12打，成连环劫，黑活])
+(;W[ei]C[正解图：小飞];B[di];W[fi];B[eh];W[ch];B[bh];W[ag];B[ah];W[bi])
+(;W[ei]C[变化图];B[di];W[fi];B[eh];W[ch];B[bi];W[ah];B[ag];W[bh]C[黑死]))

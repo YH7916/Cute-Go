@@ -1,0 +1,4 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[11]CA[gb2312]HA[0]AB[bi][ci][ei][ej][bh]AW[ah][bg][ch][cf][dh][eh][fi][fj][ii]C[黑先劫活]
+
+(;B[di]C[1粘，要点];W[bj];B[aj];W[cj];B[bk];W[ck];B[ek]C[7立，好，宽棋劫。此手如在“7”左一路大吃，则成紧气劫])
+(;B[bk]C[参考图：1跳，错着];W[aj];B[ai];W[di];B[dj];W[ek]C[黑死。如果黑多一口外气，则1跳是做活要点]))

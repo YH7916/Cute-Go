@@ -1,0 +1,5 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[11]CA[gb2312]HA[0]AB[bi][ci][di][dh][ej][fj]AW[fk][gj][fi][hi][ei][eg][bh][ch][cf]
+
+(;B[dg]C[正解图];W[df];B[cg];W[bg];B[ah];W[bf];B[dk]C[7虎，相当于猪嘴型多一个扳手，且松一口气];W[ai];B[bj]C[9退，好];W[gk];B[ck]C[黑活])
+(;B[dg]C[失败图1:1-8手和正解相同];W[df];B[cg];W[bg];B[ah];W[bf];B[dk];W[ai];B[aj]C[9提，错着];W[bk]C[10点，演变成大猪嘴。黑死])
+(;B[dk]C[失败图2:1直接虎，次序错误];W[ai];B[aj];W[bk];B[ah];W[bf]C[黑死]))

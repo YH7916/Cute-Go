@@ -1,0 +1,4 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[bg][ch][dg][eg][fg][gg]AW[cg][cf][ce][cc][ee][gf][hf][hg][hh]
+
+(;W[ei]C[1飞，错误];B[di];W[bi];B[fi];W[bh];B[eh];W[ci];B[dh];W[bf];B[gh]C[黑活，白失败])
+(;W[bi]C[正解图];B[bh];W[ei]C[1点，3飞，好次序];B[di];W[fi];B[bf];W[be];B[af];W[ah]C[黑死]))

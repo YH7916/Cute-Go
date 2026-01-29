@@ -1,0 +1,6 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[10]CA[gb2312]HA[0]AB[bi][ah][ch][dh][ei][fi][gi]AW[bh][bg][cg][dg][eh][fh][gh][hh][hi]
+
+(;W[ai]C[正解：1扑，要点];B[aj];W[ag]C[3打，重要];B[cj];W[ai];B[dj];W[ci];B[di];W[bj]C[缓气劫])
+(;W[ai]C[参考图];B[cj]C[2虎];W[ag];B[di];W[bj]C[同样是劫])
+(;W[ai]C[参考图2];B[aj];W[ag];B[gj]C[4立];W[ci];B[di];W[ai];B[cj];W[bj]C[仍是劫])
+(;W[ai]C[参考图3];B[aj];W[ag];B[ci]C[4接];W[dj]C[5点，当然];B[gj];W[ej];B[cj];W[ai]C[成劫]))

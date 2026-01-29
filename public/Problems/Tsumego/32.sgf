@@ -1,0 +1,7 @@
+(;GM[1]AP[StoneBase:SGFParser.3.0.1]SZ[9]CA[gb2312]HA[0]AB[ag][bg][cf][dg][dh][eh]AW[bf][be][cd][de][df][eg][fh][gg]
+
+(;W[ei]C[正解图];B[bi];W[ah];B[di];W[ch];B[cg];W[bh])
+(;W[ei]C[变化图];B[di];W[cg]C[黑死])
+(;W[ei]C[变化图2];B[bh];W[cg]C[3扑，好];B[di];W[ai]C[5点“一，一”，要点。黑死])
+(;W[bi]C[失败图];B[bh];W[ci];B[ai]C[黑活])
+(;W[bh]C[失败图2];B[bi]C[黑2反夹，好];W[ci];B[ah]C[劫，白失败]))

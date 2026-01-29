@@ -12,39 +12,29 @@ export function getAIConfig(difficulty: string): AIConfig {
     // Environment Check
     const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
     
-    // Easy (18k equivalent)
+    // Easy
     if (difficulty === 'Easy') {
         return {
-            useModel: false, // Use local Alpha-Beta algorithm, no model loading required
+            useModel: true, // Now using b6 model
             simulations: 1, 
             randomness: 0,
-            temperature: 2.0, // High variety (Mistakes likely)
+            temperature: 2.0, // High variety
             heuristicFactor: 1.0
         };
     }
 
-    // Medium (5k equivalent)
+    // Medium
     if (difficulty === 'Medium') {
          return {
             useModel: true,
-            simulations: isMobile ? 3 : 5, // A bit more search
+            simulations: isMobile ? 2 : 4, 
             randomness: 0,
-            temperature: 0.5, // Balanced
+            temperature: 0.5,
             heuristicFactor: 1.0
         };
     }
 
-    // Legacy Fallback (Migration for strings like "5k", "1d")
-    if (/^\d+k$/i.test(difficulty)) {
-        const kValue = parseInt(difficulty);
-        if (kValue >= 6) return getAIConfig('Easy'); 
-        return getAIConfig('Medium'); 
-    }
-    if (/^\d+d$/i.test(difficulty)) {
-        return getAIConfig('Hard'); 
-    }
-
-    // Hard (1d equivalent or higher)
+    // Hard
     // Map to Strongest available within reason
     return {
         useModel: true,

@@ -85,7 +85,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             setTempGameType(currentGameSettings.gameType);
             setTempGameMode(currentGameSettings.gameMode);
             
-            // Auto-fix difficulty to Easy/Medium/Hard valid values
+            // Ensure difficulty is a standard entry
             let diff = currentGameSettings.difficulty;
             if (['Easy', 'Medium', 'Hard'].indexOf(diff) === -1) {
                 diff = 'Easy';
@@ -152,7 +152,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                     <button onClick={() => setTempGameType('Go')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Go' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>围棋</button>
                                     <button onClick={() => {
                                         setTempGameType('Gomoku');
-                                        // Auto-fix difficulty if switching to Gomoku and current is Rank
+                                        // Auto-fix difficulty if switching to Gomoku
                                         if (['Easy', 'Medium', 'Hard'].indexOf(tempDifficulty) === -1) {
                                             setTempDifficulty('Easy');
                                         }
