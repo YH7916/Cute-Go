@@ -82,6 +82,16 @@ const App: React.FC = () => {
     const [useCloud, setUseCloud] = useState(false); // [New] Cloud AI Toggle (Changed default to Local)
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+    // Auto-dismiss toast after 3 seconds
+    useEffect(() => {
+        if (toastMsg) {
+            const timer = setTimeout(() => {
+                setToastMsg(null);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [toastMsg]);
+
     // --- [New] Tsumego Refactor States ---
     const [tsumegoLives, setTsumegoLives] = useState(2);
     const [unlockedLevelIds, setUnlockedLevelIds] = useState<string[]>(() => {
@@ -1347,10 +1357,10 @@ const App: React.FC = () => {
             try {
                 if (result.captured > 0) {
                     playSfx('capture');
-                    try { if(navigator.vibrate) navigator.vibrate([20, 30, 20]); } catch(e){}
+                    vibrate([20, 30, 20]);
                 } else {
                     playSfx('move');
-                    try { if(navigator.vibrate) navigator.vibrate(15); } catch(e){}
+                    vibrate(15);
                 }
             } catch(e) {}
 

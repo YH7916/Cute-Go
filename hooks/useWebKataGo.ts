@@ -144,15 +144,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
                     if (move) onAiMove(move.x, move.y);
                     else onAiPass();
                     
-                    if (isMobile) {
-                        if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
-                        releaseTimeoutRef.current = setTimeout(() => {
-                             console.log("[WebAI] Idle timeout: Releasing memory now.");
-                             isReleasingRef.current = true;
-                             worker.postMessage({ type: 'release' });
-                             releaseTimeoutRef.current = null;
-                        }, 15000);
-                    }
+
 
                 } else if (msg.type === 'released') {
                     console.log("[WebAI] Worker memory released (Suspended).");
