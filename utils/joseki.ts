@@ -1,171 +1,152 @@
-import { BoardState, Player, Point } from '../types';
+import { MicroBoard, type Sign } from './micro-board';
 
-// Helper: Rotate/Flip a point to match canonical orientation
-// Canonical: Top-Left corner (0,0)
-type Transformation = {
-    rotate: 0 | 90 | 180 | 270;
-    flip: boolean;
-};
+/**
+ * Basic Joseki Library for Easy AI.
+ * Focuses on common 4-4 and 3-4 corner patterns.
+ */
 
-// All 8 symmetries for a corner check
-const SYMMETRIES: Transformation[] = [
-    { rotate: 0, flip: false },
-    { rotate: 90, flip: false },
-    { rotate: 180, flip: false },
-    { rotate: 270, flip: false },
-    { rotate: 0, flip: true },
-    { rotate: 90, flip: true },
-    { rotate: 180, flip: true },
-    { rotate: 270, flip: true },
-];
+export interface Point {
+    x: number;
+    y: number;
+}
 
-// Transform a point (x,y) from Canonical (Top-Left) to Actual Board
-const transform = (pt: Point, size: number, trans: Transformation): Point => {
-    let x = pt.x;
-    let y = pt.y;
+export class JosekiEngine {
+    private size: number;
 
-    // 1. Flip (Horizontal flip around center vertical axis? No, simplify to standard D4 symmetry group)
-    // Let's assume Canonical is Top-Left (0..size/2, 0..size/2)
-    // Actually, simple matrix approach is safer.
-    
-    // Rotate first
-    // Center is (size-1)/2
-    // But working with integer indices, better to just map corners.
-    
-    // Easier approach: Use relative coordinates from the Corner being checked.
-    // If checking Top-Left (0,0):
-    // x, y are as is.
-    // If checking Top-Right (size-1, 0):
-    // x' = size-1 - x, y' = y
-    // But we also need to handle xy-swap (transpose) for symmetry.
-    
-    // Let's refine:
-    // We check 4 corners.
-    // For each corner, we check 2 orientations (Normal and Transposed/xy-swapped).
-    // Start with normalized coordinates (dx, dy) from the corner.
-    
-    return {x, y}; // Placeholder, logic handled in getJosekiMove
-};
+    constructor(size: number) {
+        this.size = size;
+    }
 
-export const getJosekiMove = (board: BoardState, size: number, player: Player): Point | null => {
-    // Only support 9x9, 13x13, 19x19 where corners are standard
-    // Actually 9x9 is special "Tengen" game usually, but 3-3/4-4 still apply.
-    // Let's focus on corner patterns.
-    
-    // 1. Identify Corners
-    // Top-Left, Top-Right, Bottom-Left, Bottom-Right
-    const corners = [
-        { bx: 0, by: 0, dx: 1, dy: 1 },        // TL
-        { bx: size-1, by: 0, dx: -1, dy: 1 },  // TR
-        { bx: 0, by: size-1, dx: 1, dy: -1 },  // BL
-        { bx: size-1, by: size-1, dx: -1, dy: -1 } // BR
-    ];
+    /**
+     * Tries to find a standard joseki move based on the local corner situation.
+     */
+    getJosekiMove(board: MicroBoard, color: Sign): Point | null {
+        // Corners: Top-Left, Top-Right, Bottom-Left, Bottom-Right
+        const corners = [
+            { xRange: [0, 8], yRange: [0, 8], cornerId: 0 },
+            { xRange: [this.size - 9, this.size - 1], yRange: [0, 8], cornerId: 1 },
+            { xRange: [0, 8], yRange: [this.size - 9, this.size - 1], cornerId: 2 },
+            { xRange: [this.size - 9, this.size - 1], yRange: [this.size - 9, this.size - 1], cornerId: 3 }
+        ];
 
-    const opponent = player === 'black' ? 'white' : 'black';
+        for (const corner of corners) {
+            const move = this.matchCorner(board, corner, color);
+            if (move) return move;
+        }
 
-    for (const c of corners) {
-        // We define a local 6x6 grid wrapper to query stones easily relative to corner
-        // "Local (u, v)" where u,v in [0..5]
-        // u is horizontal distance from corner, v is vertical distance
-        const get = (u: number, v: number) => {
-             const tx = c.bx + u * c.dx;
-             const ty = c.by + v * c.dy;
-             if (tx < 0 || tx >= size || ty < 0 || ty >= size) return 'WALL';
-             const s = board[ty][tx];
-             if (!s) return 'EMPTY';
-             return s.color === player ? 'ME' : 'OPP';
-        };
+        return null;
+    }
 
-        // We check two main orientations for the corner:
-        // 1. Normal (u=x-dist, v=y-dist)
-        // 2. Transposed (u=y-dist, v=x-dist) - because patterns are symmetric across diagonal usually,
-        //    but specific responses (like knight approach) have direction.
-        
-        // We iterate twice: swap=false, swap=true
-        for (let swap = 0; swap < 2; swap++) {
-            const query = (u: number, v: number) => swap ? get(v, u) : get(u, v);
-            const makeMove = (u: number, v: number) => {
-                 const finalU = swap ? v : u;
-                 const finalV = swap ? u : v;
-                 return { x: c.bx + finalU * c.dx, y: c.by + finalV * c.dy };
-            };
-
-            // === 19x19 / 13x13 Patterns ===
-            if (size >= 13) {
-                 // --- 4-4 Point (Star) Patterns ---
-                 // Star is at (3,3) (0-indexed)
-                 if (query(3,3) === 'OPP' && query(2,5) === 'EMPTY' && query(5,2) === 'EMPTY') {
-                     // Enemy Star Point, I have no approach yet.
-                     // Approach! Small Knight (5,3) or Large Knight (6,3)?
-                     // Check if simple approach is valid
-                     if (query(5,3) === 'EMPTY') return makeMove(5,3); // Small Knight Approach (Standard)
-                 }
-
-                 // If I have a Star Point (3,3) and Enemy Approaches (5,3)
-                 if (query(3,3) === 'ME' && query(5,3) === 'OPP' && query(2,5) === 'EMPTY') {
-                     // Respond!
-                     // 1. Small Knight Extension (Shimari? No, response) -> (2,5)? No that's shimari direction.
-                     // Standard response to (5,3) approach is usually:
-                     // a) (1,5) Small Knight Enclosure/Response (Kosumi-ish relative to corner?)
-                     // Standard: Back off to (3,1)? No.
-                     // Diagonal attachment? (5,4)? 
-                     // Simple response: (1,5) Knight's move?
-                     // A generic good move is (1,5) or (2,6).
-                     if (query(1,5) === 'EMPTY') return makeMove(1,5); 
-                     // Or pincer?
-                 }
-
-                 // --- 3-4 Point (Komoku) Patterns ---
-                 // Komoku at (2,3) (or 3,2 via swap)
-                 if (query(2,3) === 'OPP') {
-                      // Approach to 3-4? 
-                      // (4,5) Small Knight high. (4,4) High approach? No 4-4 is Star.
-                      // Standard low approach is (4,5).
-                      if (query(4,5) === 'EMPTY') return makeMove(4,5);
-                 }
-                 
-                 // Enclosure (Shimari)
-                 // I have 3-4 (2,3), empty around.
-                 if (query(2,3) === 'ME' && query(4,5) === 'EMPTY' && query(0,2) === 'EMPTY') {
-                      // Small Knight Enclosure: (4,2)
-                      // Large Knight Enclosure: (5,2)
-                      if (query(4,2) === 'EMPTY') return makeMove(4,2);
-                 }
-
-                 // --- 3-3 Invasion (Sansan) ---
-                 // If enemy has 4-4 (3,3) and I want territory or it's late opening.
-                 // This is aggressive. Maybe check if corner is open.
-                 if (query(3,3) === 'OPP' && query(2,2) === 'EMPTY' && query(2,3) === 'EMPTY' && query(3,2) === 'EMPTY') {
-                      // 3-3 is available.
-                      // Only invade if supported? Or just heuristic?
-                      // Let's create a move with specific type for weighting?
-                      // Just return it.
-                      // return makeMove(2,2); // Maybe too aggressive for early game without support?
-                 }
-            } 
-            else if (size === 9) {
-                // === 9x9 Patterns ===
-                // Center is (4,4)
-                
-                // 1. Opening: If center taken by Opp, take 3-3 or 3-4?
-                // Or if center taken by Me, take 3-3?
-                
-                // Response to 4-4 (Tengen/Center if viewed locally? No 4,4 is center).
-                // If Opp is at (4,4) [Center], standard response is (2,4) or (2,3) or (2,2) (3-3 point).
-                // On 9x9, (2,2) is the 3-3 point (SanSan).
-                if (query(2,2) === 'EMPTY' && query(3,3) === 'EMPTY' && query(4,4) === 'OPP') {
-                    // Invade/Approach corner
-                    return makeMove(2,2); 
-                }
-                
-                // Shouldering: I at (2,2), Opp attempts (2,3).
-                // Hane! (2,4) or (3,3)
-                if (query(2,2) === 'ME' && query(2,3) === 'OPP' && query(2,4) === 'EMPTY') {
-                    return makeMove(2,4);
+    private matchCorner(board: MicroBoard, corner: { xRange: number[], yRange: number[], cornerId: number }, color: Sign): Point | null {
+        // 1. Extract pieces in the corner and normalize to Canonical (Top-Left)
+        const pieces: { x: number, y: number, color: Sign }[] = [];
+        for (let y = corner.yRange[0]; y <= corner.yRange[1]; y++) {
+            for (let x = corner.xRange[0]; x <= corner.xRange[1]; x++) {
+                const val = board.get(x, y);
+                if (val !== 0) {
+                    const canon = this.getCanonicalCoords(x, y, corner.cornerId);
+                    pieces.push({ x: canon.x, y: canon.y, color: val });
                 }
             }
         }
+
+        if (pieces.length === 0) return null;
+
+        // 2. Lookup canonical pattern
+        const josekiMove = this.lookupJoseki(pieces, color);
+        if (josekiMove) {
+            // Check if move is legal on the REAL board
+            const realMove = this.fromCanonical(josekiMove.x, josekiMove.y, corner.cornerId);
+            if (board.isLegal(realMove.x, realMove.y, color)) {
+                return realMove;
+            }
+        }
+
+        return null;
     }
 
-    return null;
-};
+    private getCanonicalCoords(x: number, y: number, cornerId: number): Point {
+        let lx, ly;
+        switch (cornerId) {
+            case 0: lx = x; ly = y; break; // TL
+            case 1: lx = (this.size - 1) - x; ly = y; break; // TR
+            case 2: lx = x; ly = (this.size - 1) - y; break; // BL
+            case 3: lx = (this.size - 1) - x; ly = (this.size - 1) - y; break; // BR
+            default: lx = x; ly = y;
+        }
+        return { x: lx, y: ly };
+    }
+
+    private fromCanonical(lx: number, ly: number, cornerId: number): Point {
+        let x, y;
+        switch (cornerId) {
+            case 0: x = lx; y = ly; break;
+            case 1: x = (this.size - 1) - lx; y = ly; break;
+            case 2: x = lx; y = (this.size - 1) - ly; break;
+            case 3: x = (this.size - 1) - lx; y = (this.size - 1) - ly; break;
+            default: x = lx; y = ly;
+        }
+        return { x, y };
+    }
+
+    private lookupJoseki(pieces: { x: number, y: number, color: Sign }[], aiColor: Sign): Point | null {
+        // Normalize colors relative to the first stone in the corner
+        const firstStone = pieces[0].color;
+        const normalizedPieces = pieces.map(p => ({
+             x: p.x, y: p.y, relColor: p.color === firstStone ? 1 : -1
+        }));
+
+        // Table Coords are Canonical Top-Left
+        const table: Record<string, Point> = {
+            // --- 4-4 (Hoshi) Patterns ---
+            // 3,3,1 = Star point exists
+            "3,3,1": { x: 5, y: 2 }, // Enclose corner (Shimari)
+            "3,3,1|3,6,-1": { x: 5, y: 2 }, // Response to knight approach
+            "3,3,1|6,3,-1": { x: 2, y: 5 }, // Response to knight approach (symmetry)
+            "3,3,1|2,5,-1": { x: 2, y: 2 }, // Response to high approach
+            "3,3,1|5,2,-1": { x: 2, y: 2 }, // Response to high approach (symmetry)
+
+            // --- 3-4 (Komoku) Patterns ---
+            // 2,3,1 = Komoku exists
+            "2,3,1": { x: 5, y: 3 }, // Knight approach
+            "3,2,1": { x: 3, y: 5 }, // Knight approach (symmetry)
+            "2,3,1|5,3,-1": { x: 3, y: 5 }, // knight response to knight approach
+            
+            // --- 3,3 (Sansan) Patterns ---
+            "3,3,1|2,2,-1": { x: 2, y: 3 }, // blocked sansan
+            "3,3,1|2,2,-1|2,3,1": { x: 3, y: 2 }, // hane
+        };
+
+        const getSig = (pts: {x: number, y: number, relColor: number}[]) => 
+            pts.map(p => `${p.x},${p.y},${p.relColor}`).sort().join('|');
+
+        // Try direct
+        let res = table[getSig(normalizedPieces)];
+        if (res) return res;
+
+        // Try X/Y Swap
+        const swapped = normalizedPieces.map(p => ({ x: p.y, y: p.x, relColor: p.relColor }));
+        res = table[getSig(swapped)];
+        if (res) return { x: res.y, y: res.x };
+
+        return null;
+    }
+}
+
+/**
+ * Static helper for legacy code compatibility (goLogic.ts)
+ */
+export function getJosekiMove(boardState: any[][], size: number, player: 'black' | 'white'): Point | null {
+    const board = new MicroBoard(size);
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const stone = boardState[y][x];
+            if (stone) {
+                board.set(x, y, stone.color === 'black' ? 1 : -1);
+            }
+        }
+    }
+    const color: Sign = player === 'black' ? 1 : -1;
+    const engine = new JosekiEngine(size);
+    return engine.getJosekiMove(board, color);
+}

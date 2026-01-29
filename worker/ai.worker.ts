@@ -4,7 +4,13 @@ import { LocalGoAI } from '../utils/localGoAi';
 
 // Define message types
 type WorkerMessage = 
-    | { type: 'init'; payload: { modelPath: string; modelParts?: string[]; wasmPath?: string; numThreads?: number } }
+    | { type: 'init'; payload: { 
+        modelPath: string; 
+        modelParts?: string[]; 
+        wasmPath?: string; 
+        numThreads?: number;
+        onlyRules?: boolean; // [New]
+    } }
     | { type: 'compute'; data: { 
             board: any[][]; // BoardState
             history: any[]; // HistoryItem[]
@@ -38,13 +44,20 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
     try {
         if (msg.type === 'init') {
-            const { modelPath, modelParts, wasmPath, numThreads } = msg.payload;
+            const { modelPath, modelParts, wasmPath, numThreads, onlyRules } = msg.payload;
             
             // Cache config for Re-Init
             (self as any).aiConfig = msg.payload;
 
             // Dispose existing engine if any
             if (engine) engine.dispose();
+            engine = null;
+
+            if (onlyRules) {
+                console.log("[AI Worker] Initialization Complete (Rule-only Mode)");
+                ctx.postMessage({ type: 'init-complete' });
+                return;
+            }
 
             engine = new OnnxEngine({
                 modelPath: modelPath,
@@ -87,6 +100,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                  return;
             }
             
+            if (config.onlyRules) {
+                 console.log("[AI Worker] Re-Initialized (Rule-only Mode)");
+                 ctx.postMessage({ type: 'init-complete' });
+                 return;
+            }
+
             if (!engine) {
                 console.log("[AI Worker] Re-Initializing engine...");
                 engine = new OnnxEngine({
@@ -108,7 +127,9 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             ctx.postMessage({ type: 'init-complete' });
 
         } else if (msg.type === 'compute') {
-            if (!engine) {
+            const { board: boardState, history: gameHistory, color, size, komi, difficulty, temperature } = msg.data;
+            
+            if (!engine && difficulty !== 'Easy') {
                 // [Fix] Auto-recover if engine is missing (Race Condition safety)
                 const config = (self as any).aiConfig;
                 if (config) {
@@ -126,7 +147,6 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 }
             }
 
-            const { board: boardState, history: gameHistory, color, size, komi, difficulty, temperature } = msg.data;
             const pla: Sign = color === 'black' ? 1 : -1;
 
             // 1. Reconstruct MicroBoard with Perfect Ko Detection
@@ -169,17 +189,20 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 const move = localAi.getBestMove(board, pla);
                 
                 // Simulate a KataGo-like result for UI compatibility
+                const score = localAi['evaluate'](board, pla); // Peek at score for winrate simulation
+                const simulatedWinrate = 1 / (1 + Math.exp(-score / 200)); 
+                
                 result = {
                     moves: move ? [{ 
-                        x: move.x, y: move.y, u: 0, prior: 1, winrate: 0.5, 
-                        scoreMean: 0, scoreStdev: 0, lead: 0, vists: 1 
+                        x: move.x, y: move.y, u: 0, prior: 1, winrate: simulatedWinrate, 
+                        scoreMean: score / 10, scoreStdev: 0, lead: score / 10, vists: 100 
                     }] : [{ 
-                        x: -1, y: -1, u: 0, prior: 1, winrate: 0.5, 
-                        scoreMean: 0, scoreStdev: 0, lead: 0, vists: 1 
+                        x: -1, y: -1, u: 0, prior: 1, winrate: simulatedWinrate, 
+                        scoreMean: score / 10, scoreStdev: 0, lead: score / 10, vists: 100 
                     }],
                     rootInfo: {
-                        winrate: 0.5, 
-                        lead: 0,
+                        winrate: simulatedWinrate, 
+                        lead: score / 10,
                         scoreStdev: 0,
                         ownership: new Float32Array(size * size).fill(0)
                     }

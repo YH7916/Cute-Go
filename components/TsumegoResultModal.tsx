@@ -51,33 +51,46 @@ const TsumegoResultModal: React.FC<TsumegoResultModalProps> = ({
 
                 {/* Actions */}
                 <div className="flex flex-col gap-3 w-full">
-                    {hasNext && isCorrect && (
-                         <button 
-                            onClick={onNext}
-                            className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-base"
-                        >
-                            <ArrowRight size={20} />
-                            <span>下一题</span>
-                        </button>
+                    {isCorrect ? (
+                        <div className="flex flex-col gap-3">
+                            {hasNext && (
+                                <button 
+                                    onClick={onNext}
+                                    className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-base shadow-lg hover:-translate-y-1 transition-all"
+                                >
+                                    <span>下一关</span>
+                                    <ArrowRight size={18} strokeWidth={2.5} />
+                                </button>
+                            )}
+                            <button 
+                                onClick={onRetry}
+                                className="btn-retro btn-beige w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-base opacity-90 hover:opacity-100"
+                            >
+                                <RotateCcw size={18} />
+                                <span>再练一遍</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-3">
+                            <button 
+                                onClick={onRetry}
+                                className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-base shadow-lg hover:-translate-y-1 transition-all"
+                            >
+                                <RotateCcw size={18} strokeWidth={2.5} />
+                                <span>立即重试</span>
+                            </button>
+                            
+                            {hasNext && (
+                                <button 
+                                    onClick={onNext}
+                                    className="text-[#8c6b38] font-bold text-sm mt-2 hover:underline flex items-center justify-center gap-1 opacity-70 hover:opacity-100 transition-opacity"
+                                >
+                                    <span>跳过，看下一题</span>
+                                    <ArrowRight size={14} />
+                                </button>
+                            )}
+                        </div>
                     )}
-
-                    <button 
-                        onClick={onRetry}
-                        className={`btn-retro ${hasNext && isCorrect ? 'btn-beige' : 'btn-brown'} w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-base`}
-                    >
-                        <RotateCcw size={20} />
-                        <span>重 试</span>
-                    </button>
-                    
-                    {hasNext && !isCorrect && (
-                        <button 
-                            onClick={onNext}
-                            className="text-[#8c6b38] font-bold text-sm mt-2 hover:underline flex items-center justify-center gap-1 opacity-80 hover:opacity-100 transition-opacity"
-                        >
-                            <span>跳过，下一题</span>
-                            <ArrowRight size={14} />
-                        </button>
-                     )}
                 </div>
             </div>
         </div>

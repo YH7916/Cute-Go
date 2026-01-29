@@ -21,6 +21,8 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
     const [aiTerritory, setAiTerritory] = useState<Float32Array | null>(null);
     
     const workerRef = useRef<Worker | null>(null);
+    const isWorkerReadyRef = useRef(false); // [New] Synchronous check
+    const isThinWorkerRef = useRef(false); // [New] Track if worker is rule-only
     const pendingRequestRef = useRef<{ board: BoardState; playerColor: Player; history: any[]; simulations: number; komi?: number; difficulty?: string; temperature?: number } | null>(null);
     const expectingResponseRef = useRef(false);
     const initializingRef = useRef(false); 
@@ -29,17 +31,25 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
     const isReleasingRef = useRef(false); // [Fix] Race Condition Lock
 
     // Initialization Function
-    const initializeAI = useCallback(() => {
-        if (isWorkerReady || isInitializing || workerRef.current || initializingRef.current) return;
+    const initializeAI = useCallback((options: { needModel: boolean } = { needModel: true }) => {
+        if (initializingRef.current || workerRef.current) {
+            // If already initialized as 'thin' but now need model, we proceed to 'upgrade'
+            if (options.needModel && isThinWorkerRef.current && !isLoading) {
+                 console.log("[WebAI] Upgrading existing Thin worker to Full Model mode...");
+            } else {
+                 return;
+            }
+        }
         
         // Only run in non-Electron environment
         if ((window as any).electronAPI) return;
 
         console.log("[WebAI] Starting Initialization...");
         initializingRef.current = true; // Lock immediately
-        setIsLoading(true);
+        setIsLoading(options.needModel);
         setIsInitializing(true);
-        setInitStatus('正在启动 AI 引擎...');
+        if (options.needModel) setInitStatus('正在启动 AI 引擎...');
+        else setInitStatus('正在启动规则引擎...');
 
         // --- 1. Paths ---
         let baseUrl = window.location.origin + window.location.pathname;
@@ -89,36 +99,25 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
             worker.onmessage = (e) => {
                 const msg = e.data;
                 if (msg.type === 'init-complete') {
-                    console.log('[WebAI] Worker Ready (or Re-Initialized).');
+                    console.log('[WebAI] Init Complete.');
                     clearTimeout(initWatchdog);
                     setIsWorkerReady(true);
+                    isWorkerReadyRef.current = true;
                     setIsLoading(false);
                     setIsInitializing(false);
-                    setInitStatus('AI 就绪');
+                    setInitStatus(isThinWorkerRef.current ? '规则引擎就绪' : 'AI 引擎就绪');
                     initializingRef.current = false;
                     
                     // Execute Pending
                     if (pendingRequestRef.current) {
                         const pending = pendingRequestRef.current;
                         pendingRequestRef.current = null; // Clear
-                        
-                        // Send compute
-                        worker.postMessage({
-                            type: 'compute',
-                            data: {
-                                board: pending.board,
-                                history: pending.history,
-                                color: pending.playerColor,
-                                size: boardSize,
-                                simulations: pending.simulations,
-                                komi: pending.komi ?? 7.5,
-                                difficulty: pending.difficulty,
-                                temperature: pending.temperature
-                            }
-                        });
-                        
-                        setIsThinking(true);
-                        expectingResponseRef.current = true;
+                        console.log("[WebAI] Processing pending request after init-complete...");
+                        requestWebAiMove(
+                            pending.board, pending.playerColor, pending.history, 
+                            pending.simulations, pending.komi, 
+                            pending.difficulty as any, pending.temperature
+                        );
                     }
                 } else if (msg.type === 'ai-response') {
                     if (!expectingResponseRef.current) return;
@@ -134,17 +133,11 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
                     if (move) onAiMove(move.x, move.y);
                     else onAiPass();
                     
-                    // [Memory Saving] Deferred Release on Mobile (15s delay)
-                    // If user moves again within 15s, we clear this timeout.
                     if (isMobile) {
                         if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
-                        
-                        // Log only
-                        // console.log("[WebAI] Scheduling memory release in 15s...");
-                        
                         releaseTimeoutRef.current = setTimeout(() => {
                              console.log("[WebAI] Idle timeout: Releasing memory now.");
-                             isReleasingRef.current = true; //Mark as releasing
+                             isReleasingRef.current = true;
                              worker.postMessage({ type: 'release' });
                              releaseTimeoutRef.current = null;
                         }, 15000);
@@ -152,8 +145,9 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
 
                 } else if (msg.type === 'released') {
                     console.log("[WebAI] Worker memory released (Suspended).");
-                    isReleasingRef.current = false; // Release done
-                    setIsWorkerReady(false); // Mark as not ready so next req triggers re-init
+                    isReleasingRef.current = false;
+                    setIsWorkerReady(false); 
+                    isWorkerReadyRef.current = false;
                     
                 } else if (msg.type === 'status') {
                     setInitStatus(msg.message);
@@ -162,13 +156,14 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
                     setIsThinking(false);
                     setIsLoading(false);
                     setIsInitializing(false);
-                    initializingRef.current = false; // Reset lock
+                    initializingRef.current = false;
                     expectingResponseRef.current = false;
                     if (onAiError) onAiError(msg.message);
                 }
             };
 
             // Send Init
+            isThinWorkerRef.current = !options.needModel;
             const modelParts = [
                 modelUrl + '.part1',
                 modelUrl + '.part2',
@@ -182,7 +177,8 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
                     modelPath: modelUrl,
                     modelParts: modelParts,
                     wasmPath: wasmUrl,
-                    numThreads: numThreads
+                    numThreads: numThreads,
+                    onlyRules: isThinWorkerRef.current
                 }
             });
 
@@ -228,8 +224,9 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
         }
 
         // [Lazy Load / Re-Init Logic]
-        if (!isWorkerReady || isReleasingRef.current) {
-            console.warn("AI requested but not ready (or releasing).");
+        const isReadyNow = isWorkerReadyRef.current && !isReleasingRef.current;
+        if (!isReadyNow) {
+            console.warn(`AI requested but not ready (isReadyNow=${isReadyNow}, isInitializing=${isInitializing})`);
             
             // If worker exists but is 'released' (memory saved), re-init it.
             if (workerRef.current && !isInitializing) {
@@ -247,12 +244,24 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
             if (!isInitializing && !workerRef.current) {
                  console.log("[WebAI] Auto-initializing for request...");
                  pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature };
-                 initializeAI();
+                 const needModel = difficulty !== 'Easy';
+                 initializeAI({ needModel });
             } else if (isInitializing) {
                  // Just Queue
                  pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature };
             }
             return;
+        }
+
+        // [Upgrade] If worker is ready but only in 'Thin' mode and we now need a model
+        const needFullModel = difficulty !== 'Easy';
+        if (isWorkerReadyRef.current && needFullModel && isThinWorkerRef.current && !isLoading) {
+             console.log("[WebAI] Upgrading from Thin to Full Mode (Model Required for Difficulty)...");
+             pendingRequestRef.current = { board, playerColor, history, simulations, komi, difficulty, temperature };
+             setIsWorkerReady(false); 
+             isWorkerReadyRef.current = false; // Mark as not ready to trigger full init
+             initializeAI({ needModel: true });
+             return;
         }
 
         if (!workerRef.current || isThinking) return;

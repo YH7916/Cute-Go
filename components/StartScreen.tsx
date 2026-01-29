@@ -101,7 +101,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
             {/* Features & Tools Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full lg:w-4/5">
                 <FeatureButton icon={Palette} label="外观商店" onClick={onOpenSkinShop} delay={50} color="btn-beige" />
-                <FeatureButton icon={Zap} label="死活题闯关(暂未开放）" onClick={onOpenTsumego} delay={100} color="btn-beige" />
+                <FeatureButton icon={Zap} label="死活题闯关" onClick={onOpenTsumego} delay={100} color="btn-beige" />
                 <FeatureButton icon={PenTool} label="电子挂盘" onClick={onStartSetup} delay={200} color="btn-beige" />
                 <FeatureButton icon={BookOpen} label="新手教程" onClick={onOpenTutorial} delay={250} color="btn-beige" />
                 <FeatureButton icon={Download} label="导入导出" onClick={onOpenImport} delay={300} color="btn-beige" />

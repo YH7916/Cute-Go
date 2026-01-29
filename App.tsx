@@ -18,7 +18,7 @@ import {
   calculateGomokuWinRate // [New]
 } from './utils/goLogic';
 import { getAIConfig } from './utils/aiConfig';
-import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown, Brain, Cpu, Home } from 'lucide-react';
+import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown, Brain, Cpu, Home, Heart as HeartIcon, Check } from 'lucide-react';
 
 // Hooks
 import { useKataGo, sliderToVisits, visitsToSlider } from './hooks/useKataGo';
@@ -58,6 +58,8 @@ import { TsumegoListModal, TsumegoSet } from './components/TsumegoListModal';
 import TsumegoResultModal from './components/TsumegoResultModal';
 import { parseSGFToTree, SGFNode } from './utils/sgfParser';
 import { StartScreen } from './components/StartScreen';
+import { TsumegoLevelSelector } from './components/TsumegoLevelSelector';
+import { TSUMEGO_DATA, TsumegoLevel, getTsumegoLevelById } from './utils/tsumegoData';
 import { SkinShopModal } from './components/SkinShopModal';
 import { BOARD_THEMES, BoardThemeId } from './utils/themes';
 
@@ -78,6 +80,19 @@ const App: React.FC = () => {
     const [isThinking, setIsThinking] = useState(false); 
     const [useCloud, setUseCloud] = useState(true); // [New] Cloud AI Toggle
     const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+    // --- [New] Tsumego Refactor States ---
+    const [tsumegoLives, setTsumegoLives] = useState(2);
+    const [unlockedLevelIds, setUnlockedLevelIds] = useState<string[]>(() => {
+        const saved = localStorage.getItem('unlocked_tsumego_levels');
+        return saved ? JSON.parse(saved) : ['1-1'];
+    });
+    const [completedLevelIds, setCompletedLevelIds] = useState<string[]>(() => {
+        const saved = localStorage.getItem('completed_tsumego_levels');
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [showTsumegoLevelSelector, setShowTsumegoLevelSelector] = useState(false);
+    const [currentTsumegoLevel, setCurrentTsumegoLevel] = useState<TsumegoLevel | null>(null);
     const [showStartScreen, setShowStartScreen] = useState(!settings.skipStartScreen);
     const [showSkinShop, setShowSkinShop] = useState(false);
 
@@ -665,10 +680,14 @@ const App: React.FC = () => {
                     const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
                     if (!isMobile) {
                         console.log("[App] Triggering Lazy AI Init (Model Required)...");
-                        webAiEngine.initializeAI();
+                        webAiEngine.initializeAI({ needModel: true });
                     } else {
                         console.log("[App] Mobile: Deferring AI Init to first move.");
                     }
+                } else if (!aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                     console.log("[App] Triggering Thin AI Init (Easy Mode)...");
+                     webAiEngine.initializeAI({ needModel: false });
+                }
                     
                     // AI Move will be requested when init completes? 
                     // Or we just wait. The logic below checks locks.
@@ -686,7 +705,6 @@ const App: React.FC = () => {
                     // Logic handled in AI Trigger Effect
                 }
             }
-        }
     };
 
     // [New] Effect: Auto-trigger Lazy Init on Startup/Settings Change if needed
@@ -703,9 +721,10 @@ const App: React.FC = () => {
 
         if (!isElectronAvailable && settings.gameMode === 'PvAI' && !useCloud && settings.gameType === 'Go') {
              const aiConfig = getAIConfig(settings.difficulty);
-             if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
-                 console.log("[App] Auto-triggering AI Init (Playing Mode)...");
-                 webAiEngine.initializeAI();
+             if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                 const needModel = aiConfig.useModel;
+                 console.log(`[App] Auto-triggering AI Init (Playing Mode, needModel=${needModel})...`);
+                 webAiEngine.initializeAI({ needModel });
              }
         }
     }, [settings.gameMode, settings.difficulty, isElectronAvailable, webAiEngine.isWorkerReady, webAiEngine.isInitializing, showStartScreen, useCloud, gameState.appMode]);
@@ -730,10 +749,11 @@ const App: React.FC = () => {
                  setUseCloud(false);
                  // Auto Init Lazy AI if needed
                  if (!isElectronAvailable) {
-                     const aiConfig = getAIConfig(settings.difficulty);
-                     if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
-                         console.log('[handleStartGame] Initializing AI...');
-                         webAiEngine.initializeAI();
+                     const aiConfigLocal = getAIConfig(settings.difficulty);
+                     if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                         const needModel = aiConfigLocal.useModel;
+                         console.log(`[handleStartGame] Initializing AI (needModel=${needModel})...`);
+                         webAiEngine.initializeAI({ needModel });
                      }
                  }
              }
@@ -886,10 +906,18 @@ const App: React.FC = () => {
     };
 
     const handleNextTsumego = () => {
-        if (!tsumegoCollection || !tsumegoRoot) return;
-        const idx = tsumegoCollection.findIndex((n: SGFNode) => n === tsumegoRoot);
-        if (idx >= 0 && idx < tsumegoCollection.length - 1) {
-             startTsumego(tsumegoCollection[idx + 1]);
+        if (!currentTsumegoLevel) return;
+        const chapter = TSUMEGO_DATA.find(c => c.id === currentTsumegoLevel.chapterId);
+        if (!chapter) return;
+        const currentIndex = chapter.levels.findIndex(l => l.id === currentTsumegoLevel.id);
+        if (currentIndex !== -1 && currentIndex < chapter.levels.length - 1) {
+            const nextLevel = chapter.levels[currentIndex + 1];
+            setCurrentTsumegoLevel(nextLevel);
+            setTsumegoLives(2);
+            const nodes = parseSGFToTree(nextLevel.sgf);
+            if (nodes && nodes.length > 0) {
+                startTsumego(nodes[0]);
+            }
         }
     };
 
@@ -921,9 +949,22 @@ const App: React.FC = () => {
             return true;
         } else {
             // Incorrect Move
-            setToastMsg("答案错误 (Incorrect)");
-            setTimeout(() => setToastMsg(null), 1500);
-            vibrate(50);
+            setTsumegoLives(prev => {
+                const newLives = prev - 1;
+                if (newLives <= 0) {
+                    setTsumegoResultMsg("体力耗尽，关卡重置 (Out of Lives)");
+                    setTsumegoIsCorrect(false);
+                    setShowTsumegoResult(true);
+                    playSfx('lose');
+                    vibrate([100, 50, 100]);
+                } else {
+                    setToastMsg("答案错误 (Incorrect)");
+                    setTimeout(() => setToastMsg(null), 1500);
+                    playSfx('lose'); // or 'failure'
+                    vibrate(50);
+                }
+                return Math.max(0, newLives);
+            });
             return false;
         }
     };
@@ -969,6 +1010,32 @@ const App: React.FC = () => {
                       setTsumegoIsCorrect(isSuccess);
                       setTsumegoResultMsg(comment);
                       setShowTsumegoResult(true);
+                      
+                      if (isSuccess && currentTsumegoLevel) {
+                         // Progression: Mark completed and unlock next
+                           setCompletedLevelIds(prev => {
+                               if (prev.includes(currentTsumegoLevel.id)) return prev;
+                               const next = [...prev, currentTsumegoLevel.id];
+                               localStorage.setItem('completed_tsumego_levels', JSON.stringify(next));
+                               return next;
+                           });
+
+                           // Unlock next level in chapter
+                           const chapter = TSUMEGO_DATA.find(c => c.id === currentTsumegoLevel.chapterId);
+                           if (chapter) {
+                               const currentIndex = chapter.levels.findIndex(l => l.id === currentTsumegoLevel.id);
+                               if (currentIndex !== -1 && currentIndex < chapter.levels.length - 1) {
+                                   const nextLevelId = chapter.levels[currentIndex + 1].id;
+                                   setUnlockedLevelIds(prev => {
+                                       if (prev.includes(nextLevelId)) return prev;
+                                       const next = [...prev, nextLevelId];
+                                       localStorage.setItem('unlocked_tsumego_levels', JSON.stringify(next));
+                                       return next;
+                                   });
+                               }
+                           }
+                      }
+                      
                       vibrate(isSuccess ? 100 : 200);
                       playSfx(isSuccess ? 'win' : 'lose');
                  }, 500);
@@ -1822,7 +1889,7 @@ const App: React.FC = () => {
            {showStartScreen && (
                <StartScreen 
                    onStartGame={handleStartGame}
-                   onOpenTsumego={handleOpenTsumego}
+                   onOpenTsumego={() => setShowTsumegoLevelSelector(true)}
                    onOpenTutorial={() => setShowTutorial(true)}
                    onOpenOnline={() => setShowOnlineMenu(true)}
                    onOpenImport={() => setShowImportModal(true)}
@@ -2039,7 +2106,7 @@ const App: React.FC = () => {
                 onOpenOnline={() => setShowOnlineMenu(true)}
                 onOpenAbout={() => { setShowAboutModal(true); setShowMenu(false); }}
                 onOpenTutorial={() => { setShowTutorial(true); setShowMenu(false); }}
-                onOpenTsumego={handleOpenTsumego}
+                onOpenTsumego={() => setShowTsumegoLevelSelector(true)}
                 onOpenSkinShop={() => setShowSkinShop(true)}
                 isElectronAvailable={isElectronAvailable}
            />
@@ -2253,8 +2320,39 @@ const App: React.FC = () => {
                 onNext={handleNextTsumego}
                 onRetry={handleRetryTsumego}
                 onClose={() => setShowTsumegoResult(false)}
-                hasNext={!!(tsumegoCollection && tsumegoRoot && tsumegoCollection.findIndex(n => n === tsumegoRoot) < tsumegoCollection.length - 1)}
+                hasNext={useMemo(() => {
+                    if (!currentTsumegoLevel) return false;
+                    const chapter = TSUMEGO_DATA.find(c => c.id === currentTsumegoLevel.chapterId);
+                    if (!chapter) return false;
+                    const currentIndex = chapter.levels.findIndex(l => l.id === currentTsumegoLevel.id);
+                    return currentIndex !== -1 && currentIndex < chapter.levels.length - 1;
+                }, [currentTsumegoLevel])}
              />
+
+            {/* Tsumego Level Selector */}
+            {showTsumegoLevelSelector && (
+                <TsumegoLevelSelector 
+                    onClose={() => setShowTsumegoLevelSelector(false)}
+                    unlockedLevelIds={unlockedLevelIds}
+                    completedLevelIds={completedLevelIds}
+                    onSelectLevel={(level) => {
+                        setCurrentTsumegoLevel(level);
+                        setShowTsumegoLevelSelector(false);
+                        setShowStartScreen(false); // [Fix] Hide start screen when level starts
+                        settings.setGameMode('Tsumego');
+                        
+                         // Setup level
+                        const nodes = parseSGFToTree(level.sgf);
+                        if (!nodes || nodes.length === 0) return;
+                        const root = nodes[0];
+                        
+                        setTsumegoLives(2);
+                        startTsumego(root); // Use the robust setup function
+                        
+                        vibrate(20);
+                    }}
+                />
+            )}
 
         </div>
     );
