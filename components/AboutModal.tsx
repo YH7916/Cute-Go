@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Heart, RefreshCw, Download, Check } from 'lucide-react';
+import { X, Heart, RefreshCw, Download, Check, ChevronLeft } from 'lucide-react';
 import { CURRENT_VERSION } from '../utils/constants';
 import { isTapTapEnv } from '../utils/tapTapBridge';
 
@@ -26,6 +26,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 }) => {
     const [donationMethod, setDonationMethod] = useState<'wechat' | 'alipay'>('wechat');
     const [socialTip, setSocialTip] = useState('');
+    const [view, setView] = useState<'main' | 'credits'>('main');
 
     if (!isOpen) return null;
 
@@ -47,6 +48,9 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             
             {/* Scrollable Content */}
             <div className="p-6 pt-16 flex flex-col gap-5 text-center overflow-y-auto custom-scrollbar overscroll-contain">
+                
+                {view === 'main' ? (
+                  <>
                 
                 <div className="flex flex-col items-center gap-2 mt-2">
                     <div className="w-20 h-20 bg-[#5c4033] rounded-3xl shadow-lg border-4 border-[#8c6b38] overflow-hidden">
@@ -82,6 +86,14 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                         </p>
                     )}
                 </div>
+
+                <button 
+                    onClick={() => setView('credits')}
+                    className="w-full btn-retro bg-[#fff] border-[#e3c086] text-[#8c6b38] py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#fcf6ea] transition-colors"
+                >
+                    <Heart size={14} className="text-[#e57373]" />
+                    致谢名单
+                </button>
 
                  {newVersionFound && (
                      <a 
@@ -179,6 +191,39 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                             </div>
                         </div>
                     </>
+                )}
+
+                 </>
+                ) : (
+                    <div className="flex flex-col gap-4 animate-in slide-in-from-right duration-300">
+                        <div className="flex items-center gap-2 mb-2">
+                            <button 
+                                onClick={() => setView('main')}
+                                className="p-2 -ml-2 rounded-full hover:bg-black/5 text-[#8c6b38] transition-colors"
+                            >
+                                <ChevronLeft size={24} />
+                            </button>
+                            <h3 className="text-xl font-black text-[#5c4033]">致谢</h3>
+                        </div>
+
+                        <div className="bg-[#fff]/50 p-4 rounded-2xl border border-[#e3c086] text-left">
+                            <h4 className="text-sm font-bold text-[#5c4033] mb-2">特别感谢</h4>
+                            <p className="text-xs text-[#8c6b38]/80 font-bold leading-relaxed">
+                                感谢每一位支持 Cute-Go 的朋友！
+                            </p>
+                            <div className="h-px bg-[#e3c086]/30 my-3"></div>
+                            <ul className="text-xs text-[#8c6b38] font-bold space-y-2">
+                                <li>• 感谢 <span className="text-[#5c4033]">KataGo</span> 提供强大的围棋AI引擎</li>
+                                <li>• 感谢运营初期提供打赏的<br/>
+                                    <span className="pl-4 block">@卖糖术士</span>
+                                    <span className="pl-4 block">@林一泽啧啧</span>
+                                    <span className="pl-4 block">等共7位网友</span>
+                                </li>
+                                <li>• 感谢所有反馈 Bug 和提出建议的用户</li>
+                            </ul>
+                        </div>
+                        
+                    </div>
                 )}
 
             </div>

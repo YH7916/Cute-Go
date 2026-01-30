@@ -175,6 +175,9 @@ const App: React.FC = () => {
     const [downloadUrl, setDownloadUrl] = useState<string>(DEFAULT_DOWNLOAD_LINK);
     const [newVersionFound, setNewVersionFound] = useState(false);
 
+    // Online Host State [New]
+    const [isHostReady, setIsHostReady] = useState(false);
+
     // ELO Diff display
     const [eloDiffText, setEloDiffText] = useState<string | null>(null);
     const [eloDiffStyle, setEloDiffStyle] = useState<'gold' | 'normal' | 'negative' | null>(null);
@@ -1702,6 +1705,7 @@ const App: React.FC = () => {
         setOpponentProfile(null);
         setPeerId('');
         setRemotePeerId('');
+        setIsHostReady(false);
     };
 
     const getIceServers = async () => {
@@ -1858,6 +1862,7 @@ const App: React.FC = () => {
         // 2. Generate new Room ID
         const id = Math.floor(100000 + Math.random() * 900000).toString();
         setPeerId(id);
+        setIsHostReady(false); 
     
         // 3. Subscribe to channel and wait for offer
         const channel = supabase.channel(`room_${id}`);
@@ -1883,7 +1888,11 @@ const App: React.FC = () => {
             else if (payload.type === 'ice' && payload.candidate && pc) {
                  await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
             }
-        }).subscribe();
+        }).subscribe(status => {
+            if (status === 'SUBSCRIBED') {
+                setIsHostReady(true);
+            }
+        });
     };
 
     // Auto-create room when menu opens
@@ -2422,6 +2431,7 @@ const App: React.FC = () => {
                matchTime={matchTime}
                gameType={settings.gameType}
                peerId={peerId}
+               isHostReady={isHostReady}
                onCopyId={() => { navigator.clipboard.writeText(peerId); setCopied(true); setTimeout(() => setCopied(false), 2000); vibrate(10); }}
                isCopied={copied}
                remotePeerId={remotePeerId}

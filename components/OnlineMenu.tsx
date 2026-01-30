@@ -19,6 +19,7 @@ interface OnlineMenuProps {
     setRemotePeerId: (id: string) => void;
     onJoinRoom: (id: string) => void;
     onlineStatus: string;
+    isHostReady?: boolean; // New prop
 }
 
 export const OnlineMenu: React.FC<OnlineMenuProps> = ({
@@ -36,7 +37,8 @@ export const OnlineMenu: React.FC<OnlineMenuProps> = ({
     remotePeerId,
     setRemotePeerId,
     onJoinRoom,
-    onlineStatus
+    onlineStatus,
+    isHostReady = true // Default to true for backward compatibility or matchmaking
 }) => {
     const [queueCounts, setQueueCounts] = useState<{ [key: string]: number }>({});
 
@@ -125,8 +127,10 @@ export const OnlineMenu: React.FC<OnlineMenuProps> = ({
                         <div className="bg-[#fff] p-4 rounded-xl border-2 border-[#e3c086]">
                             <p className="text-[10px] font-bold text-[#8c6b38] uppercase mb-1">我的房间号</p>
                             <div className="flex items-center justify-center gap-2 mb-4">
-                                <span className="text-3xl font-black text-[#5c4033] tracking-widest font-mono">{peerId || '...'}</span>
-                                <button onClick={onCopyId} className="p-2 hover:bg-[#fcf6ea] rounded-full transition-colors">
+                                <span className={`text-3xl font-black text-[#5c4033] tracking-widest font-mono ${(peerId && isHostReady) ? '' : 'text-lg animate-pulse'}`}>
+                                    {(peerId && isHostReady) ? peerId : '创建中...'}
+                                </span>
+                                <button onClick={onCopyId} disabled={!isHostReady} className="p-2 hover:bg-[#fcf6ea] rounded-full transition-colors disabled:opacity-50">
                                     {isCopied ? <Check size={18} className="text-green-500"/> : <Copy size={18} className="text-[#8c6b38]"/>}
                                 </button>
                             </div>
