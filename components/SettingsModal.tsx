@@ -250,12 +250,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             
                             <div className="relative h-8 flex items-center px-2">
                                  <input 
-                                    type="range" min="4" max="19" step="1"
+                                    type="range" min="5" max="19" step="1"
                                     value={tempBoardSize} 
                                     onChange={(e) => setTempBoardSize(parseInt(e.target.value))}
                                     className="cute-range w-full"
                                     style={{ 
-                                        background: getSliderBackground(tempBoardSize, 4, 19),
+                                        background: getSliderBackground(tempBoardSize, 5, 19),
                                         touchAction: 'none'
                                     }}
                                 />

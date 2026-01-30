@@ -2130,14 +2130,14 @@ const App: React.FC = () => {
                     whiteCaptures={gameState.whiteCaptures}
                     gameType={settings.gameType}
                     isThinking={showThinkingStatus}
-                    showWinRate={settings.showWinRate && (settings.gameMode !== 'PvAI' || settings.gameType === 'Go' || settings.difficulty === 'Easy')}
+                    showWinRate={settings.showWinRate && (settings.gameType === 'Gomoku' || settings.gameMode === 'PvP')} // [Updated] Only show simpler winrate for Gomoku or Local PvP
                     appMode={gameState.appMode}
                     gameOver={gameState.gameOver}
                     userColor={settings.userColor}
                     displayWinRate={displayWinRate}
                 />
 
-                {gameState.appMode === 'playing' && settings.gameMode === 'PvAI' && settings.showWinRate && settings.gameType === 'Go' && settings.difficulty !== 'Easy' && (
+                {gameState.appMode === 'playing' && settings.gameMode === 'PvAI' && settings.showWinRate && settings.gameType === 'Go' && ( // [Updated] Show Analysis for ALL Go PvAI games
                     <AnalysisPanel 
                         winRate={displayWinRate}
                         lead={displayLead}

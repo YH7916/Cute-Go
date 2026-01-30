@@ -228,33 +228,30 @@ export class OnnxEngine {
         const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
         if (!isMobile) console.time('[OnnxEngine] Inference');
-        console.log(`[OnnxEngine] Starting analysis...`); // Reduced logging
+        // console.log(`[OnnxEngine] Starting analysis (Size: ${size}x${size})...`);
 
-        // 1. Prepare Input Tensors (NCHW)
-        // [Batch, Channels, Height, Width] -> Always use 19x19 for this fixed model
-        const modelBoardSize = 19;
-        const binInputData = new Float32Array(22 * modelBoardSize * modelBoardSize);
+        // 1. 准备输入 Tensor (NCHW)
+        // [Dynamic] 现在的模型支持动态尺寸，所以直接用 board.size
+        const inputChannels = 22;
+        const binInputData = new Float32Array(inputChannels * size * size);
         const globalInputData = new Float32Array(19);
 
-        // Fill with padding if size < 19
-        this.fillBinInput(board, color, komi, history, binInputData, size, modelBoardSize);
+        // 填充数据 (不再需要传递 modelBoardSize，因为 modelSize 就是 actualSize)
+        this.fillBinInput(board, color, komi, history, binInputData, size);
         this.fillGlobalInput(history, komi, color, globalInputData);
 
-        // Keep track of tensors to dispose
         const tensorsToDispose: ort.Tensor[] = [];
-
-        let binInputTensor: ort.Tensor | null = null;
-        let globalInputTensor: ort.Tensor | null = null;
         let results: ort.InferenceSession.OnnxValueMapType | null = null;
 
         try {
-            binInputTensor = new ort.Tensor('float32', binInputData, [1, 22, modelBoardSize, modelBoardSize]);
-            globalInputTensor = new ort.Tensor('float32', globalInputData, [1, 19]);
+            // 创建 Tensor: [1, 22, size, size]
+            const binInputTensor = new ort.Tensor('float32', binInputData, [1, inputChannels, size, size]);
+            const globalInputTensor = new ort.Tensor('float32', globalInputData, [1, 19]);
             
             tensorsToDispose.push(binInputTensor);
             tensorsToDispose.push(globalInputTensor);
 
-            // 2. Run Inference
+            // 2. 运行推理
             const feeds: Record<string, ort.Tensor> = {};
             feeds['input_binary'] = binInputTensor;
             feeds['input_global'] = globalInputTensor;
@@ -262,123 +259,55 @@ export class OnnxEngine {
             results = await this.session.run(feeds);
             if (!isMobile) console.timeEnd('[OnnxEngine] Inference');
 
-            // Process Results
-            // Map ONNX output names from the model (b6)
+            // 3. 处理结果
             const policyTensor = results['output_policy'];
             const valueTensor = results['output_value'];
             const miscTensor = results['output_miscvalue'];
             const ownershipTensor = results['output_ownership'];
 
-            const policyData = policyTensor ? policyTensor.data as Float32Array : null;
-            const value = valueTensor ? valueTensor.data as Float32Array : null;
-            const misc = miscTensor ? miscTensor.data as Float32Array : null;
-            const ownershipRaw = ownershipTensor ? ownershipTensor.data as Float32Array : null;
-            
-            if (!policyData || !value || !misc) {
+            if (!policyTensor || !valueTensor || !miscTensor) {
                 throw new Error('Model output missing required tensors');
             }
 
-            // [Masking Fix] Map 19x19 Policy/Ownership back to Actual Board Size
-            // Model (19x19) -> Pass is at 361.
-            // Actual (Size) -> Pass is at Size*Size.
-            const modelPassIndex = modelBoardSize * modelBoardSize;
-            const actualPassIndex = board.size * board.size;
+            const policyData = policyTensor.data as Float32Array; // 长度应该正好是 size*size + 1
+            const value = valueTensor.data as Float32Array;
+            const misc = miscTensor.data as Float32Array;
+            const ownershipRaw = ownershipTensor ? ownershipTensor.data as Float32Array : null;
+
+            // [Simplify] 因为模型是动态的，输出直接对应当前棋盘，不需要重映射！
+            // policyData 的最后一个值是 Pass
             
-            // 1. Remap Policy
-            // Create policy for actual size + 1 (Pass)
-            const finalPolicy = new Float32Array(actualPassIndex + 1);
-            
-            // Helper to get index
-            const getModelIdx = (x: number, y: number) => y * modelBoardSize + x;
-            const getActualIdx = (x: number, y: number) => y * board.size + x;
-
-            // Copy valid spots
-            for (let y = 0; y < board.size; y++) {
-                for (let x = 0; x < board.size; x++) {
-                    const mIdx = getModelIdx(x, y);
-                    const aIdx = getActualIdx(x, y);
-                    finalPolicy[aIdx] = policyData[mIdx];
-                }
-            }
-            // Copy Pass
-            finalPolicy[actualPassIndex] = policyData[modelPassIndex];
-
-
-            // [DEBUG] Find Global Max in Raw Policy
-            let maxRaw = -Infinity;
-            let maxRawIdx = -1;
-            for(let i=0; i<361; i++) {
-                if (policyData[i] > maxRaw) {
-                    maxRaw = policyData[i];
-                    maxRawIdx = i;
-                }
-            }
-            const rX = maxRawIdx % 19;
-            const rY = Math.floor(maxRawIdx / 19);
-            console.log(`[OnnxEngine] RAW BEST MOVE: (${rX}, ${rY}) Val=${maxRaw}`);
-            if (rX >= board.size || rY >= board.size) {
-                 // Common when mapping 9x9 -> 19x19 model with padding
-                 if (this.config.debug) console.log("[OnnxEngine] AI predicted move outside board (likely padding artifact). Ignored.");
-            }
-
-            // [DEBUG] Check if we have valid policy data for small board
-            let nonzero = 0;
-            let sum = 0;
-            for(let i=0; i<finalPolicy.length; i++) {
-                if (finalPolicy[i] > -1000) nonzero++; // Check for non-masked values (log space, so small negative or positive)
-                // Actually ONNX policy is usually logits, so they can be negative. 
-                // But usually we check if they are not ridiculously low if softmaxed? 
-                // Wait, output_policy is logits or probs? 
-                // KataGo usually outputs logits.
-                // Let's just count.
-            }
-            console.log(`[OnnxEngine] 9x9 Mapping Debug: PassIndex=${actualPassIndex} (Model=${modelPassIndex}).`);
-            console.log(`[OnnxEngine] FinalPolicy (Size ${finalPolicy.length}): First few=${finalPolicy.slice(0,5).join(',')}`);
-            console.log(`[OnnxEngine] ModelPolicy (Size ${policyData.length}): First few=${policyData.slice(0,5).join(',')}`);
-
-
-            // 2. Remap Ownership (if exists) -> NCHW or NHW? Usually [1, 1, 19, 19] or [19*19]
+            // 4. 处理 Ownership (如果存在)
+            // 所有权也是直接对应的，不需要翻转或映射索引
             let finalOwnership: Float32Array | null = null;
             if (ownershipRaw) {
-                 finalOwnership = new Float32Array(board.size * board.size);
-                 for (let y = 0; y < board.size; y++) {
-                    for (let x = 0; x < board.size; x++) {
-                        const mIdx = getModelIdx(x, y);
-                        const aIdx = getActualIdx(x, y);
-                        // Flip color if needed (Relative -> Absolute)
-                        // If Color=Black(1), Raw is Absolute. If Color=White(-1), Raw is Inverted.
-                        const rawVal = ownershipRaw[mIdx];
-                        finalOwnership[aIdx] = (color === 1) ? rawVal : -rawVal;
-                    }
-                }
+                 finalOwnership = new Float32Array(size * size);
+                 for (let i = 0; i < size * size; i++) {
+                     // 只需要根据颜色翻转数值符号
+                     // 模型输出: 绝对值 (黑正白负) 还是 相对值? KataGo ownership通常是绝对值(黑+, 白-)
+                     // 但我们原来的逻辑里有 (color === 1 ? raw : -raw)，这取决于模型训练时的target。
+                     // 通常 b6 ownership 是相对于视角的。如果是相对于当前玩家：
+                     // 我们假设模型输出是：正数代表当前玩家占有，负数代表对手占有。
+                     // 如果 ownershipRaw 是绝对的（黑正白负），则逻辑如下：
+                     const rawVal = ownershipRaw[i];
+                     finalOwnership[i] = (color === 1) ? rawVal : -rawVal;
+                 }
             }
 
-            // Parse outputs
-            const moveInfos = this.extractMoves(finalPolicy, size, board, color, options.temperature ?? 0);
-            
-            // [KataGo Internal Analysis]
-            // 2. Extract Winrate and Lead directly from model output!
-            // value: [log_win, log_loss, log_no_result]
-            // misc: [score_mean, score_stdev, lead, ...]
+            // 解析胜率等信息
             let winrate = this.processWinrate(value);
-            let lead = misc[0]; // Score Mean
+            let lead = misc[0];
             const scoreStdev = misc[1] || 0;
 
-            // Note: We still keep finalOwnership for territory visualization but no longer derive stats from it.
-            // This is "Winrate Direct Integration" as requested.
-
-
-
-            // Fallback if ownership missing? (Rare)
-            // lead/winrate initialized to 0/50 above.
-
-            // [Memory Fix] Reduce IPC payload on mobile
-            // We only need the best move. Sending 360 move objects kills the message channel or GC.
+            // 提取最佳着手
+            // 直接传入 policyData，它已经是正确的大小了
+            const moveInfos = this.extractMoves(policyData, size, board, color, options.temperature ?? 0);
+            
             const resultMoves = isMobile ? moveInfos.slice(0, 1) : moveInfos;
 
             // Log detailed results (Desktop Only)
             if (!isMobile) {
-                console.log(`[OnnxEngine] Analysis Complete. (Temp: ${options.temperature ?? 0})`);
+                console.log(`[OnnxEngine] Analysis Complete. (Size: ${size}x${size}, Temp: ${options.temperature ?? 0})`);
                 console.log(`  - Win Rate: ${winrate.toFixed(1)}%`);
                 console.log(`  - Score Lead: ${lead.toFixed(1)}`);
                 console.log(`  - Top 3 Moves:`);
@@ -393,29 +322,21 @@ export class OnnxEngine {
                     winrate: winrate,
                     lead: lead,
                     scoreStdev: scoreStdev,
-                    ownership: finalOwnership // Return Normalized Absolute Data
+                    ownership: finalOwnership
                 },
                 moves: resultMoves
             };
+
         } catch (e) {
-            console.timeEnd('[OnnxEngine] Inference');
             console.error('[OnnxEngine] Inference Failed:', e);
             throw e;
         } finally {
-            // [Cleanup] Explicitly dispose input tensors
-            for (const t of tensorsToDispose) {
-                if(t && typeof (t as any).dispose === 'function') {
-                    (t as any).dispose();
-                }
-            }
-            
-            // [Cleanup] Explicitly dispose output tensors
+            // 清理 Tensor
+            for (const t of tensorsToDispose) t.dispose();
             if (results) {
                 for (const key in results) {
                     const val = results[key];
-                    if (val && typeof (val as any).dispose === 'function') {
-                        (val as any).dispose();
-                    }
+                    if (val && typeof (val as any).dispose === 'function') (val as any).dispose();
                 }
             }
         }
@@ -427,54 +348,31 @@ export class OnnxEngine {
         komi: number,
         history: { color: Sign; x: number; y: number }[],
         data: Float32Array,
-        actualSize: number,
-        modelSize: number
+        size: number // 只需要 actualSize
     ) {
         const opp: Sign = pla === 1 ? -1 : 1;
         
-        // Helper to set NCHW: Channel, Y, X in the Model's coordinate system (19x19)
+        // Helper: 设置 NCHW (Channel, Y, X)
+        // 因为 tensor 大小就是 size*size，所以直接计算 offset
         const set = (c: number, y: number, x: number, val: number) => {
-             data[c * modelSize * modelSize + y * modelSize + x] = val;
+             data[c * size * size + y * size + x] = val;
         };
 
-        // [Fix] MOAT STRATEGY (2-Pixel Gap).
-        // Strict Masking (all 0s) kills the Global Pooling signal -> AI Passes.
-        // Full Padding (all 1s) hides the edge -> AI plays 4-4 (thinks it's 19x19).
-        // Solution: A 2-pixel wide "Moat" of 0s to define the edge, followed by 1s.
-        // This gives the ConvNet a clear "End of Board" signal while keeping ample "Ones"
-        // in the far background to satisfy global activation thresholds.
-        for (let y = 0; y < modelSize; y++) {
-            for (let x = 0; x < modelSize; x++) {
-                 // Check if on actual board
-                 if (x < actualSize && y < actualSize) {
-                     set(0, y, x, 1.0);
-                     continue;
-                 }
+        // 1. Feature 0: Ones (整个棋盘都是 1，不再需要边缘 Moat)
+        // 我们可以用 fill 快速填充第一个 Channel
+        const planeSize = size * size;
+        data.fill(1.0, 0, planeSize); 
 
-                 // Calculate distance from board edge
-                 const dx = x < actualSize ? 0 : x - actualSize + 1;
-                 const dy = y < actualSize ? 0 : y - actualSize + 1;
-                 const dist = Math.max(dx, dy);
-
-                 // Moat Width 2: Indices size and size+1 are 0.0. Further is 1.0.
-                 if (dist <= 2) {
-                     set(0, y, x, 0.0);
-                 } else {
-                     set(0, y, x, 1.0); 
-                 }
-            }
-        }
-
-        // Only iterate over the ACTUAL board area for stones/libs
-        for (let y = 0; y < actualSize; y++) {
-            for (let x = 0; x < actualSize; x++) {
-                // Feature 0: Ones (Already set above)
-
+        // 2. 遍历棋盘设置石子特征
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
                 const c = board.get(x, y);
-                // Model expects [Ones, Pla, Opp]
-                if (c === pla) set(1, y, x, 1.0);      // Pla -> Ch 1
-                else if (c === opp) set(2, y, x, 1.0); // Opp -> Ch 2
+                // Feature 1: Player Stones
+                if (c === pla) set(1, y, x, 1.0);
+                // Feature 2: Opponent Stones
+                else if (c === opp) set(2, y, x, 1.0);
 
+                // Feature 3-5: Liberties (只有存在石子时才计算)
                 if (c !== 0) {
                     const libs = board.getLiberties(x, y);
                     if (libs === 1) set(3, y, x, 1.0);
@@ -491,13 +389,12 @@ export class OnnxEngine {
         }
 
         // Feature 9-13: History (Moves)
-        // Revert to "Move Location" based on saturation hypothesis and reference.
-        // Ch 9 = Last Move, Ch 10 = 2nd Last Move...
         const len = history.length;
         const setHistory = (turnsAgo: number, channel: number) => {
             if (len >= turnsAgo) {
                 const h = history[len - turnsAgo];
-                if (h.x >= 0 && h.x < actualSize && h.y >= 0 && h.y < actualSize) {
+                // 确保坐标在当前棋盘范围内 (比如刚从 19路 切到 9路，历史记录可能残留大坐标)
+                if (h.x >= 0 && h.x < size && h.y >= 0 && h.y < size) {
                      set(channel, h.y, h.x, 1.0);
                 }
             }
@@ -508,10 +405,6 @@ export class OnnxEngine {
         setHistory(3, 11);
         setHistory(4, 12);
         setHistory(5, 13);
-        
-        // DEBUG: Force fill with dummy data to test model stability
-        // console.warn("DEBUG: Overwriting input with 0.1");
-        // for(let i=0; i<data.length; i++) data[i] = 0.1;
     }
 
     private fillGlobalInput(

@@ -58,7 +58,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
             baseUrl = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
         }
 
-        const modelUrl = new URL('models/kata1_b6.onnx', baseUrl).href;
+        const modelUrl = new URL('models/kata_dynamic.onnx', baseUrl).href;
         const wasmUrl = new URL('wasm/', baseUrl).href;
 
         // --- 2. Worker config ---

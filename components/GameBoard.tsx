@@ -93,9 +93,27 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // --- ACTIVE QI STATE ---
   const [activeQiSegments, setActiveQiSegments] = useState<QiSegment[]>([]);
 
+  // [Perf] Track the ID of the most recently placed stone for animation targeting
+  // This prevents ALL stones from re-animating on every render
+  const [animatingStoneId, setAnimatingStoneId] = useState<string | null>(null);
+
+  // Update animating stone when lastMove changes
+  useEffect(() => {
+    if (lastMove) {
+      const stone = board[lastMove.y]?.[lastMove.x];
+      if (stone) {
+        setAnimatingStoneId(stone.id);
+        // Clear after animation completes to prevent re-animation on unrelated re-renders
+        const timer = setTimeout(() => setAnimatingStoneId(null), 450);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [lastMove, board]);
+
   useEffect(() => {
     setTransform({ scale: 1, x: 0, y: 0 });
     setActiveQiSegments([]); // 重置棋盘大小时清除气流
+    setAnimatingStoneId(null);
   }, [boardSize, showCoordinates]);
 
   // 当棋盘变化（落子）时，清除之前的气流显示
@@ -706,7 +724,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             const orthoWidth = isGomoku ? CELL_SIZE * 0.2 : CELL_SIZE * 0.9;
             
             // Unified filter for standard themes
-            const filterId = (!isMinimal && !isGomoku) 
+            // [Fix] Allow jelly filter for Gomoku too (User Request)
+            const filterId = (!isMinimal) 
                 ? (theme.filter ? undefined : (color === 'black' ? 'url(#jelly-black)' : 'url(#jelly-white)'))
                 : undefined;
             
@@ -740,8 +759,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                  }
             }
 
+            // [Fix] For Gomoku, apply filter to individual stones to prevent fusion. 
+            // For Go, apply to group to enable fusion.
+            const groupFilter = isGomoku ? undefined : filterId;
+            const stoneFilter = isGomoku ? filterId : undefined;
+
             return (
-                <g filter={filterId} style={styleFilter} opacity={opacity}>
+                <g filter={groupFilter} style={styleFilter} opacity={opacity}>
                      {/* 1. Direct Connections (Fused Body) */}
                      {!isGomoku && (
                         <g>
@@ -783,7 +807,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             // Only draw stroke on the MAIN layer
                             stroke={effectiveStroke}
                             strokeWidth={effectiveStrokeWidth} 
-                            className="stone-enter"
+                            // [Fix] Apply filter here if Gomoku
+                            filter={stoneFilter}
+                            // [Perf] Only animate the newly placed stone
+                            className={animatingStoneId === s.id ? 'stone-enter' : undefined}
                         />
                     ))}
                 </g>
