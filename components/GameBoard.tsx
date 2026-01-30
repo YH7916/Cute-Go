@@ -852,12 +852,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         {renderShapes(mainColor, true)}
                     </g>
 
-                    {/* Layer 4: Specular Highlight (Rim light on top-left) */}
-                    {/* Rendered ON TOP of body to create "Inner Bevel" look */}
-                    <g transform={`translate(${-off1}, ${-off1})`} style={{ mixBlendMode: 'screen' }}>
-                         {/* Note: We use 'screen' blend mode if supported, or just opacity */}
-                        {renderShapes(highlightColor, false, 0.4)}
-                    </g>
+
                 </g>
             );
         } else {

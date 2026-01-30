@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Heart, RefreshCw, Download, Check } from 'lucide-react';
 import { CURRENT_VERSION } from '../utils/constants';
+import { isTapTapEnv } from '../utils/tapTapBridge';
 
 interface AboutModalProps {
     isOpen: boolean;
@@ -137,44 +138,48 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                 </div>
 
 
-                                <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
+                {!isTapTapEnv() && (
+                    <>
+                        <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
 
-                {/* Donation */}
-                <div className="flex flex-col gap-3 pb-4">
-                    <div className="flex items-center justify-center gap-2">
-                         <Heart size={16} fill="#e57373" className="text-[#e57373] animate-pulse"/>
-                         <h3 className="text-sm font-bold text-[#5c4033] uppercase">支持开发者</h3>
-                         <Heart size={16} fill="#e57373" className="text-[#e57373] animate-pulse"/>
-                    </div>
-                    <p className="text-[10px] font-bold text-[#8c6b38] leading-tight">如果喜欢这个应用，<br/>欢迎投喂一杯奶茶☕️！<br/>你们的支持是我更新的动力🤗 </p>
+                        {/* Donation */}
+                        <div className="flex flex-col gap-3 pb-4">
+                            <div className="flex items-center justify-center gap-2">
+                                <Heart size={16} fill="#e57373" className="text-[#e57373] animate-pulse"/>
+                                <h3 className="text-sm font-bold text-[#5c4033] uppercase">支持开发者</h3>
+                                <Heart size={16} fill="#e57373" className="text-[#e57373] animate-pulse"/>
+                            </div>
+                            <p className="text-[10px] font-bold text-[#8c6b38] leading-tight">如果喜欢这个应用，<br/>欢迎投喂一杯奶茶☕️！<br/>你们的支持是我更新的动力🤗 </p>
 
-                    <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086]">
-                        <div className="inset-track rounded-xl p-1 relative h-10 flex items-center mb-4">
-                            <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${donationMethod === 'alipay' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
-                            <button onClick={() => setDonationMethod('wechat')} className={`flex-1 relative z-10 font-bold text-xs transition-colors duration-200 flex items-center justify-center gap-1 ${donationMethod === 'wechat' ? 'text-[#07c160]' : 'text-[#8c6b38]/60'}`}>
-                                微信支付
-                            </button>
-                            <button onClick={() => setDonationMethod('alipay')} className={`flex-1 relative z-10 font-bold text-xs transition-colors duration-200 flex items-center justify-center gap-1 ${donationMethod === 'alipay' ? 'text-[#1677ff]' : 'text-[#8c6b38]/60'}`}>
-                                支付宝
-                            </button>
+                            <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086]">
+                                <div className="inset-track rounded-xl p-1 relative h-10 flex items-center mb-4">
+                                    <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${donationMethod === 'alipay' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
+                                    <button onClick={() => setDonationMethod('wechat')} className={`flex-1 relative z-10 font-bold text-xs transition-colors duration-200 flex items-center justify-center gap-1 ${donationMethod === 'wechat' ? 'text-[#07c160]' : 'text-[#8c6b38]/60'}`}>
+                                        微信支付
+                                    </button>
+                                    <button onClick={() => setDonationMethod('alipay')} className={`flex-1 relative z-10 font-bold text-xs transition-colors duration-200 flex items-center justify-center gap-1 ${donationMethod === 'alipay' ? 'text-[#1677ff]' : 'text-[#8c6b38]/60'}`}>
+                                        支付宝
+                                    </button>
+                                </div>
+
+                                <div className="w-full aspect-square bg-[#fcf6ea] rounded-xl border-2 border-dashed border-[#e3c086] flex items-center justify-center relative overflow-hidden group">
+                                     <img 
+                                        src={donationMethod === 'wechat' 
+                                            ? './wechat_pay.jpg' 
+                                            : './alipay_pay.jpg'
+                                        } 
+                                        alt={donationMethod === 'wechat' ? "WeChat QR" : "Alipay QR"}
+                                        className="w-full h-full object-contain p-2" 
+                                     />
+                                     <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 pointer-events-none"></div>
+                                </div>
+                                <p className="text-[10px] text-[#8c6b38] mt-2 font-bold opacity-75">
+                                    (个人收款码不支持直接跳转，请截图或长按保存扫码)
+                                </p>
+                            </div>
                         </div>
-
-                        <div className="w-full aspect-square bg-[#fcf6ea] rounded-xl border-2 border-dashed border-[#e3c086] flex items-center justify-center relative overflow-hidden group">
-                             <img 
-                                src={donationMethod === 'wechat' 
-                                    ? './wechat_pay.jpg' 
-                                    : './alipay_pay.jpg'
-                                } 
-                                alt={donationMethod === 'wechat' ? "WeChat QR" : "Alipay QR"}
-                                className="w-full h-full object-contain p-2" 
-                             />
-                             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 pointer-events-none"></div>
-                        </div>
-                        <p className="text-[10px] text-[#8c6b38] mt-2 font-bold opacity-75">
-                            (个人收款码不支持直接跳转，请截图或长按保存扫码)
-                        </p>
-                    </div>
-                </div>
+                    </>
+                )}
 
             </div>
           </div>

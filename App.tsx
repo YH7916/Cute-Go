@@ -517,7 +517,12 @@ const App: React.FC = () => {
     // --- AI Engines ---
     const electronAiEngine = useKataGo({
         boardSize: settings.boardSize,
-        onAiMove: (x, y) => executeMove(x, y, false), 
+        onAiMove: (x, y) => {
+            // [UX] Delay for natural feel
+            setTimeout(() => {
+                if (aiTurnLock.current && !gameState.gameOver) executeMove(x, y, false);
+            }, 200);
+        }, 
         onAiPass: () => handlePass(false),
         onAiResign: () => endGame(settings.userColor, 'AI 认为差距过大，投子认输')
     });
@@ -525,14 +530,22 @@ const App: React.FC = () => {
 
     const webAiEngine = useWebKataGo({
         boardSize: settings.boardSize,
-        onAiMove: (x, y) => executeMove(x, y, false),
+        onAiMove: (x, y) => {
+            setTimeout(() => {
+                 if (aiTurnLock.current && !gameState.gameOver) executeMove(x, y, false);
+            }, 200);
+        },
         onAiPass: () => handlePass(false),
         onAiResign: () => endGame(settings.userColor, 'AI 认为胜率过低，投子认输'),
         onAiError: handleAiError
     });
 
     const cloudAiEngine = useCloudKataGo({
-        onAiMove: (x, y) => executeMove(x, y, false),
+        onAiMove: (x, y) => {
+            setTimeout(() => {
+                 if (aiTurnLock.current && !gameState.gameOver) executeMove(x, y, false);
+            }, 200);
+        },
         onAiPass: () => handlePass(false),
         onAiResign: () => endGame(settings.userColor, 'Cloud AI 认输'),
         onAiError: handleAiError
@@ -690,7 +703,7 @@ const App: React.FC = () => {
                  if (newSettings.userColor === 'white') {
                    setTimeout(() => {
                         electronAiEngine.requestAiMove('black', newSettings.difficulty, newSettings.maxVisits, getResignThreshold(newSettings.difficulty)); 
-                   }, 500);
+                   }, 0);
                 }
             } 
             else if (!isElectronAvailable && newSettings.gameType === 'Go') {
@@ -1090,7 +1103,7 @@ const App: React.FC = () => {
                      setTsumegoIsCorrect(true);
                      setTsumegoResultMsg(comment);
                      setShowTsumegoResult(true);
-                 }, 500);
+                 }, 200);
              }
         } else if (isWrong) {
              // User requested to remove red 'X' prompt
@@ -1153,7 +1166,7 @@ const App: React.FC = () => {
                              }
                          }
                      }
-                 }, 500);
+                 }, 100);
             }
             return true;
         } else {
@@ -1221,7 +1234,7 @@ const App: React.FC = () => {
                       
                       vibrate(isSuccess ? 100 : 200);
                       playSfx(isSuccess ? 'win' : 'lose');
-                 }, 500);
+                 }, 200);
             }
         }
     }, [tsumegoCurrentNode, settings.gameMode, gameState.currentPlayer, settings.userColor]);
@@ -1256,7 +1269,7 @@ const App: React.FC = () => {
                                 setTimeout(() => setToastMsg(null), 3000);
                            }
                       }
-                 }, 500);
+                 }, 200);
                  return () => clearTimeout(timer);
              }
         }
@@ -1657,7 +1670,7 @@ const App: React.FC = () => {
                       } finally {
                           aiTurnLock.current = false; aiTimerRef.current = null;
                       }
-                  }, 500); 
+                  }, 200); 
               }
           }
         } else {
