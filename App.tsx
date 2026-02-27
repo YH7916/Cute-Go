@@ -58,6 +58,7 @@ import { TsumegoListModal, TsumegoSet } from './components/TsumegoListModal';
 import TsumegoResultModal from './components/TsumegoResultModal';
 import { parseSGFToTree, SGFNode } from './utils/sgfParser';
 import { StartScreen } from './components/StartScreen';
+import { TopBar } from './components/common/TopBar';
 import { TsumegoHub } from './components/Tsumego/TsumegoHub';
 import { TsumegoLevel, TsumegoCategory, fetchProblemManifest, fetchProblemSGF, getLevelsFromCategory } from './utils/tsumegoData';
 
@@ -2074,7 +2075,7 @@ const App: React.FC = () => {
 
 
     return (
-        <div className="h-full w-full bg-[#f7e7ce] flex flex-col landscape:flex-row items-center relative select-none overflow-y-auto landscape:overflow-hidden text-[#5c4033] pt-safe pb-safe">
+        <div className="h-full w-full bg-[#f7e7ce] flex flex-col landscape:flex-row items-center relative select-none overflow-y-auto landscape:overflow-hidden text-[#5c4033] pb-safe">
 
             {toastMsg && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[80] bg-[#5c4033] text-[#fcf6ea] px-4 py-2 rounded-full text-xs font-bold shadow-lg border-2 border-[#8c6b38] animate-in fade-in">
@@ -2149,16 +2150,15 @@ const App: React.FC = () => {
 
             {/* --- SIDEBAR --- */}
             <div
-                className="w-full landscape:w-96 flex flex-col gap-4 px-4 pb-4 pt-1 z-20 shrink-0 bg-[#f7e7ce] landscape:bg-[#f2e6d6] landscape:h-full landscape:border-l-4 landscape:border-[#e3c086] order-1 landscape:order-2 shadow-xl landscape:shadow-none"
+                className="w-full landscape:w-96 flex flex-col gap-4 pb-4 z-20 shrink-0 bg-[#f7e7ce] landscape:bg-[#f2e6d6] landscape:h-full landscape:border-l-4 landscape:border-[#e3c086] order-1 landscape:order-2 shadow-xl landscape:shadow-none"
             >
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
+                <TopBar
+                    leftButtons={<>
                         <button onClick={() => { setShowStartScreen(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><Home size={20} /></button>
                         <button onClick={() => { setShowUserPage(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><UserIcon size={20} /></button>
                         <button onClick={() => { setShowMenu(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><Settings size={20} /></button>
-                    </div>
-
-                    <div className="flex flex-col items-end">
+                    </>}
+                    rightContent={<>
                         <span className="font-black text-[#5c4033] text-xl leading-tight flex items-center gap-2 tracking-wide">
                             {onlineStatus === 'connected' && (
                                 <span className="relative flex h-2 w-2">
@@ -2176,220 +2176,222 @@ const App: React.FC = () => {
                                 </button>
                             </span>
                         )}
-                    </div>
-                </div>
-
-                <ScoreBoard
-                    currentPlayer={gameState.currentPlayer}
-                    blackCaptures={gameState.blackCaptures}
-                    whiteCaptures={gameState.whiteCaptures}
-                    gameType={settings.gameType}
-                    isThinking={showThinkingStatus}
-                    showWinRate={settings.showWinRate && (settings.gameType === 'Gomoku' || settings.gameMode === 'PvP')} // [Updated] Only show simpler winrate for Gomoku or Local PvP
-                    appMode={gameState.appMode}
-                    gameOver={gameState.gameOver}
-                    userColor={settings.userColor}
-                    displayWinRate={displayWinRate}
+                    </>}
                 />
 
-                {gameState.appMode === 'playing' && settings.gameMode === 'PvAI' && settings.showWinRate && settings.gameType === 'Go' && ( // [Updated] Show Analysis for ALL Go PvAI games
-                    <AnalysisPanel
-                        winRate={displayWinRate}
-                        lead={displayLead}
+                <div className="flex flex-col gap-4 px-4">
+                    <ScoreBoard
+                        currentPlayer={gameState.currentPlayer}
+                        blackCaptures={gameState.blackCaptures}
+                        whiteCaptures={gameState.whiteCaptures}
+                        gameType={settings.gameType}
                         isThinking={showThinkingStatus}
-                        showTerritory={showTerritory}
-                        onToggleTerritory={() => setShowTerritory(prev => !prev)}
+                        showWinRate={settings.showWinRate && (settings.gameType === 'Gomoku' || settings.gameMode === 'PvP')} // [Updated] Only show simpler winrate for Gomoku or Local PvP
+                        appMode={gameState.appMode}
+                        gameOver={gameState.gameOver}
                         userColor={settings.userColor}
+                        displayWinRate={displayWinRate}
                     />
-                )}
 
-                <GameControls
-                    appMode={gameState.appMode}
-                    setupTool={gameState.setupTool}
-                    setSetupTool={gameState.setSetupTool}
-                    finishSetup={() => {
-                        gameState.setAppMode('playing');
-                        gameState.setHistory([]);
-                        gameState.historyRef.current = [];
-                        aiTurnLock.current = false;
-                        setIsThinking(false);
-                    }}
-                    reviewIndex={gameState.reviewIndex}
-                    history={gameState.history}
-                    setReviewIndex={gameState.setReviewIndex}
-                    setAppMode={gameState.setAppMode}
-                    setGameOver={gameState.setGameOver}
-                    handleUndo={handleUndo}
-                    handlePass={handlePass}
-                    resetGame={(k) => resetGame(k)}
-                    isThinking={showThinkingStatus}
-                    gameOver={gameState.gameOver}
-                    onlineStatus={onlineStatus}
-                    currentPlayer={gameState.currentPlayer}
-                    myColor={myColor}
-                    consecutivePasses={gameState.consecutivePasses}
+                    {gameState.appMode === 'playing' && settings.gameMode === 'PvAI' && settings.showWinRate && settings.gameType === 'Go' && ( // [Updated] Show Analysis for ALL Go PvAI games
+                        <AnalysisPanel
+                            winRate={displayWinRate}
+                            lead={displayLead}
+                            isThinking={showThinkingStatus}
+                            showTerritory={showTerritory}
+                            onToggleTerritory={() => setShowTerritory(prev => !prev)}
+                            userColor={settings.userColor}
+                        />
+                    )}
 
-                    // Tsumego Props
-                    isTsumego={settings.gameMode === 'Tsumego'}
-                    hasPrevProblem={useMemo(() => {
-                        if (!currentTsumegoLevel) return false;
-                        const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
-                        if (!cat) return false;
-                        const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
-                        let fileList: string[] = [];
-                        if (currentTsumegoLevel.groupName) {
-                            const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
-                            if (group && (group as any).files) fileList = (group as any).files;
-                        } else {
-                            fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
-                        }
-                        const cleanCurrent = currentFilename.startsWith(cat.dirName + '/')
-                            ? currentFilename.slice(cat.dirName.length + 1)
-                            : currentFilename;
-                        const idx = fileList.indexOf(cleanCurrent);
-                        return idx > 0;
-                    }, [currentTsumegoLevel, tsumegoCategories])}
+                    <GameControls
+                        appMode={gameState.appMode}
+                        setupTool={gameState.setupTool}
+                        setSetupTool={gameState.setSetupTool}
+                        finishSetup={() => {
+                            gameState.setAppMode('playing');
+                            gameState.setHistory([]);
+                            gameState.historyRef.current = [];
+                            aiTurnLock.current = false;
+                            setIsThinking(false);
+                        }}
+                        reviewIndex={gameState.reviewIndex}
+                        history={gameState.history}
+                        setReviewIndex={gameState.setReviewIndex}
+                        setAppMode={gameState.setAppMode}
+                        setGameOver={gameState.setGameOver}
+                        handleUndo={handleUndo}
+                        handlePass={handlePass}
+                        resetGame={(k) => resetGame(k)}
+                        isThinking={showThinkingStatus}
+                        gameOver={gameState.gameOver}
+                        onlineStatus={onlineStatus}
+                        currentPlayer={gameState.currentPlayer}
+                        myColor={myColor}
+                        consecutivePasses={gameState.consecutivePasses}
 
-                    hasNextProblem={useMemo(() => {
-                        if (!currentTsumegoLevel) return false;
-                        const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
-                        if (!cat) return false;
-                        const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
-                        let fileList: string[] = [];
-                        if (currentTsumegoLevel.groupName) {
-                            const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
-                            if (group && (group as any).files) fileList = (group as any).files;
-                        } else {
-                            fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
-                        }
-                        const cleanCurrent = currentFilename.startsWith(cat.dirName + '/')
-                            ? currentFilename.slice(cat.dirName.length + 1)
-                            : currentFilename;
-                        const idx = fileList.indexOf(cleanCurrent);
-                        return idx !== -1 && idx < fileList.length - 1;
-                    }, [currentTsumegoLevel, tsumegoCategories])}
+                        // Tsumego Props
+                        isTsumego={settings.gameMode === 'Tsumego'}
+                        hasPrevProblem={useMemo(() => {
+                            if (!currentTsumegoLevel) return false;
+                            const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
+                            if (!cat) return false;
+                            const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
+                            let fileList: string[] = [];
+                            if (currentTsumegoLevel.groupName) {
+                                const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
+                                if (group && (group as any).files) fileList = (group as any).files;
+                            } else {
+                                fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
+                            }
+                            const cleanCurrent = currentFilename.startsWith(cat.dirName + '/')
+                                ? currentFilename.slice(cat.dirName.length + 1)
+                                : currentFilename;
+                            const idx = fileList.indexOf(cleanCurrent);
+                            return idx > 0;
+                        }, [currentTsumegoLevel, tsumegoCategories])}
 
-                    handlePrevProblem={() => {
-                        // Logic similar to Next but index - 1
-                        if (!currentTsumegoLevel) return;
-                        const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
-                        if (!cat) return;
-                        const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
-                        let fileList: string[] = [];
-                        if (currentTsumegoLevel.groupName) {
-                            const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
-                            if (group) fileList = (group as any).files;
-                        } else {
-                            fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
-                        }
-                        const cleanCurrent = currentFilename.startsWith(cat.dirName + '/')
-                            ? currentFilename.slice(cat.dirName.length + 1)
-                            : currentFilename;
-                        const idx = fileList.indexOf(cleanCurrent);
+                        hasNextProblem={useMemo(() => {
+                            if (!currentTsumegoLevel) return false;
+                            const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
+                            if (!cat) return false;
+                            const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
+                            let fileList: string[] = [];
+                            if (currentTsumegoLevel.groupName) {
+                                const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
+                                if (group && (group as any).files) fileList = (group as any).files;
+                            } else {
+                                fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
+                            }
+                            const cleanCurrent = currentFilename.startsWith(cat.dirName + '/')
+                                ? currentFilename.slice(cat.dirName.length + 1)
+                                : currentFilename;
+                            const idx = fileList.indexOf(cleanCurrent);
+                            return idx !== -1 && idx < fileList.length - 1;
+                        }, [currentTsumegoLevel, tsumegoCategories])}
 
-                        if (idx > 0) {
-                            const prevFile = fileList[idx - 1];
-                            const prevFull = `${cat.dirName}/${prevFile}`;
-                            const prevLevel: TsumegoLevel = {
-                                id: `${cat.id}/${prevFile}`,
-                                title: `Problem ${idx}`, // idx + 1 - 1
-                                category: cat.id,
-                                groupName: currentTsumegoLevel.groupName,
-                                filename: prevFull,
-                                difficulty: 1,
-                            };
-                            setToastMsg("加载上一关...");
-                            fetchProblemSGF(prevLevel.filename).then(sgf => {
-                                setCurrentTsumegoLevel(prevLevel);
-                                const nodes = parseSGFToTree(sgf);
-                                if (nodes && nodes.length > 0) startTsumego(nodes[0]);
-                                setToastMsg(null);
-                            }).catch(() => setToastMsg("加载失败"));
-                        }
-                    }}
-                    handleNextProblem={handleNextTsumego}
-                    handleHint={() => {
-                        if (!tsumegoCurrentNode) return;
-                        // Hint Logic
-                        const playerProp = gameState.currentPlayer === 'black' ? 'B' : 'W';
-                        const playerColor = gameState.currentPlayer;
+                        handlePrevProblem={() => {
+                            // Logic similar to Next but index - 1
+                            if (!currentTsumegoLevel) return;
+                            const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
+                            if (!cat) return;
+                            const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
+                            let fileList: string[] = [];
+                            if (currentTsumegoLevel.groupName) {
+                                const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
+                                if (group) fileList = (group as any).files;
+                            } else {
+                                fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
+                            }
+                            const cleanCurrent = currentFilename.startsWith(cat.dirName + '/')
+                                ? currentFilename.slice(cat.dirName.length + 1)
+                                : currentFilename;
+                            const idx = fileList.indexOf(cleanCurrent);
 
-                        // 1. First, look for immediate nodes marked "Correct"
-                        let hintChild = tsumegoCurrentNode.children.find(c => {
-                            const comment = c.properties['C'] ? c.properties['C'][0].toLowerCase() : '';
-                            return tsumegoKeywords.correct.some(k => comment.includes(k));
-                        });
+                            if (idx > 0) {
+                                const prevFile = fileList[idx - 1];
+                                const prevFull = `${cat.dirName}/${prevFile}`;
+                                const prevLevel: TsumegoLevel = {
+                                    id: `${cat.id}/${prevFile}`,
+                                    title: `Problem ${idx}`, // idx + 1 - 1
+                                    category: cat.id,
+                                    groupName: currentTsumegoLevel.groupName,
+                                    filename: prevFull,
+                                    difficulty: 1,
+                                };
+                                setToastMsg("加载上一关...");
+                                fetchProblemSGF(prevLevel.filename).then(sgf => {
+                                    setCurrentTsumegoLevel(prevLevel);
+                                    const nodes = parseSGFToTree(sgf);
+                                    if (nodes && nodes.length > 0) startTsumego(nodes[0]);
+                                    setToastMsg(null);
+                                }).catch(() => setToastMsg("加载失败"));
+                            }
+                        }}
+                        handleNextProblem={handleNextTsumego}
+                        handleHint={() => {
+                            if (!tsumegoCurrentNode) return;
+                            // Hint Logic
+                            const playerProp = gameState.currentPlayer === 'black' ? 'B' : 'W';
+                            const playerColor = gameState.currentPlayer;
 
-                        // 2. [New] Recursive Search: Does any branch lead to success?
-                        if (!hintChild) {
-                            hintChild = tsumegoCurrentNode.children.find(c => hasSuccessDescendant(c));
-                        }
-
-                        // Fallback Logic:
-                        if (!hintChild) {
-                            // Filter out known "Wrong" paths
-                            const candidates = tsumegoCurrentNode.children.filter(c => {
-                                if (!c.properties[playerProp]) return false;
+                            // 1. First, look for immediate nodes marked "Correct"
+                            let hintChild = tsumegoCurrentNode.children.find(c => {
                                 const comment = c.properties['C'] ? c.properties['C'][0].toLowerCase() : '';
-                                const isWrong = tsumegoKeywords.wrong.some(k => comment.includes(k));
-                                return !isWrong;
+                                return tsumegoKeywords.correct.some(k => comment.includes(k));
                             });
 
-                            if (candidates.length > 0) {
-                                hintChild = candidates[0];
-                            } else {
-                                hintChild = tsumegoCurrentNode.children.find(c => c.properties[playerProp]);
+                            // 2. [New] Recursive Search: Does any branch lead to success?
+                            if (!hintChild) {
+                                hintChild = tsumegoCurrentNode.children.find(c => hasSuccessDescendant(c));
                             }
-                        }
 
-                        if (hintChild && hintChild.properties[playerProp]) {
-                            const moveStr = hintChild.properties[playerProp][0];
-                            if (moveStr && moveStr.length >= 2) {
-                                // Trim strictly to avoid issues
-                                const trimmed = moveStr.trim();
-                                const x = trimmed.charCodeAt(0) - 97;
-                                const y = trimmed.charCodeAt(1) - 97;
+                            // Fallback Logic:
+                            if (!hintChild) {
+                                // Filter out known "Wrong" paths
+                                const candidates = tsumegoCurrentNode.children.filter(c => {
+                                    if (!c.properties[playerProp]) return false;
+                                    const comment = c.properties['C'] ? c.properties['C'][0].toLowerCase() : '';
+                                    const isWrong = tsumegoKeywords.wrong.some(k => comment.includes(k));
+                                    return !isWrong;
+                                });
 
-                                // 1. Place Stone (Visual)
-                                const attempt = attemptMove(gameState.boardRef.current, x, y, playerColor);
-                                if (attempt) {
-                                    gameState.setBoard(attempt.newBoard);
-                                    gameState.setLastMove({ x, y });
-                                    gameState.setCurrentPlayer(playerColor === 'black' ? 'white' : 'black');
-                                    playSfx('place');
-
-                                    // 2. Trigger Tsumego Logic
-                                    handleTsumegoMove(x, y);
+                                if (candidates.length > 0) {
+                                    hintChild = candidates[0];
+                                } else {
+                                    hintChild = tsumegoCurrentNode.children.find(c => c.properties[playerProp]);
                                 }
                             }
-                        } else {
-                            setToastMsg("无更多提示 / 已是最后一步");
-                            setTimeout(() => setToastMsg(null), 1500);
-                        }
-                    }}
-                    showTerritory={showTerritory}
-                    onToggleTerritory={() => {
-                        const nextState = !showTerritory;
-                        setShowTerritory(nextState);
-                        if (nextState && gameState.appMode === 'review') {
-                            const historySlice = gameState.history.slice(0, gameState.reviewIndex + 1);
-                            const currentItem = gameState.history[gameState.reviewIndex];
-                            const boardToAnalyze = currentItem ? currentItem.board : gameState.board;
-                            // Make sure to determine the correct next player
-                            const playerToAnalyze = currentItem
-                                ? (currentItem.currentPlayer === 'black' ? 'white' : 'black')
-                                : gameState.currentPlayer;
 
-                            webAiEngine.requestAnalysis(
-                                boardToAnalyze,
-                                playerToAnalyze,
-                                historySlice,
-                                7.5, // Default Komi
-                                settings.gameType
-                            );
-                        }
-                    }}
-                />
+                            if (hintChild && hintChild.properties[playerProp]) {
+                                const moveStr = hintChild.properties[playerProp][0];
+                                if (moveStr && moveStr.length >= 2) {
+                                    // Trim strictly to avoid issues
+                                    const trimmed = moveStr.trim();
+                                    const x = trimmed.charCodeAt(0) - 97;
+                                    const y = trimmed.charCodeAt(1) - 97;
+
+                                    // 1. Place Stone (Visual)
+                                    const attempt = attemptMove(gameState.boardRef.current, x, y, playerColor);
+                                    if (attempt) {
+                                        gameState.setBoard(attempt.newBoard);
+                                        gameState.setLastMove({ x, y });
+                                        gameState.setCurrentPlayer(playerColor === 'black' ? 'white' : 'black');
+                                        playSfx('place');
+
+                                        // 2. Trigger Tsumego Logic
+                                        handleTsumegoMove(x, y);
+                                    }
+                                }
+                            } else {
+                                setToastMsg("无更多提示 / 已是最后一步");
+                                setTimeout(() => setToastMsg(null), 1500);
+                            }
+                        }}
+                        showTerritory={showTerritory}
+                        onToggleTerritory={() => {
+                            const nextState = !showTerritory;
+                            setShowTerritory(nextState);
+                            if (nextState && gameState.appMode === 'review') {
+                                const historySlice = gameState.history.slice(0, gameState.reviewIndex + 1);
+                                const currentItem = gameState.history[gameState.reviewIndex];
+                                const boardToAnalyze = currentItem ? currentItem.board : gameState.board;
+                                // Make sure to determine the correct next player
+                                const playerToAnalyze = currentItem
+                                    ? (currentItem.currentPlayer === 'black' ? 'white' : 'black')
+                                    : gameState.currentPlayer;
+
+                                webAiEngine.requestAnalysis(
+                                    boardToAnalyze,
+                                    playerToAnalyze,
+                                    historySlice,
+                                    7.5, // Default Komi
+                                    settings.gameType
+                                );
+                            }
+                        }}
+                    />
+                </div>
             </div>
 
             {/* --- Modals --- */}
