@@ -86,4 +86,3 @@ export type SignalMessage =
   | { type: 'answer'; sdp: RTCSessionDescriptionInit }
   | { type: 'ice'; candidate: RTCIceCandidateInit };
 
-export type ExtendedDifficulty = Difficulty | 'Custom';

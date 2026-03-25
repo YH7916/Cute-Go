@@ -204,7 +204,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
                                 <Undo2 size={20} /> <span className="text-xs">悔棋</span>
                             </button>
                             <button onClick={() => handlePass(false)} disabled={gameOver || isThinking || (onlineStatus === 'connected' && currentPlayer !== myColor)} className={`btn-retro btn-coffee flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50 ${consecutivePasses === 1 ? 'animate-pulse' : ''}`}>
-                                <SkipForward size={20} /> <span className="text-xs">{consecutivePasses === 1 ? '结算' : '停着'}</span>
+                                <SkipForward size={20} /> <span className="text-xs">{gameMode === 'PvAI' && gameType === 'Go' ? '结算' : (consecutivePasses === 1 ? '结算' : '停着')}</span>
                             </button>
                             <button onClick={() => resetGame(onlineStatus === 'connected')} className="btn-retro btn-beige flex flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold">
                                 <RotateCcw size={20} /> <span className="text-xs">重开</span>

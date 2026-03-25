@@ -199,7 +199,11 @@ export const checkGomokuWin = (board: BoardState, lastMove: { x: number, y: numb
 };
 
 // [优化 2] 使用数字 Set 优化算分
-export const calculateScore = (board: BoardState, ownership?: Float32Array | null): { black: number, white: number } => {
+export const calculateScore = (
+    board: BoardState,
+    ownership?: Float32Array | null,
+    komi: number = 7.5
+): { black: number, white: number } => {
     // If AI ownership data is provided, remove dead stones before counting territory.
     if (ownership && ownership.length > 0) board = cleanBoardWithTerritory(board, ownership);
     const size = board.length;
@@ -243,7 +247,42 @@ export const calculateScore = (board: BoardState, ownership?: Float32Array | nul
             }
         }
     }
-    whiteScore += 7.5; // Komi
+    whiteScore += komi;
+    return { black: blackScore, white: whiteScore };
+};
+
+const MODEL_TERRITORY_THRESHOLD = 0.3;
+
+export const calculateModelScore = (
+    board: BoardState,
+    ownership: Float32Array | null,
+    komi: number = 7.5
+): { black: number, white: number } => {
+    if (!ownership || ownership.length === 0) {
+        return calculateScore(board, undefined, komi);
+    }
+
+    const cleanedBoard = cleanBoardWithTerritory(board, ownership);
+    const size = cleanedBoard.length;
+    let blackScore = 0;
+    let whiteScore = 0;
+
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const stone = cleanedBoard[y][x];
+            if (stone) {
+                if (stone.color === 'black') blackScore++;
+                else whiteScore++;
+                continue;
+            }
+
+            const owner = ownership[y * size + x] ?? 0;
+            if (owner > MODEL_TERRITORY_THRESHOLD) blackScore++;
+            else if (owner < -MODEL_TERRITORY_THRESHOLD) whiteScore++;
+        }
+    }
+
+    whiteScore += komi;
     return { black: blackScore, white: whiteScore };
 };
 

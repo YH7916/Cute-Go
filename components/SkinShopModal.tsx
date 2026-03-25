@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Check, Gem, Box } from 'lucide-react';
-import { BOARD_THEMES, STONE_THEMES, BoardThemeId, StoneThemeId } from '../utils/themes';
+import { BOARD_THEMES, STONE_THEMES } from '../utils/themes';
+import { StoneSkinPreview } from './common/StoneSkinPreview';
 
 interface SkinShopModalProps {
     isOpen: boolean;
@@ -81,32 +82,7 @@ export const SkinShopModal: React.FC<SkinShopModalProps> = ({
                                         }`}
                                     >
                                         {/* Preview Area */}
-                                        <div className="flex gap-3 justify-center items-center h-20 w-full rounded-xl bg-[#f5e6d3]/60 border-2 border-[#e3c086]">
-                                            {/* Black Stone (Skeuomorphic Preview) */}
-                                            <div 
-                                                className="w-9 h-9 rounded-full shadow-lg relative"
-                                                style={{ 
-                                                    background: theme.blackColor, 
-                                                    border: id === 'minimal' ? 'none' : `2px solid ${theme.blackBorder}`,
-                                                    filter: theme.filter,
-                                                    boxShadow: id === 'minimal' ? 
-                                                        'inset 2px 2px 3px rgba(255,255,255,0.2), 1px 1px 2px rgba(0,0,0,0.5), inset -1px -1px 2px rgba(0,0,0,0.5)' 
-                                                        : undefined
-                                                }}
-                                            />
-                                            {/* White Stone (Skeuomorphic Preview) */}
-                                            <div 
-                                                className="w-9 h-9 rounded-full shadow-lg relative"
-                                                style={{ 
-                                                    background: theme.whiteColor, 
-                                                    border: id === 'minimal' ? 'none' : `2px solid ${theme.whiteBorder}`,
-                                                    filter: theme.filter,
-                                                    boxShadow: id === 'minimal' ? 
-                                                        'inset 2px 2px 2px rgba(255,255,255,0.8), 1px 1px 2px rgba(0,0,0,0.3), inset -1px -1px 2px rgba(0,0,0,0.2)' 
-                                                        : undefined
-                                                }}
-                                            />
-                                        </div>
+                                        <StoneSkinPreview stoneSkin={id} />
                                         
                                         {/* Name & Check */}
                                         <div className="flex justify-between items-center w-full px-1">

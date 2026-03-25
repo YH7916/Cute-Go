@@ -1,7 +1,6 @@
 import React from 'react';
 import { Player, GameType, AppMode } from '../types';
 import { RenderStoneIcon } from './common/RenderStoneIcon';
-import { Map as MapIcon } from 'lucide-react';
 
 interface ScoreBoardProps {
     currentPlayer: Player;
@@ -28,28 +27,49 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
     userColor,
     displayWinRate
 }) => {
+    const blackActive = currentPlayer === 'black';
+    const whiteActive = currentPlayer === 'white';
+    const blackCardClass = blackActive
+        ? 'btn-retro btn-coffee shadow-md'
+        : 'btn-retro btn-sand opacity-90';
+    const whiteCardClass = whiteActive
+        ? 'btn-retro btn-beige shadow-md'
+        : 'btn-retro btn-beige opacity-90';
+
     return (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
             <div className="grid grid-cols-2 gap-3">
-                <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-300 ${currentPlayer === 'black' ? 'bg-[#5c4033] border-[#3e2b22] text-[#f7e7ce] shadow-md scale-105' : 'border-[#e3c086] bg-transparent opacity-60'}`}>
-                    <div className="relative">
-                        <RenderStoneIcon color="black" />
-                        {currentPlayer === 'black' && isThinking && <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-ping"></div>}
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="font-bold text-sm">黑子</span>
-                        {gameType === 'Go' && <span className="text-[10px] font-bold opacity-80">提子: {blackCaptures}</span>}
+                <div className={`${blackCardClass} flex h-16 items-center rounded-2xl px-4 py-3 transition-all duration-300`}>
+                    <div className="flex w-full items-center gap-2.5">
+                        <div className="relative shrink-0">
+                            <RenderStoneIcon color="black" />
+                            {blackActive && isThinking && <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-yellow-400 animate-ping" />}
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-col justify-center">
+                            <span className={`text-base font-black tracking-tight ${blackActive ? 'text-[#f7e7ce]' : 'text-[#5d4037]'}`}>黑子</span>
+                            {gameType === 'Go' && (
+                                <span className={`text-xs font-bold ${blackActive ? 'text-[#f7e7ce]/85' : 'text-[#7a5b49]'}`}>
+                                    提子: {blackCaptures}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <div className={`flex items-center justify-end gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-300 ${currentPlayer === 'white' ? 'bg-[#fcf6ea] border-[#e3c086] text-[#5c4033] shadow-md scale-105' : 'border-[#e3c086] bg-transparent opacity-60'}`}>
-                    <div className="flex flex-col items-end">
-                        <span className="font-bold text-sm">白子</span>
-                        {gameType === 'Go' && <span className="text-[10px] font-bold opacity-80">提子: {whiteCaptures}</span>}
-                    </div>
-                    <div className="relative">
-                        <RenderStoneIcon color="white" />
-                        {currentPlayer === 'white' && isThinking && <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-ping"></div>}
+                <div className={`${whiteCardClass} flex h-16 items-center rounded-2xl px-4 py-3 transition-all duration-300`}>
+                    <div className="flex w-full items-center justify-end gap-2.5 text-right">
+                        <div className="flex min-w-0 flex-1 flex-col justify-center items-end">
+                            <span className="text-base font-black tracking-tight text-[#5c4033]">白子</span>
+                            {gameType === 'Go' && (
+                                <span className="text-xs font-bold text-[#7a5b49]">
+                                    提子: {whiteCaptures}
+                                </span>
+                            )}
+                        </div>
+                        <div className="relative shrink-0">
+                            <RenderStoneIcon color="white" />
+                            {whiteActive && isThinking && <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-yellow-400 animate-ping" />}
+                        </div>
                     </div>
                 </div>
             </div>

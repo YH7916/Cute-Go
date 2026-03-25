@@ -1,5 +1,5 @@
-import React from 'react';
-import { Map, Zap, TrendingUp, AlertCircle } from 'lucide-react';
+import React, { useDeferredValue } from 'react';
+import { Map } from 'lucide-react';
 import { Player } from '../types';
 
 interface AnalysisPanelProps {
@@ -19,79 +19,67 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
     onToggleTerritory,
     userColor
 }) => {
-    // Determine display values based on user perspective?
-    // User wants to see "My WinRate" or always Black?  
-    // Traditional Go apps show Black WinRate.
-    // But "Lead" is usually relative.
-    // Let's stick to standard: WinRate = Black%, Lead = Black+ / White+
-    
-    // Visual Helper: Convert Lead to Text
-    const getLeadText = () => {
-        if (lead === null) return '--';
-        if (lead === 0) return '平局';
-        return lead > 0 ? `黑 +${lead.toFixed(1)}` : `白 +${Math.abs(lead).toFixed(1)}`;
-    };
+    const deferredWinRate = useDeferredValue(Math.max(0, Math.min(100, winRate)));
+    const deferredLead = useDeferredValue(lead);
 
-    const leadColor = lead && lead > 0 ? 'text-black' : 'text-gray-600';
-    
-    // Win Rate Bar Widths
-    // If winRate is Black%, and we want a single bar:
-    // [Black Part ---- White Part]
-    
+    const blackWinRate = deferredWinRate;
+    const leader: Player | null = deferredLead === null || Math.abs(deferredLead) < 0.05
+        ? null
+        : deferredLead > 0
+            ? 'black'
+            : 'white';
+    const leadValue = deferredLead === null ? '--' : `${Math.abs(deferredLead).toFixed(1)}目`;
+    const leadMatchesUser = leader !== null && leader === userColor;
+    const leadText = deferredLead === null
+        ? '--'
+        : leader === null
+            ? '局势接近'
+            : `${leader === 'black' ? '黑' : '白'}领先 ${leadValue}`;
+
+    const blackWidth = `${blackWinRate}%`;
+    const leadTone = leadMatchesUser ? 'btn-beige' : 'btn-sand';
+
     return (
-        <div className="bg-[#fcf6ea]/90 rounded-xl shadow-sm border border-[#e3c086] px-3 py-2 flex items-center justify-between gap-2 text-[#5c4033] select-none min-h-[48px] transition-all">
-            
-            {/* 1. Status / Lead */}
-            <div className="flex items-center gap-2 shrink-0">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isThinking ? 'bg-yellow-100' : 'bg-[#e3c086]/20'}`}>
-                    {isThinking ? (
-                        <Zap size={14} className="text-yellow-600 animate-pulse" />
-                    ) : (
-                        <TrendingUp size={16} className="text-[#8c6b38]" />
-                    )}
-                </div>
-                
-                <div className="flex flex-col leading-none gap-0.5">
-                    <span className="text-[10px] font-bold opacity-60">AI 局势</span>
-                    <span className={`text-sm font-black font-mono tracking-tight ${leadColor}`}>
-                         {getLeadText()}
+        <div className="rounded-2xl border-2 border-[#e3c086] bg-[#fcf6ea] p-2 shadow-md text-[#5c4033]">
+            <div className="flex items-stretch gap-2">
+                <div className={`btn-retro ${leadTone} flex h-10 shrink-0 items-center rounded-xl px-3`}>
+                    <span className="whitespace-nowrap text-[12px] font-black tracking-tight text-[#5c4033]">
+                        {leadText}
                     </span>
                 </div>
-            </div>
 
-            {/* 2. WinRate Bar (Compact & Styled) */}
-            <div className="flex-grow flex flex-col justify-center px-3 border-l border-r border-[#e3c086]/30 mx-1">
-                <div className="flex justify-between items-end text-[10px] font-bold mb-1 opacity-90">
-                    <span className="text-[#8c6b38]">黑胜率</span>
-                    <span className="font-mono">{winRate.toFixed(1)}%</span>
+                <div className="btn-retro btn-sand flex h-10 min-w-0 flex-1 items-center rounded-xl px-3">
+                    <div className="flex h-full w-full min-w-0 -translate-y-[5px] flex-col justify-between py-[6px]">
+                        <div className="flex items-center justify-between gap-2 px-0.5 text-[#5c4033]">
+                            <span className="truncate text-[11px] font-black tracking-tight">
+                                黑方胜率
+                            </span>
+                            <span className="shrink-0 font-mono text-[13px] font-black">
+                                {Math.round(blackWinRate)}%
+                            </span>
+                        </div>
+                        <div className="relative min-w-0 px-0.5">
+                            <div className="relative h-2.5 overflow-hidden rounded-full border border-[#c9b08a] bg-[#efe4cf] shadow-[inset_0_2px_4px_rgba(104,74,47,0.16)]">
+                                <div
+                                    className="absolute inset-y-[1px] left-[1px] rounded-full bg-[linear-gradient(90deg,#2a2a2a_0%,#4b372d_55%,#6b4c3c_100%)] transition-all duration-500 ease-out"
+                                    style={{ width: blackWidth }}
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div className="w-full h-1.5 bg-[#e3c086]/30 rounded-full overflow-hidden ring-1 ring-[#e3c086]/20">
-                    <div 
-                        className="h-full bg-gradient-to-r from-[#5c4033] to-[#8c6b38] transition-all duration-700 ease-out" 
-                        style={{ width: `${winRate}%` }} 
-                    />
-                </div>
-            </div>
 
-            {/* 3. Toggle Button (Icon Only - Square) */}
-            <button 
-                onClick={onToggleTerritory}
-                title={showTerritory ? "隐藏领地" : "显示领地"}
-                className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center transition-all active:scale-95 ${
-                    showTerritory 
-                    ? 'bg-[#5c4033] text-[#f7e7ce] shadow-md border border-[#5c4033]' 
-                    : 'bg-[#fffdf9] text-[#5c4033]/80 hover:bg-[#fff8e6] border border-[#e3c086] hover:border-[#8c6b38]'
-                }`}
-            >
-                <div className="relative">
-                     <Map size={18} />
-                     {/* Dot indicating logic but minimal */}
-                     {showTerritory && !isThinking && <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white" />}
-                </div>
-            </button>
+                <button
+                    onClick={onToggleTerritory}
+                    title={showTerritory ? '隐藏领地' : '显示领地'}
+                    aria-label={showTerritory ? '隐藏领地' : '显示领地'}
+                    className={`btn-retro ${showTerritory ? 'btn-coffee' : 'btn-beige'} relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl`}
+                >
+                    <Map size={16} />
+                    {showTerritory && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#9be26f]" />}
+                </button>
+            </div>
         </div>
     );
 };
-
-// Helper for tiny active dot
 

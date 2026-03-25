@@ -45,6 +45,8 @@ export const OnlineMenu: React.FC<OnlineMenuProps> = ({
     useEffect(() => {
         if (!isOpen) return;
         const updateCounts = async () => {
+            if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
             const sizes: BoardSize[] = [9, 13, 19];
             const activeSince = new Date(Date.now() - 15000).toISOString();
             const results = await Promise.all(

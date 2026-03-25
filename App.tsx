@@ -8,6 +8,7 @@ import {
     getAIMove,
     checkGomokuWin,
     calculateScore,
+    calculateModelScore,
     calculateWinRate,
     serializeGame,
     deserializeGame,
@@ -21,7 +22,6 @@ import { getAIConfig } from './utils/aiConfig';
 import { Settings, User as UserIcon, Trophy, Feather, Egg, Crown, Brain, Cpu, Home, Heart as HeartIcon, Check } from 'lucide-react';
 
 // Hooks
-import { useKataGo, sliderToVisits, visitsToSlider } from './hooks/useKataGo';
 import { useWebKataGo } from './hooks/useWebKataGo';
 import { useCloudKataGo } from './hooks/useCloudKataGo';
 import { useAchievements } from './hooks/useAchievements';
@@ -211,7 +211,11 @@ const App: React.FC = () => {
 
     // --- Auth Logic ---
     const fetchProfile = async (userId: string) => {
-        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        const { data } = await supabase
+            .from('profiles')
+            .select('nickname, elo_rating, avatar_url')
+            .eq('id', userId)
+            .single();
         if (data) setUserProfile({ nickname: data.nickname, elo: data.elo_rating });
     };
 
@@ -249,7 +253,11 @@ const App: React.FC = () => {
     }, []);
 
     const restoreTapTapSession = async (tapId: string) => {
-        const { data: profile } = await supabase.from('profiles').select('*').eq('taptap_id', tapId).single();
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, nickname, elo_rating, avatar_url')
+            .eq('taptap_id', tapId)
+            .single();
         if (profile) {
             setSession({
                 user: { id: profile.id, email: '', app_metadata: {}, user_metadata: {}, aud: '', created_at: '' } as any,
@@ -393,7 +401,7 @@ const App: React.FC = () => {
         console.log('[App] Searching for profile with taptap_id:', tapId);
         let { data: profile, error: searchError } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id, nickname, avatar_url, elo_rating')
             .eq('taptap_id', tapId)
             .single();
 
@@ -520,19 +528,6 @@ const App: React.FC = () => {
     }, []);
 
     // --- AI Engines ---
-    const electronAiEngine = useKataGo({
-        boardSize: settings.boardSize,
-        onAiMove: (x, y) => {
-            // [UX] Delay for natural feel
-            setTimeout(() => {
-                if (aiTurnLock.current && !gameState.gameOver) executeMove(x, y, false);
-            }, 200);
-        },
-        onAiPass: () => handlePass(false),
-        onAiResign: () => endGame(settings.userColor, 'AI 认为差距过大，投子认输')
-    });
-    const { isAvailable: isElectronAvailable, aiWinRate: electronWinRate, isThinking: isElectronThinking, isInitializing, setIsInitializing } = electronAiEngine;
-
     const webAiEngine = useWebKataGo({
         boardSize: settings.boardSize,
         onAiMove: (x, y) => {
@@ -547,18 +542,20 @@ const App: React.FC = () => {
             if (!pendingEndGameRef.current) return;
             pendingEndGameRef.current = false;
             console.log('[App] KataGo Endgame Analysis:', data);
-            // Use KataGo lead to determine winner (lead is from black's perspective, already includes komi)
+            const komi = settings.boardSize === 9 ? 6.5 : 7.5;
             const finalBoard = gameState.boardRef.current;
             const cleanedBoard = data.ownership ? cleanBoardWithTerritory(finalBoard, data.ownership) : finalBoard;
-            const score = calculateScore(cleanedBoard, data.ownership ?? undefined);
+            const score = data.ownership
+                ? calculateModelScore(finalBoard, data.ownership, komi)
+                : calculateScore(cleanedBoard, undefined, komi);
+            const lead = score.black - score.white;
             gameState.setBoard(cleanedBoard);
             gameState.setFinalScore(score);
             setShowPassModal(false);
-            // KataGo lead > 0 = black is winning (already accounts for komi)
-            if (data.lead > 0) {
-                endGame('black', "比分: 黑 " + score.black.toFixed(1) + " - 白 " + score.white.toFixed(1) + " (AI判定)");
+            if (lead > 0) {
+                endGame('black', `AI判定：黑领先 ${lead.toFixed(1)} 目`);
             } else {
-                endGame('white', "比分: 白 " + score.white.toFixed(1) + " - 黑 " + score.black.toFixed(1) + " (AI判定)");
+                endGame('white', `AI判定：白领先 ${Math.abs(lead).toFixed(1)} 目`);
             }
         }
     });
@@ -579,6 +576,7 @@ const App: React.FC = () => {
         aiLead: cloudLead,
         aiTerritory: cloudTerritory, // Extract territory from cloud engine
         requestCloudAiMove,
+        stopThinking: stopCloudThinking,
         errorMsg: cloudErrorMsg
     } = cloudAiEngine;
 
@@ -597,8 +595,13 @@ const App: React.FC = () => {
     } = webAiEngine;
 
     const [isFirstRun] = useState(() => !localStorage.getItem('has_run_ai_before'));
+    const [hideOfflineLoading, setHideOfflineLoading] = useState(false);
     const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
-    const showThinkingStatus = isThinking || isElectronThinking || isWebThinking || isCloudThinking;
+    const showThinkingStatus = isThinking || isWebThinking || isCloudThinking;
+
+    useEffect(() => {
+        if (isWebInitializing) setHideOfflineLoading(false);
+    }, [isWebInitializing]);
 
     // --- Visibility Handler (App Level) ---
     // Resets AI lock when going to background to prevent stuck state
@@ -643,6 +646,18 @@ const App: React.FC = () => {
         return str;
     };
 
+    const exitTsumegoMode = (nextGameMode: GameMode = 'PvP') => {
+        if (settings.gameMode === 'Tsumego') {
+            settings.setGameMode(nextGameMode);
+        }
+        setTsumegoRoot(null);
+        setTsumegoCurrentNode(null);
+        setShowTsumegoResult(false);
+        setTsumegoInstruction(null);
+        setShowTsumegoList(false);
+        setShowTsumegoLevelSelector(false);
+    };
+
     // --- Game Logic ---
     const resetGame = (keepOnline: boolean = false, explicitSize?: number, shouldBroadcast: boolean = true) => {
         const sizeToUse = explicitSize !== undefined ? explicitSize : settings.boardSize;
@@ -672,13 +687,12 @@ const App: React.FC = () => {
         gameState.setAppMode('playing');
         setEloDiffText(null);
         setEloDiffStyle(null);
+        setTsumegoRoot(null);
         setTsumegoCurrentNode(null); // [Fix] Clear tsumego state on reset
+        setShowTsumegoResult(false);
+        setTsumegoInstruction(null);
 
-        if (isElectronAvailable && settings.gameType === 'Go') {
-            electronAiEngine.resetAI(sizeToUse, 7.5);
-        } else if (!isElectronAvailable) {
-            webAiEngine.resetAI(); // [Fix] Clear WebAI state
-        }
+        webAiEngine.resetAI();
         cloudAiEngine.resetAI();
 
         if (keepOnline && shouldBroadcast && onlineStatusRef.current === 'connected' && dataChannelRef.current?.readyState === 'open') {
@@ -698,14 +712,12 @@ const App: React.FC = () => {
         aiTurnLock.current = false;
         if (aiTimerRef.current) { clearTimeout(aiTimerRef.current); aiTimerRef.current = null; }
 
+        exitTsumegoMode(newSettings.gameMode);
         settings.setBoardSize(newSettings.boardSize);
         settings.setGameType(newSettings.gameType);
         settings.setDifficulty(newSettings.difficulty);
         settings.setGameMode(newSettings.gameMode);
         settings.setUserColor(newSettings.userColor);
-        // maxVisits is updated immediately by slider in modal but we sync here just in case? 
-        // No, modal updates temp state, we need to update global state.
-        settings.setMaxVisits(newSettings.maxVisits);
 
         if (newSettings.gameMode === 'PvAI' && userProfile?.elo !== undefined) {
             const lowAi = newSettings.difficulty === 'Easy' || newSettings.difficulty === 'Medium';
@@ -719,48 +731,20 @@ const App: React.FC = () => {
         resetGame(false, newSettings.boardSize); // This handles board creation
 
         // AI specific init
-        if (newSettings.gameMode === 'PvAI') {
-            if (isElectronAvailable && newSettings.gameType === 'Go') {
-                electronAiEngine.initializeAI();
-                electronAiEngine.resetAI(newSettings.boardSize, 7.5);
-                if (newSettings.userColor === 'white') {
-                    setTimeout(() => {
-                        electronAiEngine.requestAiMove('black', newSettings.difficulty, newSettings.maxVisits, getResignThreshold(newSettings.difficulty));
-                    }, 500); // Give it a bit more time to spawn
-                }
-            }
-            else if (!isElectronAvailable && newSettings.gameType === 'Go') {
-                // [Lazy Load] Trigger Initialization specific for H5
-                // Check if this difficulty actually NEEDS the model
-                const aiConfig = getAIConfig(newSettings.difficulty);
+        if (newSettings.gameMode === 'PvAI' && newSettings.gameType === 'Go') {
+            const aiConfig = getAIConfig(newSettings.difficulty);
 
-                if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
-                    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-                    if (!isMobile) {
-                        console.log("[App] Triggering Lazy AI Init (Model Required)...");
-                        webAiEngine.initializeAI({ needModel: true });
-                    } else {
-                        console.log("[App] Mobile: Deferring AI Init to first move.");
-                    }
-                } else if (!aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
-                    console.log("[App] Triggering AI Init (Thin config, but loading model for safety)...");
+            if (aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+                if (!isMobile) {
+                    console.log("[App] Triggering Lazy AI Init (Model Required)...");
                     webAiEngine.initializeAI({ needModel: true });
+                } else {
+                    console.log("[App] Mobile: Deferring AI Init to first move.");
                 }
-
-                // AI Move will be requested when init completes? 
-                // Or we just wait. The logic below checks locks.
-                // If we need AI to move FIRST (White), logic is usually in useEffect or manual trigger.
-                // For now, Init -> App waits.
-                // If user is White, AI should move. But AI is not ready. 
-                // We need a way to auto-start AI move after Init. 
-                // (Adding simple effect for this or trusting user to wait).
-                // Actually, if user is White, we need to trigger AI move once ready.
-                // Let's handle that in the `useEffect` that watches `isWorkerReady`.
-            }
-
-            // If AI is already ready, and user is White, trigger Logic?
-            if (webAiEngine.isWorkerReady && newSettings.userColor === 'white') {
-                // Logic handled in AI Trigger Effect
+            } else if (!aiConfig.useModel && !webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                console.log("[App] Triggering AI Init (Thin config, but loading model for safety)...");
+                webAiEngine.initializeAI({ needModel: true });
             }
         }
     };
@@ -772,25 +756,12 @@ const App: React.FC = () => {
 
         if (settings.gameMode !== 'PvAI') {
             console.log("[App] Non-AI Mode detected: Terminating AI engines to save power.");
-            if (isElectronAvailable) {
-                electronAiEngine.terminateAI();
-            } else {
-                webAiEngine.terminateAI();
-            }
-            return;
-        }
-
-        const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-
-        // Ensure Electron AI is started
-        if (isElectronAvailable && settings.gameType === 'Go') {
-            console.log("[App] Auto-triggering Electron AI Init...");
-            electronAiEngine.initializeAI();
+            webAiEngine.terminateAI();
             return;
         }
 
         // [Fix] Auto-trigger Local AI for Easy mode even if Cloud is enabled (since Cloud Easy now redirects to Local)
-        if (!isElectronAvailable && (!useCloud || settings.difficulty === 'Easy') && settings.gameType === 'Go') {
+        if ((!useCloud || settings.difficulty === 'Easy') && settings.gameType === 'Go') {
             const aiConfig = getAIConfig(settings.difficulty);
             if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
                 const needModel = aiConfig.useModel;
@@ -798,7 +769,7 @@ const App: React.FC = () => {
                 webAiEngine.initializeAI({ needModel });
             }
         }
-    }, [settings.gameMode, settings.difficulty, isElectronAvailable, webAiEngine.isWorkerReady, webAiEngine.isInitializing, showStartScreen, useCloud, gameState.appMode]);
+    }, [settings.gameMode, settings.difficulty, webAiEngine.isWorkerReady, webAiEngine.isInitializing, showStartScreen, useCloud, gameState.appMode]);
 
     // --- Start Screen Handler ---
     const handleStartGame = (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local') => {
@@ -807,6 +778,7 @@ const App: React.FC = () => {
 
         // [FIX] Hide StartScreen FIRST to prevent UI blocking
         setShowStartScreen(false);
+        exitTsumegoMode(mode);
 
         settings.setGameMode(mode);
 
@@ -817,7 +789,7 @@ const App: React.FC = () => {
             if (aiType === 'cloud') {
                 setUseCloud(true);
                 // [Fix] If Easy, we use Local AI, so we must init it.
-                if (settings.difficulty === 'Easy' && !isElectronAvailable) {
+                if (settings.difficulty === 'Easy') {
                     const aiConfigLocal = getAIConfig(settings.difficulty);
                     if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
                         const needModel = aiConfigLocal.useModel && settings.gameType === 'Go';
@@ -828,27 +800,18 @@ const App: React.FC = () => {
             } else {
                 setUseCloud(false);
                 // Auto Init Lazy AI if needed
-                if (isElectronAvailable) {
-                    console.log(`[handleStartGame] Initializing Electron AI...`);
-                    electronAiEngine.initializeAI();
-                } else {
-                    const aiConfigLocal = getAIConfig(settings.difficulty);
-                    if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
-                        const needModel = aiConfigLocal.useModel;
-                        console.log(`[handleStartGame] Initializing AI (needModel=${needModel})...`);
-                        webAiEngine.initializeAI({ needModel });
-                    }
+                const aiConfigLocal = getAIConfig(settings.difficulty);
+                if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                    const needModel = aiConfigLocal.useModel;
+                    console.log(`[handleStartGame] Initializing AI (needModel=${needModel})...`);
+                    webAiEngine.initializeAI({ needModel });
                 }
             }
             // Ensure User Color is respected or defaulted? 
             // Logic in resetGame uses defaults.
         } else {
             setUseCloud(false); // irrelevant for PvP but keep clean
-            if (isElectronAvailable) {
-                electronAiEngine.terminateAI();
-            } else {
-                webAiEngine.terminateAI();
-            }
+            webAiEngine.terminateAI();
         }
 
         console.log('[handleStartGame] showStartScreen set to false');
@@ -1236,41 +1199,36 @@ const App: React.FC = () => {
             return 50;
         }
 
-        const aiColor = settings.userColor === 'black' ? 'white' : 'black';
-
         // Priority 1: Cloud AI
         if (useCloud && cloudWinRate !== 50) {
+            const aiColor = settings.userColor === 'black' ? 'white' : 'black';
             return (aiColor === 'white') ? (100 - cloudWinRate) : cloudWinRate;
         }
 
-        // Priority 2: Electron AI
-        if (isElectronAvailable && electronWinRate !== 50) {
-            return (aiColor === 'white') ? (100 - electronWinRate) : electronWinRate;
-        }
-
-        // Priority 3: Web Worker AI
-        if (!isElectronAvailable && isWorkerReady && settings.gameMode === 'PvAI' && webWinRate !== 50) {
-            return (aiColor === 'white') ? (100 - webWinRate) : webWinRate;
+        // Priority 2: Web Worker AI
+        // Local worker values are already normalized to black's perspective.
+        if (isWorkerReady && settings.gameMode === 'PvAI' && webWinRate !== 50) {
+            return webWinRate;
         }
 
         // [Perf] Local heuristic removed — was calling heavy flood-fill on every board change
         return 50;
-    }, [settings.showWinRate, gameState.gameOver, gameState.appMode, settings.gameType, settings.userColor, useCloud, cloudWinRate, isElectronAvailable, electronWinRate, isWorkerReady, settings.gameMode, webWinRate]);
+    }, [settings.showWinRate, gameState.gameOver, gameState.appMode, settings.gameType, settings.userColor, useCloud, cloudWinRate, isWorkerReady, settings.gameMode, webWinRate]);
 
     // Lead Calculation
     const displayLead = useMemo(() => {
         let lead: number | null = null;
-        const aiColor = settings.userColor === 'black' ? 'white' : 'black';
         if (settings.gameMode === 'PvAI') {
             if (useCloud && cloudLead !== null) {
+                const aiColor = settings.userColor === 'black' ? 'white' : 'black';
                 lead = (aiColor === 'white') ? -cloudLead : cloudLead;
             }
-            else if (!isElectronAvailable && webLead !== null && isWorkerReady) {
-                lead = (aiColor === 'white') ? -webLead : webLead;
+            else if (webLead !== null && isWorkerReady) {
+                lead = webLead;
             }
         }
         return lead;
-    }, [settings.gameMode, useCloud, cloudLead, settings.userColor, isElectronAvailable, webLead, isWorkerReady]);
+    }, [settings.gameMode, useCloud, cloudLead, settings.userColor, webLead, isWorkerReady]);
 
     // Territory (Ownership)
     const displayTerritory = useMemo(() => {
@@ -1287,11 +1245,9 @@ const App: React.FC = () => {
                 return flipped;
             }
             return cloudTerritory;
-        } else if (!isElectronAvailable) {
-            return webTerritory;
         }
-        return null;
-    }, [settings.gameMode, settings.userColor, useCloud, cloudTerritory, isElectronAvailable, webTerritory, gameState.appMode]);
+        return webTerritory;
+    }, [settings.gameMode, settings.userColor, useCloud, cloudTerritory, webTerritory, gameState.appMode]);
 
     // --- Tsumego End Check ---
     useEffect(() => {
@@ -1413,7 +1369,8 @@ const App: React.FC = () => {
                 gameState.setBoard(finalBoard); // Visual Update for user
             }
 
-            const currentScore = calculateScore(finalBoard);
+            const komi = settings.boardSize === 9 ? 6.5 : 7.5;
+            const currentScore = calculateScore(finalBoard, undefined, komi);
             checkEndGameAchievements({
                 winner: winnerColor, myColor: myPlayerColor || 'black',
                 score: currentScore, captures: { black: gameState.blackCaptures, white: gameState.whiteCaptures },
@@ -1550,11 +1507,46 @@ const App: React.FC = () => {
         }
     }, [gameState.history, settings.gameMode, settings.gameType, settings.boardSize, gameState.blackCaptures, gameState.whiteCaptures, gameState.consecutivePasses, handleTsumegoMove, endGame, session?.user?.id, gameState.boardRef, gameState.currentPlayerRef, gameTypeRef, getBoardHash, attemptMove, playSfx, vibrate, checkMoveAchievements, gameState.setHistory, gameState.setBoard, gameState.setLastMove, gameState.setConsecutivePasses, gameState.setPassNotificationDismissed, checkGomokuWin, gameState.setCurrentPlayer, gameState.setBlackCaptures, gameState.setWhiteCaptures]);
 
+    const triggerGoScoring = useCallback(() => {
+        if (settings.gameType !== 'Go' || gameState.gameOver) return;
+
+        if (isWebThinking) stopWebThinking();
+        if (isCloudThinking) stopCloudThinking();
+        setIsThinking(false);
+        aiTurnLock.current = false;
+        setShowPassModal(false);
+
+        if (settings.gameMode === 'PvAI' && isWorkerReady) {
+            console.log('[App] Requesting KataGo endgame analysis...');
+            pendingEndGameRef.current = true;
+            requestAnalysis(gameState.boardRef.current, 'black', gameState.historyRef.current, settings.boardSize === 9 ? 6.5 : 7.5, 'Go');
+            return;
+        }
+
+        setTimeout(() => {
+            const komi = settings.boardSize === 9 ? 6.5 : 7.5;
+            const score = displayTerritory
+                ? calculateModelScore(gameState.boardRef.current, displayTerritory, komi)
+                : calculateScore(gameState.boardRef.current, undefined, komi);
+            const lead = score.black - score.white;
+            gameState.setFinalScore(score);
+            setShowPassModal(false);
+            if (lead > 0) endGame('black', `计算机计分：黑领先 ${lead.toFixed(1)} 目`);
+            else endGame('white', `计算机计分：白领先 ${Math.abs(lead).toFixed(1)} 目`);
+        }, 0);
+    }, [settings.gameType, gameState.gameOver, isWebThinking, isCloudThinking, settings.gameMode, isWorkerReady, requestAnalysis, settings.boardSize, displayTerritory, endGame]);
+
     const handlePass = useCallback((isRemote: boolean = false) => {
         console.log(`[App] handlePass Triggered. Remote: ${isRemote}, GameOver: ${gameState.gameOver}, Consecutive: ${gameState.consecutivePasses}, Current: ${gameState.currentPlayerRef.current}`);
 
         if (gameState.gameOver) return;
         vibrate(10);
+
+        const isUserForceScoreInPvAI = !isRemote && settings.gameMode === 'PvAI' && settings.gameType === 'Go' && gameState.currentPlayerRef.current === settings.userColor;
+        if (isUserForceScoreInPvAI) {
+            triggerGoScoring();
+            return;
+        }
 
         // Fix: Reset AI state if it passed
         if (isRemote) {
@@ -1580,7 +1572,6 @@ const App: React.FC = () => {
         if (isUserPassInPvAI || isAIPassInPvAI) {
             // [Fix] Change to Standard 2-Pass Rule
             // Unlock AI thinking state
-            if (isElectronAvailable && isElectronThinking) electronAiEngine.stopThinking();
             if (isWebThinking) stopWebThinking(); // [Fix] Stop Web AI too
             setIsThinking(false);
             aiTurnLock.current = false;
@@ -1591,23 +1582,7 @@ const App: React.FC = () => {
             console.log(`[App] Consecutive Passes: ${prev} -> ${newPasses}`);
             if (newPasses >= 2) {
                 console.log("[App] Game End via 2 passes.");
-                // [New] Use KataGo engine for endgame judgment if available in PvAI Go mode
-                if (settings.gameMode === 'PvAI' && settings.gameType === 'Go' && isWorkerReady) {
-                    console.log('[App] Requesting KataGo endgame analysis...');
-                    pendingEndGameRef.current = true;
-                    setShowPassModal(false);
-                    // Analyze from black's perspective so lead > 0 always means black wins
-                    requestAnalysis(gameState.boardRef.current, 'black', gameState.historyRef.current, settings.boardSize === 9 ? 6.5 : 7.5, 'Go');
-                } else {
-                    // Fallback: flood-fill territory counting
-                    setTimeout(() => {
-                        const score = calculateScore(gameState.boardRef.current, displayTerritory);
-                        gameState.setFinalScore(score);
-                        setShowPassModal(false);
-                        if (score.black > score.white) endGame('black', "比分: 黑 " + score.black.toFixed(1) + " - 白 " + score.white.toFixed(1) + " (计算机计分)");
-                        else endGame('white', "比分: 白 " + score.white.toFixed(1) + " - 黑 " + score.black.toFixed(1) + " (计算机计分)");
-                    }, 0);
-                }
+                triggerGoScoring();
             }
             return newPasses;
         });
@@ -1628,7 +1603,7 @@ const App: React.FC = () => {
             gameState.currentPlayerRef.current = next;
             gameState.setLastMove(null);
         }
-    }, [gameState.gameOver, settings.gameMode, settings.gameType, gameState.consecutivePasses, settings.userColor, isElectronAvailable, isElectronThinking, gameState.currentPlayer, displayTerritory, isWorkerReady, requestAnalysis]);
+    }, [gameState.gameOver, settings.gameMode, settings.gameType, gameState.consecutivePasses, settings.userColor, isWebThinking, gameState.currentPlayer, triggerGoScoring]);
 
     const handleUndo = () => {
         if (gameState.history.length === 0 || isThinking || gameState.gameOver || onlineStatus === 'connected') return;
@@ -1679,7 +1654,6 @@ const App: React.FC = () => {
         }
 
         // Reset AI Lock on Undo
-        if (isElectronAvailable && isElectronThinking) electronAiEngine.stopThinking();
         if (isWebThinking) stopWebThinking(); // [Fix] Abort current calculation
         aiTurnLock.current = false;
         setIsThinking(false);
@@ -1700,17 +1674,26 @@ const App: React.FC = () => {
         if (!isPageVisible || showStartScreen) return;
         if (gameState.appMode !== 'playing' || gameState.gameOver || showPassModal || settings.gameMode !== 'PvAI') return;
         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
+        const isLocalAi = !(settings.gameType === 'Go' && useCloud && settings.difficulty !== 'Easy');
 
         if (gameState.currentPlayer === aiColor) {
-            if (aiTurnLock.current) return;
+            if (aiTurnLock.current) {
+                // Dev StrictMode or an interrupted init can leave the lock set while the worker is gone.
+                // In that case, release the lock so this effect can resubmit the AI turn request.
+                if (isLocalAi && !isWorkerReady && !isWebInitializing && !isWebThinking) {
+                    console.warn("[App] AI turn lock was stale. Resetting and retrying local AI request.");
+                    aiTurnLock.current = false;
+                } else {
+                    return;
+                }
+            }
 
             // [New Fix] Wait for AI to be ready if in Go mode
             // This prevents "AI requested but not ready" errors and missed moves on startup
             if (settings.gameType === 'Go' && !useCloud) {
-                if (isElectronAvailable && electronAiEngine.isInitializing) return;
                 // [Modification] Allow falling through even if !isWorkerReady, so requestWebAiMove can trigger Lazy Init
             }
-            // [Fix] All Go games now use the high-level path (Worker or Electron) for robust Ko handling
+            // [Fix] All Go games now use the high-level path for robust Ko handling
             // Gomoku implementation moved to Worker -> Also High Level.
             const shouldUseHighLevelAI = true;
 
@@ -1721,7 +1704,7 @@ const App: React.FC = () => {
 
                     const isEasyMode = settings.difficulty === 'Easy';
 
-                    // Cloud & Electron are GO Only
+                    // Cloud is GO Only
                     if (settings.gameType === 'Go' && useCloud && !isEasyMode) {
                         // Cloud Mode - Optimized for Speed
                         // Use aiConfig simulations.
@@ -1744,9 +1727,6 @@ const App: React.FC = () => {
                             sims,
                             komi
                         );
-                    }
-                    else if (settings.gameType === 'Go' && isElectronAvailable) {
-                        electronAiEngine.requestAiMove(aiColor, settings.difficulty, settings.maxVisits, getResignThreshold(settings.difficulty));
                     } else {
                         // Web AI Request (Go or Gomoku)
                         let sims = aiConfig.simulations;
@@ -1776,7 +1756,7 @@ const App: React.FC = () => {
             // User turn, ensure lock is free
             if (gameState.currentPlayer === settings.userColor) aiTurnLock.current = false;
         }
-    }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isElectronAvailable, isPageVisible, useCloud, requestCloudAiMove, webAiEngine.isWorkerReady, electronAiEngine.isInitializing, showStartScreen]);
+    }, [gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.board, gameState.gameOver, settings.gameType, settings.difficulty, showPassModal, gameState.appMode, isPageVisible, useCloud, requestCloudAiMove, isWorkerReady, isWebInitializing, isWebThinking, showStartScreen]);
 
 
 
@@ -1889,7 +1869,13 @@ const App: React.FC = () => {
         const myElo = userProfile.elo;
         try {
             // Mocking finding logic for simplicity here, assuming Supabase calls mostly identical
-            const { data: opponents } = await supabase.from('matchmaking_queue').select('*').eq('game_type', settings.gameType).eq('board_size', sizeToMatch).neq('user_id', session.user.id).limit(1);
+            const { data: opponents } = await supabase
+                .from('matchmaking_queue')
+                .select('id')
+                .eq('game_type', settings.gameType)
+                .eq('board_size', sizeToMatch)
+                .neq('user_id', session.user.id)
+                .limit(1);
             // ...
             // Actually, I should just copy the logic.
             // But wait, the previous code block logic is good. I will reuse it.
@@ -1902,7 +1888,15 @@ const App: React.FC = () => {
         const findOpponent = async (attempt: number): Promise<any> => {
             const range = attempt === 1 ? 100 : (attempt === 2 ? 300 : 9999);
             const activeSince = new Date(Date.now() - 15000).toISOString();
-            const { data: opponents } = await supabase.from('matchmaking_queue').select('*').eq('game_type', settings.gameType).eq('board_size', sizeToMatch).neq('user_id', session!.user.id).gte('last_seen', activeSince).lte('elo_rating', myElo + range).limit(1);
+            const { data: opponents } = await supabase
+                .from('matchmaking_queue')
+                .select('id, user_id, elo_rating, peer_id')
+                .eq('game_type', settings.gameType)
+                .eq('board_size', sizeToMatch)
+                .neq('user_id', session!.user.id)
+                .gte('last_seen', activeSince)
+                .lte('elo_rating', myElo + range)
+                .limit(1);
             return opponents && opponents.length > 0 ? opponents[0] : null;
         };
         let opponent = await findOpponent(1);
@@ -2053,9 +2047,8 @@ const App: React.FC = () => {
         }
 
         if (onlineStatus === 'connected') { if (gameState.currentPlayer !== myColor) return; sendData({ type: 'MOVE', x, y }); }
-        if (isElectronAvailable && settings.gameType === 'Go') electronAiEngine.syncHumanMove(gameState.currentPlayer, x, y);
         executeMove(x, y, false);
-    }, [gameState.gameOver, settings.gameMode, gameState.currentPlayer, onlineStatus, myColor, isThinking, gameState.appMode, gameState.setupTool, gameState.board, settings.userColor, isElectronAvailable, electronAiEngine, settings.gameType]);
+    }, [gameState.gameOver, settings.gameMode, gameState.currentPlayer, onlineStatus, myColor, isThinking, gameState.appMode, gameState.setupTool, gameState.board, settings.userColor, settings.gameType]);
 
     // --- Update Checker ---
     const handleCheckUpdate = async () => {
@@ -2094,7 +2087,7 @@ const App: React.FC = () => {
                     onOpenAbout={() => setShowAboutModal(true)}
                     onStartSetup={() => {
                         setShowStartScreen(false);
-                        settings.setGameMode('PvP'); // [Fix] Prevent carrying over Tsumego mode
+                        exitTsumegoMode('PvP');
                         resetGame(false);
                         gameState.setAppMode('setup');
                     }}
@@ -2130,7 +2123,7 @@ const App: React.FC = () => {
                 </div>
                 {(showThinkingStatus || webInitStatus) && (
                     <div className="absolute top-4 left-4 bg-white/80 px-4 py-2 rounded-full text-xs font-bold text-[#5c4033] animate-pulse border-2 border-[#e3c086] shadow-sm z-20">
-                        {webInitStatus ? webInitStatus : (useCloud ? '云端 AI 正在计算...' : (isElectronAvailable ? 'KataGo 正在计算...' : 'AI 正在思考...'))}
+                        {webInitStatus ? webInitStatus : (useCloud ? '云端 AI 正在计算...' : 'AI 正在思考...')}
                     </div>
                 )}
                 <PassConfirmationModal
@@ -2154,7 +2147,7 @@ const App: React.FC = () => {
             >
                 <TopBar
                     leftButtons={<>
-                        <button onClick={() => { setShowStartScreen(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><Home size={20} /></button>
+                        <button onClick={() => { exitTsumegoMode('PvP'); setShowStartScreen(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><Home size={20} /></button>
                         <button onClick={() => { setShowUserPage(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><UserIcon size={20} /></button>
                         <button onClick={() => { setShowMenu(true); vibrate(10); }} className="btn-retro btn-brown p-3 rounded-xl"><Settings size={20} /></button>
                     </>}
@@ -2408,8 +2401,8 @@ const App: React.FC = () => {
                 onClose={() => setShowMenu(false)}
                 currentGameSettings={useMemo(() => ({
                     boardSize: settings.boardSize, gameType: settings.gameType, gameMode: settings.gameMode,
-                    difficulty: settings.difficulty, maxVisits: settings.maxVisits, userColor: settings.userColor
-                }), [settings.boardSize, settings.gameType, settings.gameMode, settings.difficulty, settings.maxVisits, settings.userColor])}
+                    difficulty: settings.difficulty, userColor: settings.userColor
+                }), [settings.boardSize, settings.gameType, settings.gameMode, settings.difficulty, settings.userColor])}
                 onApplyGameSettings={handleApplySettings}
                 showQi={settings.showQi} setShowQi={settings.setShowQi}
                 showWinRate={settings.showWinRate} setShowWinRate={settings.setShowWinRate}
@@ -2418,14 +2411,13 @@ const App: React.FC = () => {
                 hapticEnabled={settings.hapticEnabled} setHapticEnabled={settings.setHapticEnabled}
                 vibrate={vibrate}
                 skipStartScreen={settings.skipStartScreen} setSkipStartScreen={settings.setSkipStartScreen}
-                onStartSetup={() => { resetGame(false); gameState.setAppMode('setup'); setShowMenu(false); }}
+                onStartSetup={() => { exitTsumegoMode('PvP'); resetGame(false); gameState.setAppMode('setup'); setShowMenu(false); }}
                 onOpenImport={() => { setShowImportModal(true); setShowMenu(false); }}
                 onOpenOnline={() => setShowOnlineMenu(true)}
                 onOpenAbout={() => { setShowAboutModal(true); setShowMenu(false); }}
                 onOpenTutorial={() => { setShowTutorial(true); setShowMenu(false); }}
                 onOpenTsumego={() => setShowTsumegoLevelSelector(true)}
                 onOpenSkinShop={() => setShowSkinShop(true)}
-                isElectronAvailable={isElectronAvailable}
                 separatePieces={settings.separatePieces}
                 setSeparatePieces={settings.setSeparatePieces}
             />
@@ -2509,6 +2501,7 @@ const App: React.FC = () => {
                     if (importKey.trim().startsWith('(;')) {
                         const sgfState = parseSGF(importKey);
                         if (sgfState) {
+                            exitTsumegoMode('PvP');
                             gameState.setBoard(sgfState.board);
                             gameState.setCurrentPlayer(sgfState.currentPlayer);
                             settings.setGameType(sgfState.gameType);
@@ -2533,6 +2526,7 @@ const App: React.FC = () => {
                     // Fallback to Legacy JSON
                     const gs = deserializeGame(importKey);
                     if (gs) {
+                        exitTsumegoMode('PvP');
                         gameState.setBoard(gs.board); gameState.setCurrentPlayer(gs.currentPlayer); settings.setGameType(gs.gameType); settings.setBoardSize(gs.boardSize);
                         gameState.setBlackCaptures(gs.blackCaptures); gameState.setWhiteCaptures(gs.whiteCaptures); gameState.setHistory([]); gameState.setGameOver(false); gameState.setWinner(null);
                         setInitialStones([]);
@@ -2594,10 +2588,9 @@ const App: React.FC = () => {
             />
 
             <OfflineLoadingModal
-                isInitializing={isInitializing}
-                isElectronAvailable={isElectronAvailable}
+                isInitializing={isWebInitializing && !hideOfflineLoading}
                 isFirstRun={isFirstRun}
-                onClose={() => { setIsInitializing(false); localStorage.setItem('has_run_ai_before', 'true'); }}
+                onClose={() => { setHideOfflineLoading(true); localStorage.setItem('has_run_ai_before', 'true'); }}
             />
 
             <LoginModal

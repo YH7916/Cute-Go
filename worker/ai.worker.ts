@@ -7,7 +7,8 @@ import {
     evaluatePositionStrength,
     GOMOKU_SCORES,
     attemptMove, // [New]
-    getBoardHash // [New]
+    getBoardHash, // [New]
+    calculateModelScore
 } from '../utils/goLogic';
 import { BoardState, Player, Point } from '../types';
 
@@ -34,11 +35,17 @@ type WorkerMessage =
             komi?: number;
             difficulty?: 'Easy' | 'Medium' | 'Hard';
             temperature?: number;
+            mode?: 'play' | 'analyze';
         }
     }
     | { type: 'stop' }
     | { type: 'release' }
     | { type: 'reinit' };
+
+type RankedMove = AnalysisResult['moves'][number] & {
+    weight?: number;
+    logit?: number;
+};
 
 let engine: OnnxEngine | null = null;
 let initPromise: Promise<void> | null = null;
@@ -50,12 +57,294 @@ const WATCHDOG_TIMEOUT = 30000; // 30s safety net
 // it is considered "confirmed enemy territory" and moves there are skipped.
 // 0.65 keeps it conservative so only clearly-dead positions are filtered.
 const OWNERSHIP_DEAD_THRESHOLD = 0.65;
+const WINRATE_TEMPERATURE = 5.0;
 
 const clearWatchdog = () => {
     if (initWatchdog) {
         clearTimeout(initWatchdog);
         initWatchdog = null;
     }
+};
+
+const clampPercent = (value: number) => {
+    if (!Number.isFinite(value)) return 50;
+    return Math.max(0, Math.min(100, value));
+};
+
+const toBlackPerspectiveLead = (lead: number, toPlay: Player) =>
+    toPlay === 'black' ? lead : -lead;
+
+const toBlackPerspectiveWinRate = (winRate: number, toPlay: Player) =>
+    toPlay === 'black' ? clampPercent(winRate) : clampPercent(100 - winRate);
+
+const deriveBlackWinRateFromLead = (blackLead: number) => {
+    if (!Number.isFinite(blackLead)) return 50;
+    const probability = 1 / (1 + Math.exp(-blackLead / WINRATE_TEMPERATURE));
+    return clampPercent(probability * 100);
+};
+
+const sampleIndexByWeight = (weights: number[]) => {
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    if (total <= 0) return 0;
+
+    let roll = Math.random() * total;
+    for (let i = 0; i < weights.length; i++) {
+        roll -= weights[i];
+        if (roll <= 0) return i;
+    }
+    return weights.length - 1;
+};
+
+const getDifficultyPoolSize = (difficulty?: 'Easy' | 'Medium' | 'Hard') => {
+    if (difficulty === 'Easy') return 16;
+    if (difficulty === 'Medium') return 6;
+    return Infinity;
+};
+
+type SearchHistoryMove = { color: Sign; x: number; y: number };
+
+type SearchNode = {
+    parent: SearchNode | null;
+    move: { x: number; y: number } | null;
+    board: MicroBoard;
+    history: SearchHistoryMove[];
+    toPlay: Sign;
+    prior: number;
+    visits: number;
+    valueSum: number;
+    children: SearchNode[];
+    expanded: boolean;
+    analysis: AnalysisResult | null;
+};
+
+const MAX_ANALYSIS_VISITS = 32;
+const MAX_ANALYSIS_BRANCH = 10;
+const ANALYSIS_CPUCT = 1.35;
+
+const cloneOwnership = (ownership: Float32Array | null | undefined) =>
+    ownership ? new Float32Array(ownership) : null;
+
+const addOwnershipInPlace = (target: Float32Array, source: Float32Array) => {
+    const len = Math.min(target.length, source.length);
+    for (let i = 0; i < len; i++) target[i] += source[i];
+};
+
+const scaleOwnership = (source: Float32Array, factor: number) => {
+    const out = new Float32Array(source.length);
+    for (let i = 0; i < source.length; i++) out[i] = source[i] * factor;
+    return out;
+};
+
+const selectSearchChild = (node: SearchNode) => {
+    let bestChild: SearchNode | null = null;
+    let bestScore = -Infinity;
+    const sqrtVisits = Math.sqrt(Math.max(1, node.visits));
+
+    for (const child of node.children) {
+        const q = child.visits > 0 ? 1 - (child.valueSum / child.visits) : 0.5;
+        const u = ANALYSIS_CPUCT * child.prior * (sqrtVisits / (1 + child.visits));
+        const score = q + u;
+        if (score > bestScore) {
+            bestScore = score;
+            bestChild = child;
+        }
+    }
+
+    return bestChild;
+};
+
+const expandSearchNode = (
+    node: SearchNode,
+    analysis: AnalysisResult
+) => {
+    node.expanded = true;
+    node.analysis = analysis;
+
+    const sortedMoves = [...analysis.moves]
+        .filter((move) => move.x >= 0 && move.y >= 0)
+        .sort((a, b) => b.prior - a.prior);
+
+    const limitedMoves = sortedMoves.slice(0, MAX_ANALYSIS_BRANCH);
+    const passMove = analysis.moves.find((move) => move.x === -1 && move.y === -1);
+    if (passMove) limitedMoves.push(passMove);
+
+    for (const move of limitedMoves) {
+        const childBoard = node.board.clone();
+        let moveOk = true;
+
+        if (move.x >= 0 && move.y >= 0) {
+            moveOk = childBoard.play(move.x, move.y, node.toPlay);
+        } else {
+            childBoard.ko = -1;
+        }
+
+        if (!moveOk) continue;
+
+        const childHistory = [...node.history, {
+            color: node.toPlay,
+            x: move.x,
+            y: move.y
+        }];
+
+        node.children.push({
+            parent: node,
+            move: move.x >= 0 && move.y >= 0 ? { x: move.x, y: move.y } : null,
+            board: childBoard,
+            history: childHistory,
+            toPlay: (node.toPlay === 1 ? -1 : 1),
+            prior: Math.max(move.prior, 0.0001),
+            visits: 0,
+            valueSum: 0,
+            children: [],
+            expanded: false,
+            analysis: null
+        });
+    }
+};
+
+const runOwnershipSearch = async (
+    rootBoard: MicroBoard,
+    rootToPlay: Sign,
+    historyMoves: SearchHistoryMove[],
+    boardSize: number,
+    komi: number,
+    difficulty: 'Easy' | 'Medium' | 'Hard' | undefined,
+    temperature: number | undefined,
+    requestedVisits: number | undefined
+) => {
+    if (!engine) throw new Error('AI Engine unavailable for ownership search.');
+
+    const visitBudget = Math.max(1, Math.min(requestedVisits ?? 16, MAX_ANALYSIS_VISITS));
+    const root: SearchNode = {
+        parent: null,
+        move: null,
+        board: rootBoard.clone(),
+        history: [...historyMoves],
+        toPlay: rootToPlay,
+        prior: 1,
+        visits: 0,
+        valueSum: 0,
+        children: [],
+        expanded: false,
+        analysis: null
+    };
+
+    let ownershipSum: Float32Array | null = null;
+    let ownershipCount = 0;
+
+    for (let visit = 0; visit < visitBudget; visit++) {
+        let node = root;
+
+        while (node.expanded && node.children.length > 0) {
+            const next = selectSearchChild(node);
+            if (!next) break;
+            node = next;
+        }
+
+        const analysis = await engine.analyze(node.board, node.toPlay, {
+            history: node.history,
+            komi,
+            difficulty,
+            temperature
+        });
+
+        expandSearchNode(node, analysis);
+
+        const ownership = cloneOwnership(analysis.rootInfo.ownership);
+        if (ownership) {
+            if (!ownershipSum) ownershipSum = new Float32Array(ownership.length);
+            addOwnershipInPlace(ownershipSum, ownership);
+            ownershipCount++;
+        }
+
+        let value = Math.max(0, Math.min(1, analysis.rootInfo.winrate / 100));
+        let current: SearchNode | null = node;
+        while (current) {
+            current.visits += 1;
+            current.valueSum += value;
+            value = 1 - value;
+            current = current.parent;
+        }
+    }
+
+    const rootChildren = [...root.children].sort((a, b) => b.visits - a.visits);
+    const bestChild = rootChildren[0] ?? null;
+    const averagedOwnership = ownershipSum && ownershipCount > 0
+        ? scaleOwnership(ownershipSum, 1 / ownershipCount)
+        : root.analysis?.rootInfo.ownership ?? null;
+
+    const fallbackAnalysis = root.analysis ?? await engine.analyze(root.board, root.toPlay, {
+        history: root.history,
+        komi,
+        difficulty,
+        temperature
+    });
+
+    return {
+        move: bestChild?.move ?? null,
+        winRate: root.visits > 0 ? (root.valueSum / root.visits) * 100 : fallbackAnalysis.rootInfo.winrate,
+        lead: fallbackAnalysis.rootInfo.lead,
+        scoreStdev: fallbackAnalysis.rootInfo.scoreStdev,
+        ownership: averagedOwnership,
+        visits: root.visits
+    };
+};
+
+const getDifficultyRankBias = (difficulty: 'Easy' | 'Medium' | 'Hard' | undefined, rank: number) => {
+    if (difficulty === 'Easy') {
+        const table = [0.45, 0.72, 0.9, 1.0, 1.0, 0.9, 0.76, 0.62, 0.5, 0.4, 0.31, 0.24, 0.18, 0.13, 0.09, 0.06];
+        return table[rank] ?? 0.03;
+    }
+
+    if (difficulty === 'Medium') {
+        const table = [1.08, 0.82, 0.58, 0.34, 0.18, 0.1];
+        return table[rank] ?? 0.05;
+    }
+
+    return 1;
+};
+
+const selectMoveByDifficulty = (
+    candidates: RankedMove[],
+    validationBoard: BoardState,
+    color: Player,
+    previousBoardHash: string | null,
+    difficulty?: 'Easy' | 'Medium' | 'Hard'
+) => {
+    const poolSize = Math.min(candidates.length, getDifficultyPoolSize(difficulty));
+    const weightedPool = candidates
+        .slice(0, poolSize)
+        .map((candidate, rank) => ({ candidate, rank }));
+
+    while (weightedPool.length > 0) {
+        const weights = weightedPool.map(({ candidate, rank }) => {
+            const baseWeight = Math.max((candidate as any).weight || candidate.prior || 0.0001, 0.0001);
+            return baseWeight * getDifficultyRankBias(difficulty, rank);
+        });
+
+        const selectedIndex = sampleIndexByWeight(weights);
+        const [{ candidate }] = weightedPool.splice(selectedIndex, 1);
+
+        if (candidate.x === -1) {
+            if (difficulty === 'Easy' || difficulty === 'Medium') {
+                continue;
+            }
+            return null;
+        }
+
+        if (attemptMove(validationBoard, candidate.x, candidate.y, color, 'Go', previousBoardHash)) {
+            return { x: candidate.x, y: candidate.y };
+        }
+    }
+
+    for (const candidate of candidates) {
+        if (candidate.x === -1) return null;
+        if (attemptMove(validationBoard, candidate.x, candidate.y, color, 'Go', previousBoardHash)) {
+            return { x: candidate.x, y: candidate.y };
+        }
+    }
+
+    return undefined;
 };
 
 const ctx: Worker = self as any;
@@ -178,7 +467,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             ctx.postMessage({ type: 'init-complete' });
 
         } else if (msg.type === 'compute') {
-            const { board: boardState, history: gameHistory, color, size, gameType = 'Go', komi, difficulty, temperature } = msg.data;
+            const { board: boardState, history: gameHistory, color, size, gameType = 'Go', komi, difficulty, temperature, mode = 'play', simulations } = msg.data;
             console.log(`[AI Worker] Compute Request Received. Type=${gameType}, Size=${size}, Diff=${difficulty}`);
 
             // === Gomoku Logic ===
@@ -314,56 +603,6 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 return;
             }
 
-            // --- Blunder Logic (Artificial Stupidity for Easy/Medium) ---
-            // We do this BEFORE the heavy AI engine to save performance and create "natural" mistakes.
-            if ((gameType === 'Go' || gameType === undefined) && (difficulty === 'Easy' || difficulty === 'Medium')) {
-                const blunderChance = difficulty === 'Easy' ? 0.20 : 0.05; // 20% for Easy, 5% for Medium
-                console.log(`[AI Worker] Checking Blunder Logic. Chance=${blunderChance}, Random=${Math.random()}`);
-                if (Math.random() < blunderChance) {
-                    console.log(`[AI Worker] Triggering Blunder for ${difficulty} mode...`);
-                    const board = boardState as BoardState;
-                    const safeSize = board.length;
-
-                    // Generate random moves
-                    const attempts = 50;
-                    for (let i = 0; i < attempts; i++) {
-                        const rx = Math.floor(Math.random() * safeSize);
-                        const ry = Math.floor(Math.random() * safeSize);
-
-                        // Check basic legality (empty)
-                        if (!board[ry][rx]) {
-                            // Check suicide/ko rules using attemptMove
-                            // We need a history logic? 
-                            // For simplicity in blunder, we can just check if it's not suicide.
-                            // We'll use the proper AttemptMove with empty history (or just prevHash if available) to be safe.
-                            // But wait, `attemptMove` needs full board? Yes, we have `board`.
-
-                            let pHash: string | null = null;
-                            if (gameHistory.length > 0) {
-                                const last = gameHistory[gameHistory.length - 1];
-                                if (last && last.board) pHash = getBoardHash(last.board);
-                            }
-
-                            const isValid = attemptMove(board, rx, ry, color, 'Go', pHash);
-                            if (isValid) {
-                                console.log(`[AI Worker] Blunder Move Selected: (${rx}, ${ry})`);
-                                ctx.postMessage({
-                                    type: 'ai-response',
-                                    data: {
-                                        move: { x: rx, y: ry },
-                                        winRate: 0.4, // Fake winrate
-                                        lead: 0,
-                                        ownership: []
-                                    }
-                                });
-                                return; // Stop here, skip engine!
-                            }
-                        }
-                    }
-                    console.log("[AI Worker] Failed to find valid blunder move, falling back to Engine.");
-                }
-            }
-
             // === Go Logic (Engine) ===
             if (!engine) {
                 // [Fix] If engine is missing, we cannot analyze.
@@ -420,32 +659,53 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
             // 3. Run Analysis
             console.log("[AI Worker] Calling engine.analyze...");
+            const effectiveKomi = komi ?? 7.5;
+
+            if (mode === 'analyze') {
+                console.log("[AI Worker] Analysis Mode: Running Kaya-style root search...");
+                const analyzed = await runOwnershipSearch(
+                    board,
+                    pla,
+                    historyMoves,
+                    size,
+                    effectiveKomi,
+                    difficulty,
+                    temperature,
+                    simulations
+                );
+
+                const blackLead = analyzed.ownership
+                    ? (() => {
+                        const score = calculateModelScore(boardState as BoardState, analyzed.ownership, effectiveKomi);
+                        return score.black - score.white;
+                    })()
+                    : toBlackPerspectiveLead(analyzed.lead, color);
+                const blackWinRate = analyzed.ownership
+                    ? deriveBlackWinRateFromLead(blackLead)
+                    : toBlackPerspectiveWinRate(analyzed.winRate, color);
+
+                ctx.postMessage({
+                    type: 'ai-response',
+                    data: {
+                        move: null, // No move
+                        winRate: blackWinRate,
+                        lead: blackLead,
+                        scoreStdev: analyzed.scoreStdev,
+                        ownership: analyzed.ownership
+                    }
+                });
+                return;
+            }
+
             const result = await engine.analyze(board, pla, {
                 history: historyMoves,
-                komi: komi ?? 7.5,
+                komi: effectiveKomi,
                 difficulty: difficulty,
                 temperature: temperature
             });
             console.log("[AI Worker] Analysis returned.");
 
             // 4. Send Response
-
-            // Check for Analysis Mode (No Move Selection)
-            // @ts-ignore
-            if (msg.data.mode === 'analyze') {
-                console.log("[AI Worker] Analysis Mode: Returning stats only.");
-                ctx.postMessage({
-                    type: 'ai-response',
-                    data: {
-                        move: null, // No move
-                        winRate: result.rootInfo.winrate,
-                        lead: result.rootInfo.lead,
-                        scoreStdev: result.rootInfo.scoreStdev,
-                        ownership: result.rootInfo.ownership
-                    }
-                });
-                return;
-            }
 
             // Normal Move Selection
             let selectedMove: any = null;
@@ -481,43 +741,10 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     if (filteredCandidates.length > 0) candidates = filteredCandidates;
                 }
 
-                if (temperature && temperature > 0) {
-                    // Weight-based Sampling (Retry loop for validity)
-                    for (let retry = 0; retry < 20; retry++) {
-                        if (candidates.length === 0) break;
-
-                        let sumWeight = 0;
-                        for (const m of candidates) sumWeight += (m as any).weight || m.prior;
-
-                        let r = Math.random() * sumWeight;
-                        let pickedIndex = -1;
-                        for (let i = 0; i < candidates.length; i++) {
-                            const w = (candidates[i] as any).weight || candidates[i].prior;
-                            r -= w;
-                            if (r <= 0) { pickedIndex = i; break; }
-                        }
-                        if (pickedIndex === -1) pickedIndex = candidates.length - 1;
-
-                        const candidate = candidates[pickedIndex];
-                        if (candidate.x === -1) { selectedMove = null; break; } // Pass is valid
-
-                        if (attemptMove(validationBoard, candidate.x, candidate.y, color, 'Go', prevHash)) {
-                            selectedMove = { x: candidate.x, y: candidate.y };
-                            break;
-                        } else {
-                            candidates.splice(pickedIndex, 1); // Remove invalid
-                        }
-                    }
-                    // Fallback to best valid if sampling failed
-                    if (selectedMove === undefined) {
-                        for (const m of result.moves) {
-                            if (m.x === -1) { selectedMove = null; break; }
-                            if (attemptMove(validationBoard, m.x, m.y, color, 'Go', prevHash)) {
-                                selectedMove = { x: m.x, y: m.y };
-                                break;
-                            }
-                        }
-                    }
+                if (difficulty === 'Easy' || difficulty === 'Medium') {
+                    selectedMove = selectMoveByDifficulty(candidates as RankedMove[], validationBoard, color, prevHash, difficulty);
+                } else if (temperature && temperature > 0) {
+                    selectedMove = selectMoveByDifficulty(candidates as RankedMove[], validationBoard, color, prevHash, difficulty);
                 } else {
                     // Argmax (Iterate filtered+sorted candidates)
                     for (const m of candidates) {
@@ -535,16 +762,26 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             if (selectedMove === undefined) selectedMove = null; // Safety
 
             const isPass = selectedMove === null;
+            const blackLead = result.rootInfo.ownership
+                ? (() => {
+                    const score = calculateModelScore(boardState as BoardState, result.rootInfo.ownership, effectiveKomi);
+                    return score.black - score.white;
+                })()
+                : toBlackPerspectiveLead(result.rootInfo.lead, color);
+            const blackWinRate = result.rootInfo.ownership
+                ? deriveBlackWinRateFromLead(blackLead)
+                : toBlackPerspectiveWinRate(result.rootInfo.winrate, color);
+
             // Only log if not null or valid object
             const moveStr = isPass ? 'Pass' : `(${selectedMove.x},${selectedMove.y})`;
-            console.log(`[AI Worker] Best Move: ${moveStr} Win=${result.rootInfo.winrate.toFixed(1)}%`);
+            console.log(`[AI Worker] Best Move: ${moveStr} Win=${blackWinRate.toFixed(1)}% BlackLead=${blackLead.toFixed(2)}`);
 
             ctx.postMessage({
                 type: 'ai-response',
                 data: {
                     move: selectedMove,
-                    winRate: result.rootInfo.winrate,
-                    lead: result.rootInfo.lead,
+                    winRate: blackWinRate,
+                    lead: blackLead,
                     scoreStdev: result.rootInfo.scoreStdev,
                     ownership: result.rootInfo.ownership
                 }

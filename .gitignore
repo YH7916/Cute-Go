@@ -27,7 +27,6 @@ dist-ssr
 android/
 assets/
 dist/
-dist_electron/
 dist.zip
 gtp_logs/
 release/

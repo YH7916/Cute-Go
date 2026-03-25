@@ -3,33 +3,22 @@ import { Cpu, AlertCircle, Zap } from 'lucide-react';
 
 interface OfflineLoadingModalProps {
     isInitializing: boolean;
-    isElectronAvailable: boolean;
     isFirstRun: boolean;
     onClose: () => void;
-    message?: string; // New: Custom status message
+    message?: string;
 }
 
 export const OfflineLoadingModal: React.FC<OfflineLoadingModalProps> = ({
     isInitializing,
-    isElectronAvailable,
     isFirstRun,
     onClose,
-    message 
+    message
 }) => {
-    // [Fix] Allow showing this modal even if NOT Electron (for H5 lazy load)
-    // Pass isElectronAvailable=true from H5 if we want to force show it? 
-    // Or just remove the check.
-    // Better: Add `forceShow` or just rely on `isInitializing`.
-    // The previous check `if (!isInitializing || !isElectronAvailable) return null;` blocked H5.
-    // Let's change the condition.
-    const isVisible = isInitializing && (isElectronAvailable || !!message);
-    if (!isVisible) return null;
+    if (!isInitializing) return null;
 
     return (
         <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-500">
             <div className="bg-[#fcf6ea] rounded-3xl p-8 w-full max-w-sm shadow-2xl border-[6px] border-[#8c6b38] flex flex-col items-center text-center relative">
-                
-                {/* 加载图标 */}
                 <div className="mb-6 relative">
                     <div className="w-16 h-16 border-4 border-[#e3c086] border-t-[#5c4033] rounded-full animate-spin"></div>
                     <Cpu size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#5c4033]" />

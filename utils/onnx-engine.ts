@@ -278,26 +278,26 @@ export class OnnxEngine {
             // policyData 的最后一个值是 Pass
             
             // 4. 处理 Ownership (如果存在)
-            // 所有权也是直接对应的，不需要翻转或映射索引
+            // 动态模型输出已经直接对齐当前棋盘坐标。
+            // 这里仍然统一转换成绝对视角：黑为正，白为负。
             let finalOwnership: Float32Array | null = null;
             if (ownershipRaw) {
                  finalOwnership = new Float32Array(size * size);
                  for (let i = 0; i < size * size; i++) {
-                     // 只需要根据颜色翻转数值符号
-                     // 模型输出: 绝对值 (黑正白负) 还是 相对值? KataGo ownership通常是绝对值(黑+, 白-)
-                     // 但我们原来的逻辑里有 (color === 1 ? raw : -raw)，这取决于模型训练时的target。
-                     // 通常 b6 ownership 是相对于视角的。如果是相对于当前玩家：
-                     // 我们假设模型输出是：正数代表当前玩家占有，负数代表对手占有。
-                     // 如果 ownershipRaw 是绝对的（黑正白负），则逻辑如下：
+                     // This older model's ownership head is relative to the side to play.
+                     // Normalize it back to absolute ownership for downstream code.
                      const rawVal = ownershipRaw[i];
                      finalOwnership[i] = (color === 1) ? rawVal : -rawVal;
                  }
             }
 
-            // 解析胜率等信息
-            let winrate = this.processWinrate(value);
-            let lead = misc[0];
-            const scoreStdev = misc[1] || 0;
+            // KataGo's misc head is a 4-float vector.
+            // The official PyTorch export order is:
+            // [scoreMeanRaw, scoreStdevRaw, leadRaw, varianceTimeRaw]
+            // We only consume lead/stdev here, and they are still uncalibrated raw values.
+            const winrate = this.processWinrate(value);
+            const lead = misc[2] ?? 0;
+            const scoreStdev = misc[1] ?? 0;
 
             // 提取最佳着手
             // 直接传入 policyData，它已经是正确的大小了
@@ -309,7 +309,8 @@ export class OnnxEngine {
             if (!isMobile) {
                 console.log(`[OnnxEngine] Analysis Complete. (Size: ${size}x${size}, Temp: ${options.temperature ?? 0})`);
                 console.log(`  - Win Rate: ${winrate.toFixed(1)}%`);
-                console.log(`  - Score Lead: ${lead.toFixed(1)}`);
+                console.log(`  - Misc Raw: [${Array.from(misc).map(v => v.toFixed(3)).join(', ')}]`);
+                console.log(`  - Lead Raw: ${lead.toFixed(3)}`);
                 console.log(`  - Top 3 Moves:`);
                 moveInfos.slice(0, 3).forEach((m, i) => {
                     const moveStr = m.x === -1 ? 'Pass' : `(${m.x},${m.y})`;

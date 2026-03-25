@@ -18,7 +18,7 @@ export function getAIConfig(difficulty: string): AIConfig {
             useModel: true, // Now using b6 model
             simulations: 1, 
             randomness: 0,
-            temperature: 2.5, // Increased variety + Blunder logic in worker
+            temperature: 2.1, // Wider but still plausible sampling so Easy feels weaker without becoming chaotic
             heuristicFactor: 1.0
         };
     }
@@ -29,7 +29,7 @@ export function getAIConfig(difficulty: string): AIConfig {
             useModel: true,
             simulations: isMobile ? 2 : 4, 
             randomness: 0,
-            temperature: 0.5,
+            temperature: 0.22,
             heuristicFactor: 1.0
         };
     }

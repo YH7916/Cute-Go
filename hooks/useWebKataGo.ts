@@ -45,9 +45,6 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
             }
         }
 
-        // Only run in non-Electron environment
-        if ((window as any).electronAPI) return;
-
         console.log("[WebAI] Starting Initialization...");
         initializingRef.current = true; // Lock immediately
         setIsLoading(options.needModel);
@@ -140,20 +137,21 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
                     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
                     const { move, winRate, lead, scoreStdev, ownership } = msg.data;
-                    setAiWinRate(winRate);
-                    setAiLead(lead ?? null);
-                    setAiScoreStdev(scoreStdev ?? null);
-                    if (ownership) setAiTerritory(new Float32Array(ownership));
+                    const territory = ownership ? new Float32Array(ownership) : null;
+                    setAiTerritory(territory);
                     setIsThinking(false);
                     expectingResponseRef.current = false;
 
                     if (requestTypeRef.current === 'move') {
+                        setAiWinRate(winRate);
+                        setAiLead(lead ?? null);
+                        setAiScoreStdev(scoreStdev ?? null);
                         if (move) onAiMove(move.x, move.y);
                         else onAiPass();
                     } else {
                         console.log("[WebAI] Analysis complete.");
                         if (onAnalysisComplete) {
-                            onAnalysisComplete({ winRate, lead: lead ?? 0, ownership: ownership ? new Float32Array(ownership) : null });
+                            onAnalysisComplete({ winRate, lead: lead ?? 0, ownership: territory });
                         }
                     }
 
