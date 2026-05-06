@@ -28,6 +28,7 @@ import { useAchievements } from './hooks/useAchievements';
 import { useAppSettings } from './hooks/useAppSettings';
 import { useGameState } from './hooks/useGameState';
 import { useAudio } from './hooks/useAudio';
+import { useTsumego } from './domains/tsumego/useTsumego';
 
 // Utils
 import { supabase } from './utils/supabaseClient';
@@ -112,21 +113,23 @@ const App: React.FC = () => {
     const [tsumegoRoot, setTsumegoRoot] = useState<SGFNode | null>(null);
     const [tsumegoCurrentNode, setTsumegoCurrentNode] = useState<SGFNode | null>(null);
     const [tsumegoCollection, setTsumegoCollection] = useState<SGFNode[] | null>(null);
-    const [tsumegoSetTitle, setTsumegoSetTitle] = useState<string>("");
+    const [tsumegoSetTitle, setTsumegoSetTitle] = useState<string>('');
+    const [tsumegoCategories, setTsumegoCategories] = useState<TsumegoCategory[]>([]);
 
-    const [tsumegoCategories, setTsumegoCategories] = useState<TsumegoCategory[]>([]); // [New]
-
-    // Load Manifest
     useEffect(() => {
         fetchProblemManifest().then(data => {
-            setTsumegoCategories(data.filter(c => c.id === 'life_death'));
-        });
+            setTsumegoCategories(data.filter((c: TsumegoCategory) => c.id === 'life_death'));
+        }).catch(() => {});
     }, []);
 
     const [showTsumegoResult, setShowTsumegoResult] = useState(false);
     const [tsumegoIsCorrect, setTsumegoIsCorrect] = useState(false);
-    const [tsumegoResultMsg, setTsumegoResultMsg] = useState("");
+    const [tsumegoResultMsg, setTsumegoResultMsg] = useState('');
     const [tsumegoInstruction, setTsumegoInstruction] = useState<string | null>(null);
+
+    // Ref to break circular dependency between executeMove and handleTsumegoMove
+    const handleTsumegoMoveRef = useRef<(x: number, y: number) => boolean>(() => false);
+    const executeMoveRef = useRef<(x: number, y: number, isRemote: boolean) => void>(() => {});
 
     // --- Tutorial Init Check ---
     useEffect(() => {
@@ -658,6 +661,7 @@ const App: React.FC = () => {
         setShowTsumegoLevelSelector(false);
     };
 
+
     // --- Game Logic ---
     const resetGame = (keepOnline: boolean = false, explicitSize?: number, shouldBroadcast: boolean = true) => {
         const sizeToUse = explicitSize !== undefined ? explicitSize : settings.boardSize;
@@ -705,6 +709,60 @@ const App: React.FC = () => {
             setMyColor(null);
         }
     };
+
+    // --- Tsumego Logic (extracted to useTsumego hook) ---
+    const {
+        startTsumego,
+        handleOpenTsumego,
+        handleSelectTsumegoSet,
+        handleNextTsumego,
+        handleRetryTsumego,
+        handleTsumegoMove,
+        checkTsumegoStatus,
+    } = useTsumego({
+        state: {
+            tsumegoRoot,
+            tsumegoCurrentNode,
+            tsumegoCategories,
+            currentTsumegoLevel,
+            showTsumegoResult,
+        },
+        setters: {
+            setTsumegoRoot,
+            setTsumegoCurrentNode,
+            setTsumegoCollection,
+            setTsumegoSetTitle,
+            setShowTsumegoResult,
+            setTsumegoIsCorrect,
+            setTsumegoResultMsg,
+            setTsumegoInstruction,
+            setShowTsumegoLevelSelector,
+            setCurrentTsumegoLevel,
+            setCompletedLevelIds,
+        },
+        gameMode: settings.gameMode,
+        userColor: settings.userColor,
+        boardSize: settings.boardSize,
+        currentPlayer: gameState.currentPlayer,
+        gameOver: gameState.gameOver,
+        boardRef: gameState.boardRef,
+        currentPlayerRef: gameState.currentPlayerRef,
+        setBoardSize: settings.setBoardSize,
+        setBoard: gameState.setBoard,
+        setCurrentPlayer: gameState.setCurrentPlayer,
+        setLastMove: gameState.setLastMove,
+        setGameMode: settings.setGameMode,
+        setGameType: settings.setGameType,
+        setUserColor: settings.setUserColor,
+        resetGame,
+        executeMove: (x, y, isRemote) => executeMoveRef.current(x, y, isRemote),
+        setToastMsg,
+        vibrate,
+        playSfx,
+    });
+
+    // Keep ref in sync so executeMove can call handleTsumegoMove without circular dep
+    handleTsumegoMoveRef.current = handleTsumegoMove;
 
     const handleApplySettings = (newSettings: GameSettingsData) => {
         vibrate(20);
@@ -818,371 +876,6 @@ const App: React.FC = () => {
         vibrate(20);
     };
 
-    // --- Tsumego Logic ---
-    const handleOpenTsumego = () => {
-        setIsThinking(false);
-        aiTurnLock.current = false;
-        setShowMenu(false);
-        setShowTsumegoList(true);
-        setTsumegoCollection(null);
-    };
-
-    const handleSelectTsumegoSet = async (set: TsumegoSet) => {
-        setToastMsg(`正在加载 ${set.title}...`);
-
-        try {
-            if (!set.filename) throw new Error("Filename is missing");
-
-            const url = `/Tsumego/${set.filename}`;
-            console.log(`[Tsumego] Fetching ${url}`);
-
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-
-            // Direct Text Load for SGF
-            const text = await res.text();
-
-            // Parse
-            const roots = parseSGFToTree(text);
-            if (roots.length > 0) {
-                console.log(`[Tsumego] Parsed ${roots.length} problems.`);
-                setTsumegoCollection(roots);
-                setTsumegoSetTitle(set.title);
-                setToastMsg(null);
-            } else {
-                throw new Error("Invalid SGF content or empty");
-            }
-
-        } catch (e: any) {
-            console.error("Tsumego Load Error", e);
-            setToastMsg(`加载失败: ${e.message}`);
-            setTimeout(() => setToastMsg(null), 3000);
-        }
-    };
-
-    const startTsumego = (root: SGFNode) => {
-        resetGame(false, 19, false);
-
-
-        let currentNode: SGFNode = root;
-        let combinedProps: { [key: string]: string[] } = { ...root.properties };
-
-        // Accumulate Setup from sequence of nodes until a Move node occurs
-        let depth = 0;
-        while (depth < 10 && !currentNode.properties['B'] && !currentNode.properties['W'] && currentNode.children.length === 1) {
-            const child = currentNode.children[0];
-
-            if (child.properties['AB']) {
-                combinedProps['AB'] = [...(combinedProps['AB'] || []), ...child.properties['AB']];
-            }
-            if (child.properties['AW']) {
-                combinedProps['AW'] = [...(combinedProps['AW'] || []), ...child.properties['AW']];
-            }
-            if (child.properties['SZ']) combinedProps['SZ'] = child.properties['SZ'];
-            if (child.properties['PL']) combinedProps['PL'] = child.properties['PL'];
-            if (child.properties['C']) combinedProps['C'] = child.properties['C'];
-
-            if (child.properties['B'] || child.properties['W']) {
-                break; // Child is a move, stop accumulation
-            } else {
-                currentNode = child; // Advance
-            }
-            depth++;
-        }
-
-        // --- Apply Size ---
-        let size = 19;
-        if (combinedProps['SZ']) {
-            size = parseInt(combinedProps['SZ'][0]);
-        }
-        if (size !== settings.boardSize) {
-            settings.setBoardSize(size as BoardSize);
-            boardSizeRef.current = size as BoardSize;
-            gameState.setBoard(createBoard(size as BoardSize));
-        }
-
-        settings.setGameMode('Tsumego');
-        settings.setGameType('Go');
-        setTsumegoRoot(root); // Keep original root for reference
-        setTsumegoCurrentNode(currentNode); // Set effective start node
-
-        // --- Helper: Parse Point or Range ---
-        const parseSGFPointOrRange = (val: string): { x: number, y: number }[] => {
-            if (val.length < 2) return [];
-
-            // Handle compressed range "aa:cc"
-            if (val.includes(':')) {
-                const parts = val.split(':');
-                if (parts.length !== 2) return [];
-
-                const p1 = parts[0];
-                const p2 = parts[1];
-                if (p1.length < 2 || p2.length < 2) return [];
-
-                const x1 = p1.charCodeAt(0) - 97;
-                const y1 = p1.charCodeAt(1) - 97;
-                const x2 = p2.charCodeAt(0) - 97;
-                const y2 = p2.charCodeAt(1) - 97;
-
-                const minX = Math.min(x1, x2);
-                const maxX = Math.max(x1, x2);
-                const minY = Math.min(y1, y2);
-                const maxY = Math.max(y1, y2);
-
-                const points = [];
-                for (let ix = minX; ix <= maxX; ix++) {
-                    for (let iy = minY; iy <= maxY; iy++) {
-                        points.push({ x: ix, y: iy });
-                    }
-                }
-                return points;
-            } else {
-                // Single point
-                const x = val.charCodeAt(0) - 97;
-                const y = val.charCodeAt(1) - 97;
-                return [{ x, y }];
-            }
-        };
-
-        // --- Apply Stones ---
-        const newBoard = createBoard(size as BoardSize);
-
-        if (combinedProps['AB']) {
-            combinedProps['AB'].forEach(val => {
-                const points = parseSGFPointOrRange(val);
-                points.forEach(p => {
-                    if (p.x >= 0 && p.x < size && p.y >= 0 && p.y < size) {
-                        newBoard[p.y][p.x] = { color: 'black', x: p.x, y: p.y, id: `setup-b-${p.x}-${p.y}` };
-                    }
-                });
-            });
-        }
-        if (combinedProps['AW']) {
-            combinedProps['AW'].forEach(val => {
-                const points = parseSGFPointOrRange(val);
-                points.forEach(p => {
-                    if (p.x >= 0 && p.x < size && p.y >= 0 && p.y < size) {
-                        newBoard[p.y][p.x] = { color: 'white', x: p.x, y: p.y, id: `setup-w-${p.x}-${p.y}` };
-                    }
-                });
-            });
-        }
-        if (combinedProps['AE']) {
-            combinedProps['AE'].forEach(val => {
-                const points = parseSGFPointOrRange(val);
-                points.forEach(p => {
-                    if (p.x >= 0 && p.x < size && p.y >= 0 && p.y < size) {
-                        newBoard[p.y][p.x] = null;
-                    }
-                });
-            });
-        }
-
-        gameState.setBoard(newBoard);
-        gameState.boardRef.current = newBoard;
-
-        // --- Determine Turn ---
-        let firstPlayer: Player = 'black';
-        if (combinedProps['PL']) {
-            const pl = combinedProps['PL'][0];
-            firstPlayer = (pl.toLowerCase() === 'w' || pl === '2') ? 'white' : 'black';
-        } else if (currentNode.children.length > 0) {
-            // Auto-detect based on first move color
-            const firstChild = currentNode.children[0];
-            if (firstChild.properties['W'] && !firstChild.properties['B']) {
-                firstPlayer = 'white';
-            } else if (firstChild.properties['B']) {
-                firstPlayer = 'black';
-            }
-        }
-
-        gameState.setCurrentPlayer(firstPlayer);
-        gameState.currentPlayerRef.current = firstPlayer;
-        settings.setUserColor(firstPlayer);
-
-        // Show Comment & Player Info
-        const turnMsg = firstPlayer === 'black' ? "执黑 (Black to Play)" : "执白 (White to Play)";
-        let fullMsg = turnMsg;
-        if (combinedProps['C']) {
-            fullMsg += `\n${combinedProps['C'][0]}`;
-        }
-        setTsumegoInstruction(fullMsg);
-
-        // Clear previous result modal
-        setShowTsumegoResult(false);
-    };
-
-    const handleNextTsumego = async () => {
-        if (!currentTsumegoLevel) return;
-        const cat = tsumegoCategories.find(c => c.id === currentTsumegoLevel.category);
-        if (!cat) return;
-
-        let fileList: string[] = [];
-        const currentFilename = currentTsumegoLevel.filename.replace(/\\/g, '/');
-
-        if (currentTsumegoLevel.groupName) {
-            const group = cat.children.find(c => (c as any).isGroup && c.name === currentTsumegoLevel.groupName);
-            if (group && (group as any).files) {
-                fileList = (group as any).files;
-            }
-        } else {
-            fileList = cat.children.filter(c => !(c as any).isGroup).map(c => (c as any).file);
-        }
-
-        const cleanCurrent = currentFilename.startsWith(cat.dirName + '/')
-            ? currentFilename.slice(cat.dirName.length + 1)
-            : currentFilename;
-
-        const idx = fileList.indexOf(cleanCurrent);
-
-        if (idx !== -1 && idx < fileList.length - 1) {
-            const nextFile = fileList[idx + 1];
-            const nextFull = `${cat.dirName}/${nextFile}`;
-            const nextLevel: TsumegoLevel = {
-                id: `${cat.id}/${nextFile}`,
-                title: `Problem ${idx + 2}`,
-                category: cat.id,
-                groupName: currentTsumegoLevel.groupName, // Preserve group
-                filename: nextFull,
-                difficulty: 1,
-            };
-
-            try {
-                setToastMsg("加载下一关...");
-                const sgf = await fetchProblemSGF(nextLevel.filename);
-                setCurrentTsumegoLevel(nextLevel);
-                // setTsumegoLives(99); // Infinite lives
-
-                const nodes = parseSGFToTree(sgf);
-                if (nodes && nodes.length > 0) startTsumego(nodes[0]);
-                setToastMsg(null);
-            } catch (e) {
-                setToastMsg("加载失败");
-            }
-        } else {
-            setToastMsg("本章已完成！");
-        }
-    };
-
-    const handleRetryTsumego = () => {
-        if (tsumegoRoot) startTsumego(tsumegoRoot);
-        // setShowTsumegoResult(false);
-    };
-
-    // --- Tsumego Status Helpers ---
-    const tsumegoKeywords = {
-        correct: ['正解', 'correct', 'right', 'success', 'succeed', '活', 'win', '手筋', '官子', '优'],
-        wrong: ['错', 'wrong', 'fail', 'failure', 'die', 'dead', '失败']
-    };
-
-    const hasSuccessDescendant = (node: SGFNode): boolean => {
-        const comment = node.properties['C'] ? node.properties['C'][0].toLowerCase() : '';
-        const isCorrect = tsumegoKeywords.correct.some(k => comment.includes(k));
-        const isWrong = tsumegoKeywords.wrong.some(k => comment.includes(k));
-
-        if (isCorrect && !isWrong) return true;
-        if (isWrong) return false;
-
-        // Recursive check
-        return node.children.some(child => hasSuccessDescendant(child));
-    };
-
-    const checkTsumegoStatus = (node: SGFNode | null) => {
-        if (!node) return;
-
-        const comment = node.properties['C'] ? node.properties['C'][0] : '';
-        if (!comment) return;
-
-        // User Request: Filter out "参考图" as meaningless
-        if (comment.includes('参考图')) return;
-
-        const isCorrect = tsumegoKeywords.correct.some(k => comment.toLowerCase().includes(k));
-        const isWrong = tsumegoKeywords.wrong.some(k => comment.toLowerCase().includes(k));
-
-        if (isCorrect && !isWrong) {
-            if (node.children.length > 0) {
-                // Has follow-up (opponent moves), so don't end yet.
-                setToastMsg(`✅ ${comment} (继续落子...)`);
-            } else {
-                setToastMsg(`✅ ${comment}`);
-                setTimeout(() => {
-                    setTsumegoIsCorrect(true);
-                    setTsumegoResultMsg(comment);
-                    setShowTsumegoResult(true);
-                }, 200);
-            }
-        } else if (isWrong) {
-            // User requested to remove red 'X' prompt
-            setToastMsg(`${comment}`);
-        } else {
-            setToastMsg(comment);
-        }
-    };
-
-    const handleTsumegoMove = (x: number, y: number) => {
-        if (!tsumegoCurrentNode) return false;
-
-        const playerProp = gameState.currentPlayer === 'black' ? 'B' : 'W';
-        const coordStr = String.fromCharCode(x + 97) + String.fromCharCode(y + 97);
-
-        const nextNode = tsumegoCurrentNode.children.find((child: SGFNode) => {
-            const prop = child.properties[playerProp];
-            // [Robustness] Trim space, just in case 'B[aa ]'
-            return prop && prop[0].trim() === coordStr;
-        });
-
-        if (nextNode) {
-            setTsumegoCurrentNode(nextNode);
-
-            // User Move Status
-            checkTsumegoStatus(nextNode);
-
-            // Trigger Opponent Response
-            if (nextNode.children.length > 0 && !showTsumegoResult) {
-                setTimeout(() => {
-                    // Check again if game ended
-
-                    const opponentNode = nextNode.children[0];
-                    const oppColor = gameState.currentPlayer === 'black' ? 'white' : 'black';
-                    const oppProp = oppColor === 'black' ? 'B' : 'W';
-
-                    if (opponentNode.properties[oppProp]) {
-                        const moveStr = opponentNode.properties[oppProp][0].trim();
-                        if (moveStr && moveStr.length >= 2) { // Allow 'tt'(pass) or 'aa'
-                            const ox = moveStr.charCodeAt(0) - 97;
-                            const oy = moveStr.charCodeAt(1) - 97;
-
-                            // Use REF to get latest board state!
-                            const currentBoard = gameState.boardRef.current;
-                            const attempt = attemptMove(currentBoard, ox, oy, oppColor);
-
-                            if (attempt) {
-                                gameState.setBoard(attempt.newBoard);
-                                gameState.setLastMove({ x: ox, y: oy });
-                                gameState.setCurrentPlayer(oppColor === 'black' ? 'white' : 'black');
-
-                                if (oppColor === 'black') gameState.setWhiteCaptures(c => c + attempt.captured);
-                                else gameState.setBlackCaptures(c => c + attempt.captured);
-
-                                if (attempt.captured > 0) playSfx('capture');
-                                else playSfx('move');
-
-                                setTsumegoCurrentNode(opponentNode);
-                                checkTsumegoStatus(opponentNode);
-                            }
-                        }
-                    }
-                }, 100);
-            }
-            return true;
-        } else {
-            console.log(`[Tsumego] Failed Move: ${coordStr} (${x},${y})`);
-            setToastMsg("答案错误 (再试一次)");
-            vibrate(50);
-            return false;
-        }
-    };
-
 
     // --- Display Metrics Hooks (Moved Up to avoid TDZ in endGame) ---
     // Persist AI Run Flag
@@ -1250,102 +943,6 @@ const App: React.FC = () => {
     }, [settings.gameMode, settings.userColor, useCloud, cloudTerritory, webTerritory, gameState.appMode]);
 
     // --- Tsumego End Check ---
-    useEffect(() => {
-        if (settings.gameMode === 'Tsumego' && tsumegoCurrentNode) {
-            if (tsumegoCurrentNode.children.length === 0) {
-                // Check if it's "Correct" or "Incorrect" based on comments or context
-                // Simple heuristic: If comment contains positive words or if it's the only path?
-                // Usually SGF problems have "C[Right]" or "C[Correct]"
-                // Let's rely on simple presence of comment for now or default to "Ended".
-                // BUT: If the user just played and there is NO response, it might be correct.
-                // If the AI just played (which leads to leaf), it means user FAILED (usually).
-
-                // Logic: 
-                // If currentPlayer is USER's color, it means AI just played and reached end -> User Failed.
-                // If currentPlayer is OPPONENT, it means USER just played and reached end -> User Solved (probably).
-
-                // Wait, after User moves, we check `tsumegoCurrentNode.children`. If 0, User Solved.
-                // After AI moves, we check `tsumegoCurrentNode.children`. If 0, AI won -> User Failed.
-
-                const userColor = settings.userColor;
-                const justPlayedColor = gameState.currentPlayer === 'black' ? 'white' : 'black'; // Previous player
-
-                let isSuccess = false;
-
-                if (justPlayedColor === userColor) {
-                    // User just played the last move.
-                    isSuccess = true;
-                } else {
-                    // AI just played the last move (refutation).
-                    isSuccess = false;
-                }
-
-                // Override with comments if available
-                const comment = tsumegoCurrentNode.properties['C'] ? tsumegoCurrentNode.properties['C'][0] : "";
-                if (comment.toLowerCase().includes("right") || comment.includes("正解") || comment.includes("correct") || comment.includes("win")) isSuccess = true;
-                if (comment.toLowerCase().includes("wrong") || comment.includes("failure") || comment.includes("失败")) isSuccess = false;
-
-                // Delay slightly to show the move
-                setTimeout(() => {
-                    setTsumegoIsCorrect(isSuccess);
-                    setTsumegoResultMsg(comment);
-                    setShowTsumegoResult(true);
-
-                    if (isSuccess && currentTsumegoLevel) {
-                        // Progression: Mark completed and unlock next
-                        setCompletedLevelIds(prev => {
-                            if (prev.includes(currentTsumegoLevel.id)) return prev;
-                            const next = [...prev, currentTsumegoLevel.id];
-                            localStorage.setItem('completed_tsumego_levels', JSON.stringify(next));
-                            return next;
-                        });
-
-                        // Unlock logic is now derived from completion history in LevelGrid
-                        // No need to manually update unlockedLevelIds
-                    }
-
-                    vibrate(isSuccess ? 100 : 200);
-                    playSfx(isSuccess ? 'win' : 'lose');
-                }, 200);
-            }
-        }
-    }, [tsumegoCurrentNode, settings.gameMode, gameState.currentPlayer, settings.userColor]);
-
-    // --- Tsumego Auto-Move Effect ---
-    useEffect(() => {
-        if (settings.gameMode !== 'Tsumego' || gameState.gameOver || !tsumegoCurrentNode) return;
-
-        // Auto-Play conditions:
-        // 1. It is NOT the user's turn (AI turn).
-        // 2. There is a valid move defined in the SGF for the current player.
-        if (gameState.currentPlayer !== settings.userColor) {
-            const playerProp = gameState.currentPlayer === 'black' ? 'B' : 'W';
-
-            // Find response
-            // Heuristic: Take the first child that matches the player color.
-            const nextMove = tsumegoCurrentNode.children.find(c => c.properties[playerProp]);
-
-            if (nextMove && nextMove.properties[playerProp]) {
-                const timer = setTimeout(() => {
-                    const moveStr = nextMove.properties[playerProp][0];
-                    if (moveStr && moveStr.length >= 2) {
-                        const x = moveStr.charCodeAt(0) - 97;
-                        const y = moveStr.charCodeAt(1) - 97;
-                        executeMove(x, y, false);
-
-                        setTsumegoCurrentNode(nextMove); // Update node pointer
-
-                        // Handle Comments on AI move
-                        if (nextMove.properties['C']) {
-                            setToastMsg(nextMove.properties['C'][0]);
-                            setTimeout(() => setToastMsg(null), 3000);
-                        }
-                    }
-                }, 200);
-                return () => clearTimeout(timer);
-            }
-        }
-    }, [tsumegoCurrentNode, gameState.currentPlayer, settings.gameMode, settings.userColor, gameState.gameOver]);
 
     const endGame = useCallback(async (winnerColor: Player, reason: string) => {
         gameState.setGameOver(true);
@@ -1442,7 +1039,7 @@ const App: React.FC = () => {
         }
 
         if (settings.gameMode === 'Tsumego' && !isRemote && tsumegoCurrentNode) {
-            const isValid = handleTsumegoMove(x, y);
+            const isValid = handleTsumegoMoveRef.current(x, y);
             if (!isValid) return;
         }
 
@@ -1505,7 +1102,10 @@ const App: React.FC = () => {
         } else {
             if (!isRemote) try { playSfx('error'); } catch (e) { }
         }
-    }, [gameState.history, settings.gameMode, settings.gameType, settings.boardSize, gameState.blackCaptures, gameState.whiteCaptures, gameState.consecutivePasses, handleTsumegoMove, endGame, session?.user?.id, gameState.boardRef, gameState.currentPlayerRef, gameTypeRef, getBoardHash, attemptMove, playSfx, vibrate, checkMoveAchievements, gameState.setHistory, gameState.setBoard, gameState.setLastMove, gameState.setConsecutivePasses, gameState.setPassNotificationDismissed, checkGomokuWin, gameState.setCurrentPlayer, gameState.setBlackCaptures, gameState.setWhiteCaptures]);
+    }, [gameState.history, settings.gameMode, settings.gameType, settings.boardSize, gameState.blackCaptures, gameState.whiteCaptures, gameState.consecutivePasses, endGame, session?.user?.id, gameState.boardRef, gameState.currentPlayerRef, gameTypeRef, getBoardHash, attemptMove, playSfx, vibrate, checkMoveAchievements, gameState.setHistory, gameState.setBoard, gameState.setLastMove, gameState.setConsecutivePasses, gameState.setPassNotificationDismissed, checkGomokuWin, gameState.setCurrentPlayer, gameState.setBlackCaptures, gameState.setWhiteCaptures]);
+
+    // Keep refs in sync after executeMove is defined
+    executeMoveRef.current = executeMove;
 
     const triggerGoScoring = useCallback(() => {
         if (settings.gameType !== 'Go' || gameState.gameOver) return;
@@ -2304,28 +1904,37 @@ const App: React.FC = () => {
                         handleNextProblem={handleNextTsumego}
                         handleHint={() => {
                             if (!tsumegoCurrentNode) return;
-                            // Hint Logic
                             const playerProp = gameState.currentPlayer === 'black' ? 'B' : 'W';
                             const playerColor = gameState.currentPlayer;
+
+                            const hintKeywords = {
+                                correct: ['正解', 'correct', 'right', 'success', 'succeed', '活', 'win', '手筋', '官子', '优'],
+                                wrong: ['错', 'wrong', 'fail', 'failure', 'die', 'dead', '失败'],
+                            };
+                            const hasSuccess = (node: SGFNode): boolean => {
+                                const c = node.properties['C']?.[0]?.toLowerCase() ?? '';
+                                if (hintKeywords.correct.some(k => c.includes(k)) && !hintKeywords.wrong.some(k => c.includes(k))) return true;
+                                if (hintKeywords.wrong.some(k => c.includes(k))) return false;
+                                return node.children.some(child => hasSuccess(child));
+                            };
 
                             // 1. First, look for immediate nodes marked "Correct"
                             let hintChild = tsumegoCurrentNode.children.find(c => {
                                 const comment = c.properties['C'] ? c.properties['C'][0].toLowerCase() : '';
-                                return tsumegoKeywords.correct.some(k => comment.includes(k));
+                                return hintKeywords.correct.some(k => comment.includes(k));
                             });
 
-                            // 2. [New] Recursive Search: Does any branch lead to success?
+                            // 2. Recursive Search: Does any branch lead to success?
                             if (!hintChild) {
-                                hintChild = tsumegoCurrentNode.children.find(c => hasSuccessDescendant(c));
+                                hintChild = tsumegoCurrentNode.children.find(c => hasSuccess(c));
                             }
 
                             // Fallback Logic:
                             if (!hintChild) {
-                                // Filter out known "Wrong" paths
                                 const candidates = tsumegoCurrentNode.children.filter(c => {
                                     if (!c.properties[playerProp]) return false;
                                     const comment = c.properties['C'] ? c.properties['C'][0].toLowerCase() : '';
-                                    const isWrong = tsumegoKeywords.wrong.some(k => comment.includes(k));
+                                    const isWrong = hintKeywords.wrong.some(k => comment.includes(k));
                                     return !isWrong;
                                 });
 
