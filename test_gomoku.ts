@@ -13,7 +13,7 @@ const runTest = () => {
   board[7][9] = { color: 'black', x: 9, y: 7, id: '3' };
   
   // AI is White
-  const move = getAIMove(board, 'white', 'Gomoku', 'Hard', null);
+  const move = getAIMove(board, 'white', 'Gomoku', 'Hard');
   console.log('AI Move:', move);
   
   if (move && move !== 'RESIGN' && (move.x === 6 || move.x === 10) && move.y === 7) {
@@ -30,7 +30,7 @@ const runTest = () => {
   board[7][9] = { color: 'white', x: 9, y: 7, id: '3' };
   board[7][10] = { color: 'white', x: 10,y: 7, id: '4' };
 
-  const winMove = getAIMove(board, 'white', 'Gomoku', 'Hard', null);
+  const winMove = getAIMove(board, 'white', 'Gomoku', 'Hard');
   console.log('AI Win Move:', winMove);
     if (winMove && winMove !== 'RESIGN' && (winMove.x === 6 || winMove.x === 11) && winMove.y === 7) {
       console.log("SUCCESS: Found winning move");
