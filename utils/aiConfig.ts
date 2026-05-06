@@ -15,10 +15,10 @@ export function getAIConfig(difficulty: string): AIConfig {
     // Easy
     if (difficulty === 'Easy') {
         return {
-            useModel: true, // Now using b6 model
-            simulations: 1, 
+            useModel: false, // 使用手写初学者 AI，不需要 ONNX 模型
+            simulations: 1,
             randomness: 0,
-            temperature: 2.1, // Wider but still plausible sampling so Easy feels weaker without becoming chaotic
+            temperature: 0,
             heuristicFactor: 1.0
         };
     }
