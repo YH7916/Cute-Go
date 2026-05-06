@@ -678,15 +678,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     simulations
                 );
 
-                const blackLead = analyzed.ownership
-                    ? (() => {
-                        const score = calculateModelScore(boardState as BoardState, analyzed.ownership, effectiveKomi);
-                        return score.black - score.white;
-                    })()
-                    : toBlackPerspectiveLead(analyzed.lead, color);
-                const blackWinRate = analyzed.ownership
-                    ? deriveBlackWinRateFromLead(blackLead)
-                    : toBlackPerspectiveWinRate(analyzed.winRate, color);
+                const blackLead = (() => {
+                    const score = calculateModelScore(boardState as BoardState, analyzed.ownership ?? null, effectiveKomi);
+                    return score.black - score.white;
+                })();
+                // 直接用模型输出的真实胜率，不用 lead 推算
+                const blackWinRate = toBlackPerspectiveWinRate(analyzed.winRate, color);
 
                 ctx.postMessage({
                     type: 'ai-response',
@@ -766,15 +763,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             if (selectedMove === undefined) selectedMove = null; // Safety
 
             const isPass = selectedMove === null;
-            const blackLead = result.rootInfo.ownership
-                ? (() => {
-                    const score = calculateModelScore(boardState as BoardState, result.rootInfo.ownership, effectiveKomi);
-                    return score.black - score.white;
-                })()
-                : toBlackPerspectiveLead(result.rootInfo.lead, color);
-            const blackWinRate = result.rootInfo.ownership
-                ? deriveBlackWinRateFromLead(blackLead)
-                : toBlackPerspectiveWinRate(result.rootInfo.winrate, color);
+            const blackLead = (() => {
+                const score = calculateModelScore(boardState as BoardState, result.rootInfo.ownership ?? null, effectiveKomi);
+                return score.black - score.white;
+            })();
+            // 直接用模型输出的真实胜率，不用 lead 推算
+            const blackWinRate = toBlackPerspectiveWinRate(result.rootInfo.winrate, color);
 
             // Only log if not null or valid object
             const moveStr = isPass ? 'Pass' : `(${selectedMove.x},${selectedMove.y})`;

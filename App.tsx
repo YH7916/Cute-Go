@@ -1519,7 +1519,7 @@ const App: React.FC = () => {
         if (settings.gameMode === 'PvAI' && isWorkerReady) {
             console.log('[App] Requesting KataGo endgame analysis...');
             pendingEndGameRef.current = true;
-            requestAnalysis(gameState.boardRef.current, 'black', gameState.historyRef.current, settings.boardSize === 9 ? 6.5 : 7.5, 'Go');
+            requestAnalysis(gameState.boardRef.current, gameState.currentPlayerRef.current, gameState.historyRef.current, settings.boardSize === 9 ? 6.5 : 7.5, 'Go');
             return;
         }
 
