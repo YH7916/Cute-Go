@@ -470,7 +470,9 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             const { board: boardState, history: gameHistory, color, size, gameType = 'Go', komi, difficulty, temperature, mode = 'play', simulations } = msg.data;
             console.log(`[AI Worker] Compute Request Received. Type=${gameType}, Size=${size}, Diff=${difficulty}`);
 
-            // === Gomoku Logic ===
+            // ============================================================
+            // === GOMOKU SECTION — 五子棋逻辑（minimax + 启发式评估）===
+            // ============================================================
             if (gameType === 'Gomoku') {
                 const board = boardState as BoardState;
                 // [Fix] Defensive: ensure `size` matches actual board dimensions.
@@ -603,7 +605,9 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 return;
             }
 
-            // === Go Logic (Engine) ===
+            // ============================================================
+            // === GO SECTION — 围棋逻辑（ONNX推理 + MCTS搜索）===
+            // ============================================================
             if (!engine) {
                 // [Fix] If engine is missing, we cannot analyze.
                 // We should check if we can auto-recover or if we should fail.
