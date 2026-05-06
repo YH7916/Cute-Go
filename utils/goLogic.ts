@@ -16,7 +16,7 @@ export {
   calculateTerritory,
 } from '../core/go/scoring';
 export { generateSGF, parseSGF, serializeGame, deserializeGame } from '../core/go/sgf';
-export { evaluateShape, evaluatePositionStrength } from '../core/go/ai';
+export { evaluateShape, evaluatePositionStrength, getBeginnerAIMove } from '../core/go/ai';
 export { checkGomokuWin, attemptGomokuMove } from '../core/gomoku/rules';
 export {
   getGomokuAIMove,

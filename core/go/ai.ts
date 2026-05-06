@@ -194,3 +194,102 @@ export const getGoAIMove = (
 
   return bestMove;
 };
+
+// --- 初学者 AI（Easy 模式）---
+// 模拟刚学围棋的人：只看局部、会提子、会叫吃、不会做眼、不会判断死活
+export const getBeginnerAIMove = (
+  board: BoardState,
+  player: Player,
+  previousBoardHash: string | null = null
+): Point | null => {
+  const size = board.length;
+  const opponent: Player = player === 'black' ? 'white' : 'black';
+
+  // 找最近有子的区域（局部视野：3格范围）
+  const localCandidates = new Set<number>();
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (board[y][x]) {
+        for (let dy = -3; dy <= 3; dy++) {
+          for (let dx = -3; dx <= 3; dx++) {
+            const ny = y + dy, nx = x + dx;
+            if (nx >= 0 && nx < size && ny >= 0 && ny < size && !board[ny][nx])
+              localCandidates.add(ny * size + nx);
+          }
+        }
+      }
+    }
+  }
+
+  // 没有子时走天元
+  if (localCandidates.size === 0) {
+    const center = Math.floor(size / 2);
+    return { x: center, y: center };
+  }
+
+  const candidates = Array.from(localCandidates).map(idx => ({
+    x: idx % size,
+    y: Math.floor(idx / size),
+  }));
+
+  const scored: { pt: Point; score: number }[] = [];
+
+  for (const pt of candidates) {
+    const { x, y } = pt;
+
+    // 不走真眼
+    if (isSimpleEye(board, x, y, player)) continue;
+
+    const sim = attemptMove(board, x, y, player, 'Go', previousBoardHash);
+    if (!sim) continue;
+
+    let score = 0;
+
+    // 1. 提子——初学者最懂的操作，权重最高
+    if (sim.captured > 0) {
+      score += 500 + sim.captured * 200;
+    }
+
+    // 2. 叫吃对方——看到对方只有一口气就叫吃
+    const neighbors = getNeighbors({ x, y }, size);
+    for (const n of neighbors) {
+      const stone = board[n.y][n.x];
+      if (stone && stone.color === opponent) {
+        const enemyGroup = getGroup(sim.newBoard, n);
+        if (enemyGroup && enemyGroup.liberties === 1) {
+          score += 300 + enemyGroup.stones.length * 50;
+        }
+      }
+    }
+
+    // 3. 逃跑——自己只有一口气时优先逃
+    const myGroup = getGroup(sim.newBoard, { x, y });
+    if (myGroup) {
+      if (myGroup.liberties === 1) {
+        score -= 400; // 落子后仍然只有一口气，危险
+      } else if (myGroup.liberties >= 3) {
+        score += 50; // 气多更安全
+      }
+    }
+
+    // 4. 连接自己的子——初学者喜欢连棋
+    let myNeighborStones = 0;
+    for (const n of neighbors) {
+      if (board[n.y][n.x]?.color === player) myNeighborStones++;
+    }
+    score += myNeighborStones * 30;
+
+    // 5. 30% 概率加随机扰动，模拟"不知道下哪里"
+    score += Math.random() < 0.3 ? Math.random() * 100 : 0;
+
+    scored.push({ pt, score });
+  }
+
+  if (scored.length === 0) return null;
+
+  scored.sort((a, b) => b.score - a.score);
+
+  // 从前3个里随机选，模拟初学者的不确定性
+  const topN = scored.slice(0, Math.min(3, scored.length));
+  return topN[Math.floor(Math.random() * topN.length)].pt;
+};

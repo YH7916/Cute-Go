@@ -6,9 +6,10 @@ import {
     checkGomokuWin,
     evaluatePositionStrength,
     GOMOKU_SCORES,
-    attemptMove, // [New]
-    getBoardHash, // [New]
-    calculateModelScore
+    attemptMove,
+    getBoardHash,
+    calculateModelScore,
+    getBeginnerAIMove,
 } from '../utils/goLogic';
 import { BoardState, Player, Point } from '../types';
 
@@ -96,8 +97,8 @@ const sampleIndexByWeight = (weights: number[]) => {
 };
 
 const getDifficultyPoolSize = (difficulty?: 'Easy' | 'Medium' | 'Hard') => {
-    if (difficulty === 'Easy') return 16;
-    if (difficulty === 'Medium') return 6;
+    if (difficulty === 'Easy') return 20;  // 更大的池，让随机性更高
+    if (difficulty === 'Medium') return 8;
     return Infinity;
 };
 
@@ -292,13 +293,16 @@ const runOwnershipSearch = async (
 
 const getDifficultyRankBias = (difficulty: 'Easy' | 'Medium' | 'Hard' | undefined, rank: number) => {
     if (difficulty === 'Easy') {
-        const table = [0.45, 0.72, 0.9, 1.0, 1.0, 0.9, 0.76, 0.62, 0.5, 0.4, 0.31, 0.24, 0.18, 0.13, 0.09, 0.06];
-        return table[rank] ?? 0.03;
+        // 峰值在 rank 8-12，让 AI 倾向于选较差的棋而不是最好的
+        // rank 0-3（最好的棋）权重很低，rank 8-12 权重最高
+        const table = [0.05, 0.08, 0.12, 0.18, 0.35, 0.55, 0.75, 0.90, 1.0, 1.0, 0.95, 0.85, 0.70, 0.50, 0.30, 0.15, 0.08, 0.05, 0.03, 0.02];
+        return table[rank] ?? 0.01;
     }
 
     if (difficulty === 'Medium') {
-        const table = [1.08, 0.82, 0.58, 0.34, 0.18, 0.1];
-        return table[rank] ?? 0.05;
+        // 峰值在 rank 2-3，偶尔选次优棋
+        const table = [0.5, 0.85, 1.0, 0.9, 0.6, 0.35, 0.15, 0.05];
+        return table[rank] ?? 0.03;
     }
 
     return 1;
@@ -608,6 +612,23 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             // ============================================================
             // === GO SECTION — 围棋逻辑（ONNX推理 + MCTS搜索）===
             // ============================================================
+
+            // Easy 模式：用手写初学者 AI，不走 ONNX 模型
+            if (difficulty === 'Easy' && gameType === 'Go') {
+                const boardState2 = boardState as BoardState;
+                let prevHash: string | null = null;
+                if (gameHistory.length > 0) {
+                    const last = gameHistory[gameHistory.length - 1];
+                    if (last?.board) prevHash = getBoardHash(last.board);
+                }
+                const beginnerMove = getBeginnerAIMove(boardState2, color, prevHash);
+                ctx.postMessage({
+                    type: 'ai-response',
+                    data: { move: beginnerMove, winRate: 50, lead: 0, ownership: null }
+                });
+                return;
+            }
+
             if (!engine) {
                 // [Fix] If engine is missing, we cannot analyze.
                 // We should check if we can auto-recover or if we should fail.
