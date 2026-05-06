@@ -144,7 +144,7 @@ export const tapAuthorizeUserInfo = async () => {
 /**
  * Get User Info (Profile)
  */
-export const getTapUserInfo = async (retryIfUnauthorized = true) => {
+export const getTapUserInfo = async (retryIfUnauthorized = true): Promise<any> => {
   const tap = getTap();
   if (tap && tap.getUserInfo) {
     try {

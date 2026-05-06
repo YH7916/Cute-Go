@@ -55,7 +55,7 @@ export const useCloudKataGo = ({ onAiMove, onAiPass, onAiResign, onAiError }: Us
             
             // 1. Format Moves History for Server
             // Server expects: { x, y, color: "black"|"white" }[]
-            const historyPayload = [];
+            const historyPayload: { x: number; y: number; color: string }[] = [];
             
             history.forEach(item => {
                 if (item.lastMove) {

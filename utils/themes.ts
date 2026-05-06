@@ -1,5 +1,5 @@
 export type BoardThemeId = 'wood' | 'realistic_wood';
-export type StoneThemeId = 'classic' | 'skeuomorphic';
+export type StoneThemeId = 'classic' | 'skeuomorphic' | 'minimal';
 
 export interface BoardTheme {
   id: BoardThemeId;
@@ -63,12 +63,20 @@ export const STONE_THEMES: Record<StoneThemeId, StoneTheme> = {
   skeuomorphic: {
     id: 'skeuomorphic',
     name: '新拟物风格',
-    blackColor: '#303030',  // Flat matte black
-    whiteColor: '#e8e8e4',  // Flat matte cream
+    blackColor: '#303030',
+    whiteColor: '#e8e8e4',
     blackBorder: '#000000',
     whiteBorder: '#d0d0d0',
-    filter: 'none', // No SVG filters - uses multi-layer shadows for neumorphism
-    useGradientFill: false, // Now uses solid colors
-    useShadowLayers: true   // Uses light+dark shadow layers for extruded effect
+    filter: 'none',
+    useGradientFill: false,
+    useShadowLayers: true
+  },
+  minimal: {
+    id: 'minimal',
+    name: '极简风格',
+    blackColor: '#1a1a1a',
+    whiteColor: '#ffffff',
+    blackBorder: '#1a1a1a',
+    whiteBorder: '#cccccc'
   }
 };

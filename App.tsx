@@ -143,7 +143,7 @@ const App: React.FC = () => {
 
     // Auth & Profile
     const [session, setSession] = useState<Session | null>(null);
-    const [userProfile, setUserProfile] = useState<{ nickname: string; elo: number } | null>(null);
+    const [userProfile, setUserProfile] = useState<{ nickname: string; elo: number; avatar_url?: string | null } | null>(null);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -1165,7 +1165,7 @@ const App: React.FC = () => {
                                 else gameState.setBlackCaptures(c => c + attempt.captured);
 
                                 if (attempt.captured > 0) playSfx('capture');
-                                else playSfx('place');
+                                else playSfx('move');
 
                                 setTsumegoCurrentNode(opponentNode);
                                 checkTsumegoStatus(opponentNode);
@@ -1233,7 +1233,7 @@ const App: React.FC = () => {
     // Territory (Ownership)
     const displayTerritory = useMemo(() => {
         // [Optimized] Only calculate if enabled and in valid mode
-        if (settings.gameType !== 'Go' && (gameState.appMode !== 'review' || settings.gameType !== 'Go')) return null;
+        if (settings.gameType !== 'Go') return null;
         const aiColor = settings.userColor === 'black' ? 'white' : 'black';
 
         if (useCloud && cloudTerritory) {
@@ -2350,7 +2350,7 @@ const App: React.FC = () => {
                                         gameState.setBoard(attempt.newBoard);
                                         gameState.setLastMove({ x, y });
                                         gameState.setCurrentPlayer(playerColor === 'black' ? 'white' : 'black');
-                                        playSfx('place');
+                                        playSfx('move');
 
                                         // 2. Trigger Tsumego Logic
                                         handleTsumegoMove(x, y);

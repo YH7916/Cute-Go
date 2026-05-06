@@ -16,7 +16,7 @@ const runTest = () => {
   const move = getAIMove(board, 'white', 'Gomoku', 'Hard', null);
   console.log('AI Move:', move);
   
-  if (move && (move.x === 6 || move.x === 10) && move.y === 7) {
+  if (move && move !== 'RESIGN' && (move.x === 6 || move.x === 10) && move.y === 7) {
       console.log("SUCCESS: Blocked open 3");
   } else {
       console.log("FAILURE: Did not block open 3");
@@ -32,7 +32,7 @@ const runTest = () => {
 
   const winMove = getAIMove(board, 'white', 'Gomoku', 'Hard', null);
   console.log('AI Win Move:', winMove);
-    if (winMove && (winMove.x === 6 || winMove.x === 11) && winMove.y === 7) {
+    if (winMove && winMove !== 'RESIGN' && (winMove.x === 6 || winMove.x === 11) && winMove.y === 7) {
       console.log("SUCCESS: Found winning move");
   } else {
       console.log("FAILURE: Missed winning move");
