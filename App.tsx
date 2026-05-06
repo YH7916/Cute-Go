@@ -65,6 +65,7 @@ import { TsumegoLevel, TsumegoCategory, fetchProblemManifest, fetchProblemSGF, g
 
 import { SkinShopModal } from './components/SkinShopModal';
 import { BOARD_THEMES, BoardThemeId } from './utils/themes';
+import { Toast } from './ui/common';
 
 import { Session } from '@supabase/supabase-js';
 
@@ -1670,11 +1671,7 @@ const App: React.FC = () => {
     return (
         <div className="h-full w-full bg-[#f7e7ce] flex flex-col landscape:flex-row items-center relative select-none overflow-y-auto landscape:overflow-hidden text-[#5c4033] pb-safe">
 
-            {toastMsg && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[80] bg-[#5c4033] text-[#fcf6ea] px-4 py-2 rounded-full text-xs font-bold shadow-lg border-2 border-[#8c6b38] animate-in fade-in">
-                    {toastMsg}
-                </div>
-            )}
+            <Toast message={toastMsg} />
 
             {showStartScreen && (
                 <StartScreen
