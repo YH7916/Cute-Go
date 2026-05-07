@@ -34,7 +34,7 @@ type WorkerMessage =
             gameType?: 'Go' | 'Gomoku'; // [New]
             simulations?: number;
             komi?: number;
-            difficulty?: 'Easy' | 'Medium' | 'Hard';
+            difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard';
             temperature?: number;
             mode?: 'play' | 'analyze';
         }
@@ -96,7 +96,7 @@ const sampleIndexByWeight = (weights: number[]) => {
     return weights.length - 1;
 };
 
-const getDifficultyPoolSize = (difficulty?: 'Easy' | 'Medium' | 'Hard') => {
+const getDifficultyPoolSize = (difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard') => {
     if (difficulty === 'Easy') return 20;  // 更大的池，让随机性更高
     if (difficulty === 'Medium') return 8;
     return Infinity;
@@ -209,7 +209,7 @@ const runOwnershipSearch = async (
     historyMoves: SearchHistoryMove[],
     boardSize: number,
     komi: number,
-    difficulty: 'Easy' | 'Medium' | 'Hard' | undefined,
+    difficulty: 'Fun' | 'Easy' | 'Medium' | 'Hard' | undefined,
     temperature: number | undefined,
     requestedVisits: number | undefined
 ) => {
@@ -291,7 +291,7 @@ const runOwnershipSearch = async (
     };
 };
 
-const getDifficultyRankBias = (difficulty: 'Easy' | 'Medium' | 'Hard' | undefined, rank: number) => {
+const getDifficultyRankBias = (difficulty: 'Fun' | 'Easy' | 'Medium' | 'Hard' | undefined, rank: number) => {
     if (difficulty === 'Easy') {
         // 峰值在 rank 8-12，让 AI 倾向于选较差的棋而不是最好的
         // rank 0-3（最好的棋）权重很低，rank 8-12 权重最高
@@ -313,7 +313,7 @@ const selectMoveByDifficulty = (
     validationBoard: BoardState,
     color: Player,
     previousBoardHash: string | null,
-    difficulty?: 'Easy' | 'Medium' | 'Hard'
+    difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard'
 ) => {
     const poolSize = Math.min(candidates.length, getDifficultyPoolSize(difficulty));
     const weightedPool = candidates
@@ -613,8 +613,8 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             // === GO SECTION — 围棋逻辑（ONNX推理 + MCTS搜索）===
             // ============================================================
 
-            // Easy 模式：用手写初学者 AI，不走 ONNX 模型
-            if (difficulty === 'Easy' && gameType === 'Go') {
+            // Fun 模式：用手写初学者 AI，不走 ONNX 模型
+            if (difficulty === 'Fun' && gameType === 'Go') {
                 const boardState2 = boardState as BoardState;
                 let prevHash: string | null = null;
                 if (gameHistory.length > 0) {
