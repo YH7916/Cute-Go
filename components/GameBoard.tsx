@@ -922,32 +922,83 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const renderLooseSilk = (color: Player) => {
         const theme = STONE_THEMES[stoneSkin as StoneThemeId] || STONE_THEMES['classic'];
         const baseColor = color === 'black' ? theme.blackColor : theme.whiteColor;
+        const highlightColor = color === 'black' ? '#f8f1df' : '#ffffff';
         const isGomoku = gameType === 'Gomoku';
 
         // Gomoku: no silk lines
         if (isGomoku) return null;
 
-        // [Perf] Use CSS drop-shadow instead of SVG goo-silk filter.
-        // SVG filters force full re-rasterization on any geometry change (like stroke-width anim).
-        // CSS drop-shadow is GPU-accelerated and much cheaper.
-        const silkShadow = { filter: `drop-shadow(0px 0px ${CELL_SIZE * 0.08}px ${baseColor})` };
-        const strokeWidth = CELL_SIZE * 0.15;
+        const silkLines = connections.filter(c => c.color === color && c.type === 'loose');
+        if (silkLines.length === 0) return null;
+
+        // Balanced liquid silk: only the loose Go links get the soft SVG filter.
+        // The halo breathes by opacity, while the main line has a small width pulse.
+        const glowShadow = { filter: `drop-shadow(0px 0px ${CELL_SIZE * 0.08}px ${baseColor})` };
+        const haloWidth = CELL_SIZE * 0.32;
+        const mainWidth = CELL_SIZE * 0.15;
+        const coreWidth = CELL_SIZE * 0.07;
+        const highlightWidth = Math.max(1.2, CELL_SIZE * 0.035);
     
         return (
-            <g opacity={0.65} style={silkShadow}>
-                <g className="animate-liquid-flow">
-                    {connections.filter(c => c.color === color && c.type === 'loose').map((c, i) => {
+            <g className="liquid-silk-group">
+                <g className="liquid-silk-halo" style={glowShadow}>
+                    {silkLines.map((c, i) => (
+                        <line
+                            key={`${color}-loose-halo-${i}`}
+                            x1={GRID_PADDING + c.x1 * CELL_SIZE}
+                            y1={GRID_PADDING + c.y1 * CELL_SIZE}
+                            x2={GRID_PADDING + c.x2 * CELL_SIZE}
+                            y2={GRID_PADDING + c.y2 * CELL_SIZE}
+                            stroke={baseColor}
+                            strokeWidth={haloWidth}
+                            strokeLinecap="round"
+                            opacity={0.2}
+                        />
+                    ))}
+                </g>
+                <g filter="url(#liquid-silk-go)">
+                    {silkLines.map((c, i) => {
                         const x1 = GRID_PADDING + c.x1 * CELL_SIZE;
                         const y1 = GRID_PADDING + c.y1 * CELL_SIZE;
                         const x2 = GRID_PADDING + c.x2 * CELL_SIZE;
                         const y2 = GRID_PADDING + c.y2 * CELL_SIZE;
 
                         return (
-                            <line 
-                                key={`${color}-loose-${i}`}
-                                x1={x1} y1={y1} x2={x2} y2={y2}
-                                stroke={baseColor} strokeWidth={strokeWidth} strokeLinecap="round"
-                            />
+                            <React.Fragment key={`${color}-loose-${i}`}>
+                                <line
+                                    className="liquid-silk-main"
+                                    x1={x1}
+                                    y1={y1}
+                                    x2={x2}
+                                    y2={y2}
+                                    stroke={baseColor}
+                                    strokeWidth={mainWidth}
+                                    strokeLinecap="round"
+                                    opacity={0.7}
+                                />
+                                <line
+                                    className="liquid-silk-core"
+                                    x1={x1}
+                                    y1={y1}
+                                    x2={x2}
+                                    y2={y2}
+                                    stroke={baseColor}
+                                    strokeWidth={coreWidth}
+                                    strokeLinecap="round"
+                                    opacity={0.8}
+                                />
+                                <line
+                                    className="liquid-silk-highlight"
+                                    x1={x1}
+                                    y1={y1}
+                                    x2={x2}
+                                    y2={y2}
+                                    stroke={highlightColor}
+                                    strokeWidth={highlightWidth}
+                                    strokeLinecap="round"
+                                    opacity={0.34}
+                                />
+                            </React.Fragment>
                         );
                     })}
                 </g>
@@ -1013,15 +1064,33 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             animation: pulseSlow 4s ease-in-out infinite;
             transform-origin: center;
         }
-        /* [Perf] Animate opacity instead of stroke-width.
-           stroke-width changes force SVG filter re-rasterization at 60fps.
-           opacity is GPU-composited and essentially free. */
-        @keyframes liquidFlow {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
+        @keyframes liquidSilkHalo {
+            0%, 100% { opacity: 0.14; }
+            50% { opacity: 0.34; }
         }
-        .animate-liquid-flow line {
-            animation: liquidFlow 2.5s ease-in-out infinite;
+        @keyframes liquidSilkMain {
+            0%, 100% { stroke-width: ${CELL_SIZE * 0.13}px; opacity: 0.58; }
+            50% { stroke-width: ${CELL_SIZE * 0.19}px; opacity: 0.82; }
+        }
+        @keyframes liquidSilkCore {
+            0%, 100% { stroke-width: ${CELL_SIZE * 0.055}px; opacity: 0.62; }
+            50% { stroke-width: ${CELL_SIZE * 0.09}px; opacity: 0.9; }
+        }
+        @keyframes liquidSilkShimmer {
+            to { stroke-dashoffset: -${CELL_SIZE * 0.58}px; }
+        }
+        .liquid-silk-halo line {
+            animation: liquidSilkHalo 3.2s ease-in-out infinite;
+        }
+        .liquid-silk-main {
+            animation: liquidSilkMain 3.2s ease-in-out infinite;
+        }
+        .liquid-silk-core {
+            animation: liquidSilkCore 3.2s ease-in-out infinite;
+        }
+        .liquid-silk-highlight {
+            stroke-dasharray: ${CELL_SIZE * 0.16}px ${CELL_SIZE * 0.42}px;
+            animation: liquidSilkShimmer 2.8s linear infinite;
         }
 
         /* [新增] 气流动动画 */
@@ -1059,7 +1128,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         >
             {extraSVG}
             <defs>
-                {/* [Perf] goo-silk SVG filters removed — replaced with CSS drop-shadow in renderLooseSilk */}
+                <filter
+                    id="liquid-silk-go"
+                    x={-CELL_SIZE}
+                    y={-CELL_SIZE}
+                    width={boardPixelSize + CELL_SIZE * 2}
+                    height={boardPixelSize + CELL_SIZE * 2}
+                    filterUnits="userSpaceOnUse"
+                    colorInterpolationFilters="sRGB"
+                >
+                    <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.045} result="silkBlur" />
+                    <feColorMatrix in="silkBlur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 13 -6" result="silkGoo" />
+                    <feComposite in="SourceGraphic" in2="silkGoo" operator="atop" result="silkBody" />
+                    <feGaussianBlur in="silkBody" stdDeviation={CELL_SIZE * 0.018} result="silkSoftBody" />
+                    <feMerge>
+                        <feMergeNode in="silkSoftBody" />
+                        <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                </filter>
 
                 <filter id="jelly-black" x="-50%" y="-50%" width="200%" height="200%">
                     <feGaussianBlur in="SourceGraphic" stdDeviation={CELL_SIZE * 0.1} result="blur" />
