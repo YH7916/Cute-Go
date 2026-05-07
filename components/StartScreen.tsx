@@ -82,9 +82,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                 </div>
             </div>
 
-            {/* 底部悬浮木制 Tab 栏 */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-                <div className="bg-[#c8a96e] border-[3px] border-[#5c4033] rounded-2xl p-1.5 flex gap-1.5 shadow-[0_4px_12px_rgba(92,64,51,0.4),inset_0_2px_4px_rgba(0,0,0,0.2)]">
+            {/* 底部悬浮 Tab 栏 */}
+            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10">
+                <div className="bg-[#e8c98a] border-[2px] border-[#c4a05a] rounded-full px-2 py-1.5 flex gap-1.5 shadow-[0_4px_0_#a07840,0_6px_12px_rgba(92,64,51,0.25)]">
                     <TabButton
                         label="围棋"
                         active={activeTab === 'go'}
@@ -104,10 +104,10 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
     <button
         onClick={onClick}
-        className={`px-6 py-2.5 rounded-xl font-black text-sm transition-all duration-200 ${
+        className={`px-7 py-2 rounded-full font-black text-sm transition-all duration-200 ${
             active
-                ? 'bg-[#5c4033] text-[#fcf6ea] shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]'
-                : 'text-[#5c4033] hover:bg-[#b8956a]/50'
+                ? 'bg-[#fcf6ea] text-[#5c4033] shadow-[0_2px_6px_rgba(92,64,51,0.2)]'
+                : 'text-[#8c6b38]/80 hover:text-[#5c4033] hover:bg-[#fcf6ea]/40'
         }`}
     >
         {label}
@@ -148,10 +148,7 @@ const GoContent: React.FC<GoContentProps> = ({
                 <div className="p-2 rounded-full bg-[#2d5a28]/10 group-hover:scale-110 transition-transform shrink-0">
                     <Gamepad2 size={20} strokeWidth={2.5} />
                 </div>
-                <div className="flex flex-col items-start">
-                    <span className="text-lg font-black tracking-wide leading-tight">娱乐模式</span>
-                    <span className="text-xs font-medium opacity-70">手写AI · 秒启动</span>
-                </div>
+                <span className="text-lg font-black tracking-wide">娱乐模式</span>
             </button>
 
             <button
@@ -161,10 +158,7 @@ const GoContent: React.FC<GoContentProps> = ({
                 <div className="p-2 rounded-full bg-[#5c4033]/10 group-hover:scale-110 transition-transform shrink-0">
                     <Cpu size={20} strokeWidth={2.5} />
                 </div>
-                <div className="flex flex-col items-start">
-                    <span className="text-lg font-black tracking-wide leading-tight">挑战 AI</span>
-                    <span className="text-xs font-medium opacity-70">ONNX 模型 · 需加载</span>
-                </div>
+                <span className="text-lg font-black tracking-wide">挑战 AI</span>
             </button>
 
             <button
@@ -240,7 +234,6 @@ const GomokuContent: React.FC<GomokuContentProps> = ({
             <FeatureButton icon={Palette} label="外观商店" onClick={onOpenSkinShop} color="btn-beige" />
             <FeatureButton icon={PenTool} label="电子挂盘" onClick={onStartSetup} color="btn-beige" />
             <FeatureButton icon={BookOpen} label="新手教程" onClick={onOpenTutorial} color="btn-beige" />
-            <FeatureButton icon={Download} label="导入导出" onClick={onOpenImport} color="btn-beige" />
             <FeatureButton icon={UserIcon} label="个人中心" onClick={onOpenUserPage} color="btn-beige" />
         </div>
     </>
