@@ -1,10 +1,12 @@
-import React from 'react';
-import { Play, Cloud, Cpu, BookOpen, Globe, Download, Settings, Heart, Zap, Info, HelpCircle, PenTool, User as UserIcon, Palette } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Cpu, BookOpen, Globe, Download, Settings, Heart, Zap, Info, PenTool, User as UserIcon, Palette, Swords, Gamepad2 } from 'lucide-react';
 import { CURRENT_VERSION } from '../utils/constants';
 import { TopBar } from './common/TopBar';
 
+type GameTabType = 'go' | 'gomoku';
+
 interface StartScreenProps {
-    onStartGame: (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local') => void;
+    onStartGame: (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local' | 'fun') => void;
     onOpenTsumego: () => void;
     onOpenTutorial: () => void;
     onOpenOnline: () => void;
@@ -13,7 +15,7 @@ interface StartScreenProps {
     onOpenAbout: () => void;
     onStartSetup: () => void;
     onOpenUserPage: () => void;
-    onOpenSkinShop: () => void; // New
+    onOpenSkinShop: () => void;
 }
 
 export const StartScreen: React.FC<StartScreenProps> = ({
@@ -26,12 +28,12 @@ export const StartScreen: React.FC<StartScreenProps> = ({
     onOpenAbout,
     onStartSetup,
     onOpenUserPage,
-    onOpenSkinShop
+    onOpenSkinShop,
 }) => {
+    const [activeTab, setActiveTab] = useState<GameTabType>('go');
 
     return (
         <div className="absolute inset-0 z-30 bg-[#f7e7ce] flex flex-col items-center justify-start overflow-hidden animate-in fade-in duration-500">
-
             <TopBar
                 leftButtons={<>
                     <button onClick={onOpenSettings} className="btn-retro btn-brown p-3 rounded-xl"><Settings size={20} /></button>
@@ -48,84 +50,212 @@ export const StartScreen: React.FC<StartScreenProps> = ({
             />
 
             {/* Main Scrollable Content */}
-            <div className="w-full flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center p-6 md:p-12">
+            <div className="w-full flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center p-6 pb-24 md:p-12 md:pb-28">
                 <div className="max-w-4xl w-full flex flex-col items-center gap-6 my-auto">
 
-                    {/* Main Game Modes (Responsive Grid) */}
-                    <div className="grid grid-cols-1 gap-3 w-full lg:w-4/5">
+                    {activeTab === 'go' ? (
+                        <GoContent
+                            onStartGame={onStartGame}
+                            onOpenTsumego={onOpenTsumego}
+                            onOpenTutorial={onOpenTutorial}
+                            onOpenOnline={onOpenOnline}
+                            onOpenImport={onOpenImport}
+                            onStartSetup={onStartSetup}
+                            onOpenUserPage={onOpenUserPage}
+                            onOpenSkinShop={onOpenSkinShop}
+                        />
+                    ) : (
+                        <GomokuContent
+                            onStartGame={onStartGame}
+                            onOpenTutorial={onOpenTutorial}
+                            onOpenOnline={onOpenOnline}
+                            onOpenImport={onOpenImport}
+                            onStartSetup={onStartSetup}
+                            onOpenUserPage={onOpenUserPage}
+                            onOpenSkinShop={onOpenSkinShop}
+                        />
+                    )}
 
-                        <button
-                            onClick={() => onStartGame('PvP')}
-                            className="btn-retro bg-[#997c55] border-[#5c4033] text-[#fcf6ea] hover:bg-[#8a6f4c] hover:border-[#6d4c41] h-16 rounded-xl flex flex-row items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
-                        >
-                            <div className="p-2 rounded-full bg-[#fcf6ea]/20 text-[#fcf6ea] group-hover:scale-110 transition-transform shrink-0">
-                                <Play size={20} strokeWidth={2.5} />
-                            </div>
-                            <span className="text-lg font-black tracking-wide">本地双人</span>
-                        </button>
-
-                        <button
-                            onClick={onOpenOnline}
-                            className="btn-retro bg-[#aecbeb] border-[#8cacd6] text-[#3e5c76] hover:bg-[#9dbddb] hover:border-[#7b9bc4] h-16 rounded-xl flex flex-row items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
-                        >
-                            <div className="p-2 rounded-full bg-[#3e5c76]/10 text-[#3e5c76] group-hover:scale-110 transition-transform shrink-0">
-                                <Globe size={20} strokeWidth={2.5} />
-                            </div>
-                            <span className="text-lg font-black tracking-wide">联机对战</span>
-                        </button>
-
-                        {/* <button 
-                onClick={() => onStartGame('PvAI', 'cloud')}
-                className="btn-retro bg-[#92cdf7] border-[#63b3ed] text-[#1e40af] hover:bg-[#7bc0f5] hover:border-[#4299e1] h-16 rounded-xl flex flex-row items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
-            >
-                <div className="p-2 rounded-full bg-[#1e40af]/10 text-[#1e40af] group-hover:scale-110 transition-transform shrink-0">
-                    <Cloud size={20} strokeWidth={2.5} />
-                </div>
-                <span className="text-lg font-black tracking-wide">云端 AI（试运行至1.29）</span>
-            </button> */}
-
-                        <button
-                            onClick={() => onStartGame('PvAI', 'local')}
-                            className="btn-retro bg-[#e3c086] border-[#d4a866] text-[#5c4033] hover:text-[#4e342e] hover:border-[#bfa15f] h-16 rounded-xl flex flex-row items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
-                        >
-                            <div className="p-2 rounded-full bg-[#5c4033]/10 text-[#5c4033] group-hover:scale-110 transition-transform shrink-0">
-                                <Cpu size={20} strokeWidth={2.5} />
-                            </div>
-                            <span className="text-lg font-black tracking-wide">AI对战</span>
-                        </button>
-
-                    </div>
-
-                    {/* Features & Tools Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full lg:w-4/5">
-                        <FeatureButton icon={Palette} label="外观商店" onClick={onOpenSkinShop} delay={50} color="btn-beige" />
-                        <FeatureButton icon={Zap} label="死活题闯关" onClick={onOpenTsumego} delay={100} color="btn-beige" />
-                        <FeatureButton icon={PenTool} label="电子挂盘" onClick={onStartSetup} delay={200} color="btn-beige" />
-                        <FeatureButton icon={BookOpen} label="新手教程" onClick={onOpenTutorial} delay={250} color="btn-beige" />
-                        <FeatureButton icon={Download} label="导入导出" onClick={onOpenImport} delay={300} color="btn-beige" />
-                        <FeatureButton icon={UserIcon} label="个人中心" onClick={onOpenUserPage} delay={350} color="btn-beige" />
-                    </div>
-
-                    <div className="mt-4 md:mt-8 text-[#8c6b38]/60 text-xs md:text-sm font-medium pb-4">
+                    <div className="mt-4 text-[#8c6b38]/60 text-xs font-medium pb-2">
                         v{CURRENT_VERSION} • Designed with <Heart size={12} className="inline text-red-400 fill-current" /> by Yokaku
                     </div>
+                </div>
+            </div>
+
+            {/* 底部悬浮木制 Tab 栏 */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                <div className="bg-[#c8a96e] border-[3px] border-[#5c4033] rounded-2xl p-1.5 flex gap-1.5 shadow-[0_4px_12px_rgba(92,64,51,0.4),inset_0_2px_4px_rgba(0,0,0,0.2)]">
+                    <TabButton
+                        label="围棋"
+                        active={activeTab === 'go'}
+                        onClick={() => setActiveTab('go')}
+                    />
+                    <TabButton
+                        label="五子棋"
+                        active={activeTab === 'gomoku'}
+                        onClick={() => setActiveTab('gomoku')}
+                    />
                 </div>
             </div>
         </div>
     );
 };
 
-const FeatureButton: React.FC<{ icon: any, label: string, onClick: () => void, delay: number, color: string }> = ({ icon: Icon, label, onClick, delay, color }) => {
-    return (
-        <button
-            onClick={onClick}
-            style={{ animationDelay: `${delay}ms` }}
-            className={`btn-retro ${color} animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards h-14 rounded-xl flex flex-row items-center justify-center px-3 gap-2 transition-transform hover:-translate-y-1 group`}
-        >
-            <div className="p-1.5 rounded-full bg-[#5c4033]/5 group-hover:bg-[#5c4033]/10 transition-colors shrink-0">
-                <Icon size={16} className="text-[#5c4033] group-hover:scale-110 transition-transform md:w-5 md:h-5" />
-            </div>
-            <span className="text-sm font-bold text-[#5c4033]">{label}</span>
-        </button>
-    )
+const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
+    <button
+        onClick={onClick}
+        className={`px-6 py-2.5 rounded-xl font-black text-sm transition-all duration-200 ${
+            active
+                ? 'bg-[#5c4033] text-[#fcf6ea] shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]'
+                : 'text-[#5c4033] hover:bg-[#b8956a]/50'
+        }`}
+    >
+        {label}
+    </button>
+);
+
+interface GoContentProps {
+    onStartGame: (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local' | 'fun') => void;
+    onOpenTsumego: () => void;
+    onOpenTutorial: () => void;
+    onOpenOnline: () => void;
+    onOpenImport: () => void;
+    onStartSetup: () => void;
+    onOpenUserPage: () => void;
+    onOpenSkinShop: () => void;
 }
+
+const GoContent: React.FC<GoContentProps> = ({
+    onStartGame, onOpenTsumego, onOpenTutorial, onOpenOnline,
+    onOpenImport, onStartSetup, onOpenUserPage, onOpenSkinShop,
+}) => (
+    <>
+        <div className="grid grid-cols-1 gap-3 w-full lg:w-4/5">
+            <button
+                onClick={() => onStartGame('PvP')}
+                className="btn-retro bg-[#997c55] border-[#5c4033] text-[#fcf6ea] hover:bg-[#8a6f4c] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
+            >
+                <div className="p-2 rounded-full bg-[#fcf6ea]/20 group-hover:scale-110 transition-transform shrink-0">
+                    <Play size={20} strokeWidth={2.5} />
+                </div>
+                <span className="text-lg font-black tracking-wide">本地双人</span>
+            </button>
+
+            <button
+                onClick={() => onStartGame('PvAI', 'fun')}
+                className="btn-retro bg-[#a8d5a2] border-[#5a8f55] text-[#2d5a28] hover:bg-[#96c490] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
+            >
+                <div className="p-2 rounded-full bg-[#2d5a28]/10 group-hover:scale-110 transition-transform shrink-0">
+                    <Gamepad2 size={20} strokeWidth={2.5} />
+                </div>
+                <div className="flex flex-col items-start">
+                    <span className="text-lg font-black tracking-wide leading-tight">娱乐模式</span>
+                    <span className="text-xs font-medium opacity-70">手写AI · 秒启动</span>
+                </div>
+            </button>
+
+            <button
+                onClick={() => onStartGame('PvAI', 'local')}
+                className="btn-retro bg-[#e3c086] border-[#d4a866] text-[#5c4033] hover:border-[#bfa15f] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
+            >
+                <div className="p-2 rounded-full bg-[#5c4033]/10 group-hover:scale-110 transition-transform shrink-0">
+                    <Cpu size={20} strokeWidth={2.5} />
+                </div>
+                <div className="flex flex-col items-start">
+                    <span className="text-lg font-black tracking-wide leading-tight">挑战 AI</span>
+                    <span className="text-xs font-medium opacity-70">ONNX 模型 · 需加载</span>
+                </div>
+            </button>
+
+            <button
+                onClick={onOpenOnline}
+                className="btn-retro bg-[#aecbeb] border-[#8cacd6] text-[#3e5c76] hover:bg-[#9dbddb] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
+            >
+                <div className="p-2 rounded-full bg-[#3e5c76]/10 group-hover:scale-110 transition-transform shrink-0">
+                    <Globe size={20} strokeWidth={2.5} />
+                </div>
+                <span className="text-lg font-black tracking-wide">联机对战</span>
+            </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full lg:w-4/5">
+            <FeatureButton icon={Palette} label="外观商店" onClick={onOpenSkinShop} color="btn-beige" />
+            <FeatureButton icon={Zap} label="死活题闯关" onClick={onOpenTsumego} color="btn-beige" />
+            <FeatureButton icon={PenTool} label="电子挂盘" onClick={onStartSetup} color="btn-beige" />
+            <FeatureButton icon={BookOpen} label="新手教程" onClick={onOpenTutorial} color="btn-beige" />
+            <FeatureButton icon={Download} label="导入导出" onClick={onOpenImport} color="btn-beige" />
+            <FeatureButton icon={UserIcon} label="个人中心" onClick={onOpenUserPage} color="btn-beige" />
+        </div>
+    </>
+);
+
+interface GomokuContentProps {
+    onStartGame: (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local' | 'fun') => void;
+    onOpenTutorial: () => void;
+    onOpenOnline: () => void;
+    onOpenImport: () => void;
+    onStartSetup: () => void;
+    onOpenUserPage: () => void;
+    onOpenSkinShop: () => void;
+}
+
+const GomokuContent: React.FC<GomokuContentProps> = ({
+    onStartGame, onOpenTutorial, onOpenOnline,
+    onOpenImport, onStartSetup, onOpenUserPage, onOpenSkinShop,
+}) => (
+    <>
+        <div className="grid grid-cols-1 gap-3 w-full lg:w-4/5">
+            <button
+                onClick={() => onStartGame('PvP')}
+                className="btn-retro bg-[#997c55] border-[#5c4033] text-[#fcf6ea] hover:bg-[#8a6f4c] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
+            >
+                <div className="p-2 rounded-full bg-[#fcf6ea]/20 group-hover:scale-110 transition-transform shrink-0">
+                    <Play size={20} strokeWidth={2.5} />
+                </div>
+                <span className="text-lg font-black tracking-wide">本地双人</span>
+            </button>
+
+            <button
+                onClick={() => onStartGame('PvAI', 'local')}
+                className="btn-retro bg-[#e3c086] border-[#d4a866] text-[#5c4033] hover:border-[#bfa15f] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
+            >
+                <div className="p-2 rounded-full bg-[#5c4033]/10 group-hover:scale-110 transition-transform shrink-0">
+                    <Swords size={20} strokeWidth={2.5} />
+                </div>
+                <span className="text-lg font-black tracking-wide">AI 对战</span>
+            </button>
+
+            <button
+                onClick={onOpenOnline}
+                className="btn-retro bg-[#aecbeb] border-[#8cacd6] text-[#3e5c76] hover:bg-[#9dbddb] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
+            >
+                <div className="p-2 rounded-full bg-[#3e5c76]/10 group-hover:scale-110 transition-transform shrink-0">
+                    <Globe size={20} strokeWidth={2.5} />
+                </div>
+                <span className="text-lg font-black tracking-wide">联机对战</span>
+            </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full lg:w-4/5">
+            <FeatureButton icon={Palette} label="外观商店" onClick={onOpenSkinShop} color="btn-beige" />
+            <FeatureButton icon={PenTool} label="电子挂盘" onClick={onStartSetup} color="btn-beige" />
+            <FeatureButton icon={BookOpen} label="新手教程" onClick={onOpenTutorial} color="btn-beige" />
+            <FeatureButton icon={Download} label="导入导出" onClick={onOpenImport} color="btn-beige" />
+            <FeatureButton icon={UserIcon} label="个人中心" onClick={onOpenUserPage} color="btn-beige" />
+        </div>
+    </>
+);
+
+const FeatureButton: React.FC<{ icon: any; label: string; onClick: () => void; color: string }> = ({
+    icon: Icon, label, onClick, color,
+}) => (
+    <button
+        onClick={onClick}
+        className={`btn-retro ${color} h-14 rounded-xl flex flex-row items-center justify-center px-3 gap-2 transition-transform hover:-translate-y-1 group`}
+    >
+        <div className="p-1.5 rounded-full bg-[#5c4033]/5 group-hover:bg-[#5c4033]/10 transition-colors shrink-0">
+            <Icon size={16} className="text-[#5c4033] group-hover:scale-110 transition-transform md:w-5 md:h-5" />
+        </div>
+        <span className="text-sm font-bold text-[#5c4033]">{label}</span>
+    </button>
+);
