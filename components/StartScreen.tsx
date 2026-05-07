@@ -84,7 +84,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 
             {/* 底部悬浮 Tab 栏 */}
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10">
-                <div className="bg-[#c9973d] border-[2px] border-[#a07830] rounded-full px-2 py-1.5 flex gap-1.5 shadow-[0_4px_0_#7a5a20,inset_0_2px_5px_rgba(0,0,0,0.25)]">
+                <div className="bg-[#e8c98a] border-[2px] border-[#c4a05a] rounded-full px-2 py-1.5 flex gap-1.5 shadow-[0_4px_0_#c4a05a,0_6px_12px_rgba(92,64,51,0.2)]">
                     <TabButton
                         label="围棋"
                         active={activeTab === 'go'}
@@ -106,8 +106,8 @@ const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void 
         onClick={onClick}
         className={`px-7 py-2 rounded-full font-black text-sm transition-all duration-200 ${
             active
-                ? 'bg-[#fcf6ea] text-[#5c4033] border-[2px] border-[#d4b87a] shadow-[0_3px_0_#a07830,0_1px_3px_rgba(0,0,0,0.15)] translate-y-[-1px]'
-                : 'text-[#fcf6ea]/80 hover:text-[#fcf6ea] border-[2px] border-transparent'
+                ? 'bg-[#fcf6ea] text-[#5c4033] shadow-[0_2px_4px_rgba(92,64,51,0.15)]'
+                : 'text-[#8c6b38] hover:text-[#5c4033]'
         }`}
     >
         {label}
