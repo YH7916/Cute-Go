@@ -1,21 +1,18 @@
-// export const RANKS = ... (Removed)
-
 export interface AIConfig {
     useModel: boolean;
     simulations: number;
-    randomness: number; // 0-1 (Deprecated, use temperature)
-    temperature: number; // New: Controls Softmax sampling
-    heuristicFactor: number; // 1.0 = normal
+    randomness: number;
+    temperature: number;
+    heuristicFactor: number;
 }
 
 export function getAIConfig(difficulty: string): AIConfig {
-    // Environment Check
     const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
-    
-    // Easy
-    if (difficulty === 'Easy') {
+
+    // Fun — 手写初学者AI，不加载模型
+    if (difficulty === 'Fun') {
         return {
-            useModel: false, // 使用手写初学者 AI，不需要 ONNX 模型
+            useModel: false,
             simulations: 1,
             randomness: 0,
             temperature: 0,
@@ -23,11 +20,22 @@ export function getAIConfig(difficulty: string): AIConfig {
         };
     }
 
+    // Easy — ONNX模型，高temperature随机采样
+    if (difficulty === 'Easy') {
+        return {
+            useModel: true,
+            simulations: 1,
+            randomness: 0,
+            temperature: 2.1,
+            heuristicFactor: 1.0
+        };
+    }
+
     // Medium
     if (difficulty === 'Medium') {
-         return {
+        return {
             useModel: true,
-            simulations: isMobile ? 2 : 4, 
+            simulations: isMobile ? 2 : 4,
             randomness: 0,
             temperature: 0.22,
             heuristicFactor: 1.0
@@ -35,12 +43,11 @@ export function getAIConfig(difficulty: string): AIConfig {
     }
 
     // Hard
-    // Map to Strongest available within reason
     return {
         useModel: true,
-        simulations: isMobile ? 10 : 25, // Stronger search
+        simulations: isMobile ? 10 : 25,
         randomness: 0,
-        temperature: 0, // Best moves only
+        temperature: 0,
         heuristicFactor: 1.0
     };
 }
