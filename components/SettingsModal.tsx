@@ -136,7 +136,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                         <div className="flex justify-between items-center px-1">
                                             <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
                                                 <Cpu size={16} className="text-[#8c6b38]"/>
-                                                AI 难度
+                                                {tempGameType === 'Go' ? '围棋 AI 难度' : '五子棋 AI 难度'}
                                             </span>
                                         </div>
                                         <div className="flex gap-2">
