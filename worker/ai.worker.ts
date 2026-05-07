@@ -97,7 +97,6 @@ const sampleIndexByWeight = (weights: number[]) => {
 };
 
 const getDifficultyPoolSize = (difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard') => {
-    if (difficulty === 'Easy') return 20;  // 更大的池，让随机性更高
     if (difficulty === 'Medium') return 8;
     return Infinity;
 };

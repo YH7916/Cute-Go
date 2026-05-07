@@ -820,7 +820,7 @@ const App: React.FC = () => {
         }
 
         // [Fix] Auto-trigger Local AI for Easy mode even if Cloud is enabled (since Cloud Easy now redirects to Local)
-        if ((!useCloud || settings.difficulty === 'Easy') && settings.gameType === 'Go') {
+        if ((!useCloud || settings.difficulty === 'Easy' || settings.difficulty === 'Fun') && settings.gameType === 'Go') {
             const aiConfig = getAIConfig(settings.difficulty);
             if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
                 const needModel = aiConfig.useModel;
@@ -831,7 +831,7 @@ const App: React.FC = () => {
     }, [settings.gameMode, settings.difficulty, webAiEngine.isWorkerReady, webAiEngine.isInitializing, showStartScreen, useCloud, gameState.appMode]);
 
     // --- Start Screen Handler ---
-    const handleStartGame = (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local') => {
+    const handleStartGame = (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local' | 'fun') => {
         console.log('[handleStartGame] Called with mode:', mode, 'aiType:', aiType);
         console.log('[handleStartGame] Before: showStartScreen =', showStartScreen);
 
@@ -845,7 +845,13 @@ const App: React.FC = () => {
         resetGame(false, undefined, false);
 
         if (mode === 'PvAI') {
-            if (aiType === 'cloud') {
+            if (aiType === 'fun') {
+                setUseCloud(false);
+                settings.setDifficulty('Fun');
+                if (!webAiEngine.isWorkerReady && !webAiEngine.isInitializing) {
+                    webAiEngine.initializeAI({ needModel: false });
+                }
+            } else if (aiType === 'cloud') {
                 setUseCloud(true);
                 // [Fix] If Easy, we use Local AI, so we must init it.
                 if (settings.difficulty === 'Easy') {
