@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Heart, Zap, Hexagon, Trophy, Folder, ArrowLeft, Loader2 } from 'lucide-react';
-import { TsumegoCategory, TsumegoLevel, fetchProblemManifest } from '../../utils/tsumegoData';
+import { X, Trophy, Folder, ArrowLeft, Loader2 } from 'lucide-react';
+import { TsumegoCategory, TsumegoGroup, TsumegoLevel, fetchProblemManifest, isTsumegoGroup } from '../../utils/tsumegoData';
 import { LevelGrid } from './LevelGrid';
 
 interface TsumegoHubProps {
@@ -10,7 +10,6 @@ interface TsumegoHubProps {
 }
 
 export const TsumegoHub: React.FC<TsumegoHubProps> = ({ onClose, onSelectLevel, completedLevelIds }) => {
-    const [categories, setCategories] = useState<TsumegoCategory[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState<TsumegoCategory | null>(null);
     const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -19,7 +18,6 @@ export const TsumegoHub: React.FC<TsumegoHubProps> = ({ onClose, onSelectLevel, 
         fetchProblemManifest().then(data => {
             // [Fix] Filter to ONLY Life & Death
             const filtered = data.filter(c => c.id === 'life_death');
-            setCategories(filtered);
             setLoading(false);
             
             // [Fix] Auto-select first category (Life & Death)
@@ -29,20 +27,9 @@ export const TsumegoHub: React.FC<TsumegoHubProps> = ({ onClose, onSelectLevel, 
         });
     }, []);
 
-    // Helper to get icon
-    const getIcon = (id: string) => {
-        switch (id) {
-            case 'life_death': return <Heart size={32} className="text-rose-500" fill="currentColor" fillOpacity={0.2} />;
-            default: return <Trophy size={32} className="text-[#5c4033]" />;
-        }
-    };
-
-    const getBgColor = (id: string) => {
-         switch (id) {
-            case 'life_death': return 'from-rose-50 to-rose-100/50 border-rose-200';
-            default: return 'from-gray-50 to-gray-100 border-gray-200';
-        }
-    };
+    const groupChildren: TsumegoGroup[] = selectedCategory
+        ? selectedCategory.children.filter(isTsumegoGroup)
+        : [];
 
     const handleBack = () => {
         if (selectedGroup) {
@@ -107,11 +94,11 @@ export const TsumegoHub: React.FC<TsumegoHubProps> = ({ onClose, onSelectLevel, 
                                 <Loader2 size={48} className="animate-spin mb-4" />
                                 <p className="font-bold">正在进入死活闯关...</p>
                             </div>
-                        ) : (selectedCategory.children.some((c: any) => c.isGroup) && !selectedGroup) ? (
+                        ) : (groupChildren.length > 0 && !selectedGroup) ? (
                             /* Group List */
                             <div className="h-full overflow-y-auto p-6 custom-scrollbar">
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-fade-in-up">
-                                    {selectedCategory.children.filter((c: any) => c.isGroup).map((child: any, idx) => (
+                                    {groupChildren.map((child, idx) => (
                                         <button 
                                             key={child.name}
                                             onClick={() => setSelectedGroup(child.name)}
@@ -123,9 +110,9 @@ export const TsumegoHub: React.FC<TsumegoHubProps> = ({ onClose, onSelectLevel, 
                                                 <Folder className="w-8 h-8 text-[#8c6b38]" strokeWidth={2.5} />
                                             </div>
                                             <div className="flex flex-col items-center gap-1">
-                                                <span className="text-[#5c4033] font-black text-lg text-center line-clamp-1">{child.name as string}</span>
+                                                <span className="text-[#5c4033] font-black text-lg text-center line-clamp-1">{child.name}</span>
                                                 <span className="text-xs text-[#8c6b38] font-bold bg-[#e3c086]/20 px-2 py-0.5 rounded-full">
-                                                    {(child as any).files.length} 题
+                                                    {child.files.length} 题
                                                 </span>
                                             </div>
                                         </button>
@@ -140,7 +127,6 @@ export const TsumegoHub: React.FC<TsumegoHubProps> = ({ onClose, onSelectLevel, 
                                     groupName={selectedGroup || undefined}
                                     completedIds={completedLevelIds} 
                                     onSelectLevel={onSelectLevel}
-                                    onBack={handleBack}
                                 />
                             </div>
                         )}

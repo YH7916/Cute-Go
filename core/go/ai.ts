@@ -1,5 +1,5 @@
 import { BoardState, Player, Point } from '../../types';
-import { getNeighbors, getGroup, getAllGroups } from '../board';
+import { getNeighbors, getGroup } from '../board';
 import { calculateHeuristicScore } from './scoring';
 import { getCandidateMoves, attemptMove, isSimpleEye } from './rules';
 import { getJosekiMove } from '../../utils/joseki';

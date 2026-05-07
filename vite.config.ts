@@ -35,7 +35,6 @@ export default defineConfig(({ mode }) => {
                         if (id.includes('react') || id.includes('react-dom')) return 'react-vendor';
                         if (id.includes('onnxruntime-web')) return 'onnx';
                         if (id.includes('@sabaki')) return 'game-libs';
-                        if (id.includes('@supabase')) return 'supabase';
                     }
                 }
             }

@@ -1,3 +1,4 @@
+import { BoardState } from '../types';
 import { MicroBoard, type Sign } from './micro-board';
 
 /**
@@ -89,7 +90,7 @@ export class JosekiEngine {
         return { x, y };
     }
 
-    private lookupJoseki(pieces: { x: number, y: number, color: Sign }[], aiColor: Sign): Point | null {
+    private lookupJoseki(pieces: { x: number, y: number, color: Sign }[], _aiColor: Sign): Point | null {
         // Normalize colors relative to the first stone in the corner
         const firstStone = pieces[0].color;
         const normalizedPieces = pieces.map(p => ({
@@ -136,7 +137,7 @@ export class JosekiEngine {
 /**
  * Static helper for legacy code compatibility (goLogic.ts)
  */
-export function getJosekiMove(boardState: any[][], size: number, player: 'black' | 'white'): Point | null {
+export function getJosekiMove(boardState: BoardState, size: number, player: 'black' | 'white'): Point | null {
     const board = new MicroBoard(size);
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {

@@ -1,27 +1,16 @@
 import React, { useState } from 'react';
-import { X, Heart, RefreshCw, Download, Check, ChevronLeft } from 'lucide-react';
-import { CURRENT_VERSION } from '../utils/constants';
+import { X, Heart, Check, ChevronLeft } from 'lucide-react';
 import { isTapTapEnv } from '../utils/tapTapBridge';
 
 interface AboutModalProps {
     isOpen: boolean;
     onClose: () => void;
-    checkingUpdate: boolean;
-    updateMsg: string;
-    newVersionFound: boolean;
-    downloadUrl: string;
-    onCheckUpdate: () => void;
     vibrate: (pattern: number | number[]) => void;
 }
 
 export const AboutModal: React.FC<AboutModalProps> = ({
     isOpen,
     onClose,
-    checkingUpdate,
-    updateMsg,
-    newVersionFound,
-    downloadUrl,
-    onCheckUpdate,
     vibrate
 }) => {
     const [donationMethod, setDonationMethod] = useState<'wechat' | 'alipay'>('wechat');
@@ -64,29 +53,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                     <p className="text-xs font-bold text-[#8c6b38] opacity-80">可爱的围棋/五子棋对战助手<br/>Made with ❤️ by Yohaku</p>
                 </div>
 
-                <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
-
-                {/* Version & Update */}
-                <div className="bg-[#fff]/50 p-4 rounded-2xl border border-[#e3c086]">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-bold text-[#5c4033]">当前版本</span>
-                        <span className="bg-[#8c6b38] text-[#fcf6ea] text-xs font-bold px-2 py-1 rounded-lg">v{CURRENT_VERSION}</span>
-                    </div>
-                    <button 
-                        onClick={onCheckUpdate}
-                        disabled={checkingUpdate}
-                        className="w-full btn-retro btn-beige py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
-                    >
-                        {checkingUpdate ? <RefreshCw size={14} className="animate-spin"/> : <RefreshCw size={14}/>}
-                        {checkingUpdate ? '检查中...' : '检查更新'}
-                    </button>
-                    {updateMsg && (
-                        <p className={`text-xs font-bold mt-2 ${updateMsg.includes('新版本') ? 'text-green-600' : 'text-[#8c6b38]'}`}>
-                            {updateMsg}
-                        </p>
-                    )}
-                </div>
-
                 <button 
                     onClick={() => setView('credits')}
                     className="w-full btn-retro bg-[#fff] border-[#e3c086] text-[#8c6b38] py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#fcf6ea] transition-colors"
@@ -94,19 +60,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                     <Heart size={14} className="text-[#e57373]" />
                     致谢名单
                 </button>
-
-                 {newVersionFound && (
-                     <a 
-                        href={downloadUrl} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="btn-retro bg-[#81c784] border-[#388e3c] text-white py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg animate-in fade-in slide-in-from-top-2"
-                     >
-                        <Download size={18} /> 
-                        {updateMsg.includes('发现新版本') ? '下载更新(密码：cute）' : '访问官网 / 下载'}
-                    </a>
-                 )}
-
                 <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50"></div>
 
                 {/* Social Media */}
@@ -133,7 +86,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                              <span className="text-[10px] font-bold text-[#5c4033]">Bilibili</span>
                          </button>
 
-                         <button onClick={() => copySocial('7848618811', '小红书')} className="flex flex-col items-center gap-2 group">
+                         <button onClick={() => copySocial('508905176', '小红书')} className="flex flex-col items-center gap-2 group">
                              <div className="w-12 h-12 rounded-full border-2 border-[#fff] shadow-[0_0_0_2px_#ff2442] flex items-center justify-center overflow-hidden group-active:scale-95 transition-transform bg-[#f0f0f0]">
                                  <img src="./rednote.jpg" alt="RedNote" className="w-full h-full object-cover" />
                              </div>

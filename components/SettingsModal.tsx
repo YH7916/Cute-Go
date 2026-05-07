@@ -53,36 +53,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     vibrate,
     skipStartScreen, setSkipStartScreen,
     separatePieces, setSeparatePieces,
-    onStartSetup,
     onOpenImport,
-    onOpenOnline,
-    onOpenAbout,
-    onOpenTutorial,
-    onOpenTsumego,
     onOpenSkinShop
 }) => {
     const [tempBoardSize, setTempBoardSize] = useState<BoardSize>(currentGameSettings.boardSize);
-    const [tempGameType, setTempGameType] = useState<GameType>(currentGameSettings.gameType);
-    const [tempGameMode, setTempGameMode] = useState<GameMode>(currentGameSettings.gameMode);
     const [tempDifficulty, setTempDifficulty] = useState<Difficulty>(currentGameSettings.difficulty);
     const [tempUserColor, setTempUserColor] = useState<Player>(currentGameSettings.userColor);
 
     useEffect(() => {
         if (!isOpen) return;
         setTempBoardSize(currentGameSettings.boardSize);
-        setTempGameType(currentGameSettings.gameType);
-        setTempGameMode(currentGameSettings.gameMode);
         setTempDifficulty(currentGameSettings.difficulty);
         setTempUserColor(currentGameSettings.userColor);
     }, [isOpen, currentGameSettings]);
 
     if (!isOpen) return null;
 
+    const isGomokuSettings = currentGameSettings.gameType === 'Gomoku';
+    const isFunGoSettings =
+        currentGameSettings.gameType === 'Go' &&
+        currentGameSettings.gameMode === 'PvAI' &&
+        currentGameSettings.difficulty === 'Fun';
+    const isAiSettings = currentGameSettings.gameMode === 'PvAI';
+    const isChallengeGoSettings =
+        currentGameSettings.gameType === 'Go' &&
+        currentGameSettings.gameMode === 'PvAI' &&
+        currentGameSettings.difficulty !== 'Fun';
+    const title = isGomokuSettings
+        ? '五子棋设置'
+        : isFunGoSettings
+            ? '围棋娱乐设置'
+            : isChallengeGoSettings
+                ? '挑战 AI 设置'
+                : '围棋设置';
+    const showAiDifficulty = isAiSettings && !isFunGoSettings;
+    const showWinRateSetting = isChallengeGoSettings;
+    const showGoOnlyAssist = currentGameSettings.gameType === 'Go';
+    const showImportExport = currentGameSettings.gameType === 'Go';
+
     const handleApply = () => {
         onApplyGameSettings({
             boardSize: tempBoardSize,
-            gameType: tempGameType,
-            gameMode: tempGameMode,
+            gameType: currentGameSettings.gameType,
+            gameMode: currentGameSettings.gameMode,
             difficulty: tempDifficulty,
             userColor: tempUserColor
         });
@@ -92,7 +105,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-[#fcf6ea] rounded-[2rem] w-full max-w-sm landscape:max-w-3xl shadow-2xl border-[6px] border-[#8c6b38] flex flex-col max-h-[90vh] overflow-hidden relative">
             <div className="bg-[#fcf6ea] border-b-2 border-[#e3c086] border-dashed p-4 landscape:p-3 flex justify-between items-center shrink-0">
-                <h2 className="text-2xl landscape:text-xl font-black text-[#5c4033] tracking-wide">游戏设置</h2>
+                <h2 className="text-2xl landscape:text-xl font-black text-[#5c4033] tracking-wide">{title}</h2>
                 <button onClick={onClose} className="text-[#8c6b38] hover:text-[#5c4033] bg-[#fff] rounded-full p-2 border-2 border-[#e3c086] transition-colors"><X size={20}/></button>
             </div>
 
@@ -100,28 +113,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="space-y-4 landscape:contents">
                    <div className="space-y-4">
                         <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-[#8c6b38] uppercase tracking-widest mb-1">游戏模式</h3>
+                            <h3 className="text-sm font-bold text-[#8c6b38] uppercase tracking-widest mb-1">对局设置</h3>
 
-                            <div className="space-y-4">
-                                <div className="inset-track rounded-xl p-1 relative h-12 flex items-center">
-                                    <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${tempGameType === 'Gomoku' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
-                                    <button onClick={() => setTempGameType('Go')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Go' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>围棋</button>
-                                    <button onClick={() => setTempGameType('Gomoku')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameType === 'Gomoku' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>五子棋</button>
-                                </div>
-
-                                <div className="inset-track rounded-xl p-1 relative h-12 flex items-center">
-                                     <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${tempGameMode === 'PvAI' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
-                                    <button onClick={() => setTempGameMode('PvP')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameMode === 'PvP' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>双人对战</button>
-                                    <button onClick={() => setTempGameMode('PvAI')} className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 ${tempGameMode === 'PvAI' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}>挑战 AI</button>
-                                </div>
-                            </div>
-
-                            {tempGameMode === 'PvAI' && (
+                            {isAiSettings && (
                                 <div className="flex gap-2 items-center bg-[#fff] p-2 rounded-xl border-2 border-[#e3c086] animate-in fade-in slide-in-from-top-2">
                                     <span className="text-xs font-bold text-[#8c6b38] px-2 shrink-0">我执:</span>
                                     <div className="flex-1 flex gap-2">
                                         <button onClick={() => setTempUserColor('black')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${tempUserColor === 'black' ? 'bg-[#5c4033] text-[#fcf6ea]' : 'bg-[#fcf6ea] text-[#5c4033]'}`}>
-                                            <div className="w-3 h-3 rounded-full bg-black border border-gray-500"></div> 黑子
+                                            <div className="w-3 h-3 rounded-full bg-black"></div> 黑子
                                         </button>
                                         <button onClick={() => setTempUserColor('white')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${tempUserColor === 'white' ? 'bg-[#5c4033] text-[#fcf6ea]' : 'bg-[#fcf6ea] text-[#5c4033]'}`}>
                                             <div className="w-3 h-3 rounded-full bg-white border border-gray-400"></div> 白子
@@ -130,13 +129,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </div>
                             )}
 
-                            {tempGameMode === 'PvAI' && (
+                            {showAiDifficulty && (
                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                                     <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
+                                     <div className="bg-[#fff]/50 p-3 rounded-2xl border-2 border-[#e3c086] flex flex-col gap-3">
                                         <div className="flex justify-between items-center px-1">
                                             <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
                                                 <Cpu size={16} className="text-[#8c6b38]"/>
-                                                {tempGameType === 'Go' ? '围棋 AI 难度' : '五子棋 AI 难度'}
+                                                {currentGameSettings.gameType === 'Go' ? '围棋 AI 难度' : '五子棋 AI 难度'}
                                             </span>
                                         </div>
                                         <div className="flex gap-2">
@@ -157,9 +156,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                     </div>
                                 </div>
                             )}
+
                         </div>
 
-                        <div className="bg-[#fff]/50 p-3 rounded-2xl border border-[#e3c086] flex flex-col gap-3">
+                        <div className="bg-[#fff]/50 p-3 rounded-2xl border-2 border-[#e3c086] flex flex-col gap-3">
                             <div className="flex justify-between items-center px-1">
                                 <span className="text-sm font-bold text-[#5c4033] flex items-center gap-2">
                                     <LayoutGrid size={16} className="text-[#8c6b38]"/> 棋盘大小
@@ -192,19 +192,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <h3 className="text-sm font-bold text-[#8c6b38] uppercase tracking-widest mb-1">辅助与音效</h3>
 
                         <div className="flex gap-2 justify-between">
-                            <button onClick={() => setShowWinRate(!showWinRate)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showWinRate ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
-                                <BarChart3 size={18} />
-                                <span className="text-xs font-bold">胜率</span>
-                            </button>
+                            {showWinRateSetting && (
+                                <button onClick={() => setShowWinRate(!showWinRate)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showWinRate ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
+                                    <BarChart3 size={18} />
+                                    <span className="text-xs font-bold">胜率</span>
+                                </button>
+                            )}
                             <button onClick={() => setShowCoordinates(!showCoordinates)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showCoordinates ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
                                 <LayoutGrid size={18} />
                                 <span className="text-xs font-bold">坐标</span>
                             </button>
-                            <button onClick={() => setShowQi(!showQi)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showQi ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
-                                <Wind size={18} />
-                                <span className="text-xs font-bold">气</span>
-                            </button>
-                            {tempGameType !== 'Gomoku' && (
+                            {showGoOnlyAssist && (
+                                <button onClick={() => setShowQi(!showQi)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showQi ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
+                                    <Wind size={18} />
+                                    <span className="text-xs font-bold">气</span>
+                                </button>
+                            )}
+                            {showGoOnlyAssist && (
                                 <button onClick={() => setSeparatePieces(!separatePieces)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${separatePieces ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
                                     <CircleDot size={18} />
                                     <span className="text-xs font-bold">独立</span>
@@ -212,13 +216,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             )}
                         </div>
 
-                        <button
-                            onClick={() => { onOpenImport(); onClose(); }}
-                            className="btn-retro bg-[#fff] border-[#e3c086] text-[#8c6b38] hover:text-[#5c4033] hover:border-[#8c6b38] w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all"
-                        >
-                            <FileUp size={18} />
-                            <span className="text-sm">导入 / 导出棋谱</span>
-                        </button>
+                        {showImportExport && (
+                            <button
+                                onClick={() => { onOpenImport(); onClose(); }}
+                                className="btn-retro bg-[#fff] border-[#e3c086] text-[#8c6b38] hover:text-[#5c4033] hover:border-[#8c6b38] w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all"
+                            >
+                                <FileUp size={18} />
+                                <span className="text-sm">导入 / 导出棋谱</span>
+                            </button>
+                        )}
 
                         <button
                             onClick={() => { onOpenSkinShop(); onClose(); }}
@@ -249,7 +255,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                             <button
                                 onClick={() => { setHapticEnabled(!hapticEnabled); vibrate(10); }}
-                                className={`flex-1 btn-retro rounded-xl border-2 flex items-center justify-center gap-2 ${hapticEnabled ? 'bg-[#e3c086] text-[#5c4033] border-[#c4ae88]' : 'bg-[#fff] text-[#d7ccc8] border-[#e0e0e0]'}`}
+                                className={`flex-1 btn-retro rounded-xl border-2 flex items-center justify-center gap-2 ${hapticEnabled ? 'bg-[#e3c086] text-[#5c4033] border-[#b88742]' : 'bg-[#fff] text-[#d7ccc8] border-[#e0e0e0]'}`}
                             >
                                 <Smartphone size={18} className={hapticEnabled ? 'animate-pulse' : ''}/>
                                 <span className="text-xs font-bold">振动</span>

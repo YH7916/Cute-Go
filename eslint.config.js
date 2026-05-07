@@ -49,15 +49,25 @@ export default [
       'import/no-cycle': ['error', { maxDepth: 3 }],
 
       // Boundaries — 层级依赖规则（重构完成后逐步收紧）
-      'boundaries/element-types': [
+      'boundaries/dependencies': [
         'warn',
         {
           default: 'allow',
           rules: [
             // core 不能依赖 domains/ui/app
-            { from: 'core', disallow: ['domains', 'ui', 'app'] },
+            {
+              from: { type: 'core' },
+              disallow: {
+                to: [{ type: 'domains' }, { type: 'ui' }, { type: 'app' }],
+              },
+            },
             // domains 不能依赖 ui/app
-            { from: 'domains', disallow: ['ui', 'app'] },
+            {
+              from: { type: 'domains' },
+              disallow: {
+                to: [{ type: 'ui' }, { type: 'app' }],
+              },
+            },
           ],
         },
       ],

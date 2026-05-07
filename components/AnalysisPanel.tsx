@@ -14,7 +14,7 @@ interface AnalysisPanelProps {
 export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
     winRate,
     lead,
-    isThinking,
+    isThinking: _isThinking,
     showTerritory,
     onToggleTerritory,
     userColor
@@ -59,9 +59,9 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
                             </span>
                         </div>
                         <div className="relative min-w-0 px-0.5">
-                            <div className="relative h-2.5 overflow-hidden rounded-full border border-[#c9b08a] bg-[#efe4cf] shadow-[inset_0_2px_4px_rgba(104,74,47,0.16)]">
+                            <div className="winrate-track relative h-2.5 overflow-hidden rounded-full border">
                                 <div
-                                    className="absolute inset-y-[1px] left-[1px] rounded-full bg-[linear-gradient(90deg,#2a2a2a_0%,#4b372d_55%,#6b4c3c_100%)] transition-all duration-500 ease-out"
+                                    className="winrate-fill-dark absolute inset-y-[1px] left-[1px] rounded-full transition-all duration-500 ease-out"
                                     style={{ width: blackWidth }}
                                 />
                             </div>

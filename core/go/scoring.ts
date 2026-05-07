@@ -1,4 +1,4 @@
-import { BoardState, Player, Point } from '../../types';
+import { BoardState, Point } from '../../types';
 import { getNeighbors, getAllGroups } from '../board';
 
 export const calculateScore = (

@@ -1,17 +1,17 @@
 import React from 'react';
 import { X, User as UserIcon, Shield, LogOut, LogIn, Medal, Sword, Trophy, Disc, Utensils, Clover, Check, Heart, Crown, ListOrdered } from 'lucide-react';
 import { isTapTapEnv } from '../utils/tapTapBridge';
-import { Session } from '@supabase/supabase-js';
 import { AchievementDef, UserAchievement } from '../types';
 import { getRankBadge } from '../utils/helpers';
+import type { AppProfile, AppSession } from '../services/platform';
 
 interface UserPageProps {
     isOpen: boolean;
     onClose: () => void;
-    session: Session | null;
-    userProfile: { nickname: string; elo: number; avatar_url?: string | null } | null;
+    session: AppSession | null;
+    userProfile: AppProfile | null;
     achievementsList: AchievementDef[];
-    userAchievements: Record<string, any>; // using Record<string, any> to avoid strict type issues if UserAchievement structure varies slightly or use UserAchievement
+    userAchievements: Record<string, UserAchievement>;
     onLoginClick: () => void;
     onSignOutClick: () => void;
     onTapTapLeaderboardClick?: () => void;
@@ -64,8 +64,8 @@ export const UserPage: React.FC<UserPageProps> = ({
                     <div className="bg-[#fff]/60 p-4 rounded-2xl border border-[#e3c086] flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <div className="w-14 h-14 bg-[#5c4033] rounded-full flex items-center justify-center text-[#fcf6ea] border-2 border-[#8c6b38] overflow-hidden">
-                                {userProfile?.avatar_url ? (
-                                    <img src={userProfile.avatar_url} alt="头像" className="w-full h-full object-cover" />
+                                {userProfile?.avatarUrl ? (
+                                    <img src={userProfile.avatarUrl} alt="头像" className="w-full h-full object-cover" />
                                 ) : (
                                     <UserIcon size={24} />
                                 )}
@@ -89,12 +89,14 @@ export const UserPage: React.FC<UserPageProps> = ({
                                         <span className="text-sm font-black text-[#5c4033]">{userProfile?.nickname || '未登录'}</span>
                                     )}
                                 </div>
-                                <span className="text-xs font-bold text-[#8c6b38] bg-[#e3c086]/20 px-2 py-0.5 rounded inline-flex items-center gap-1">
-                                    <Shield size={12} /> Rating: {userProfile?.elo ?? '—'}
-                                </span>
+                                {session && (
+                                    <span className="text-xs font-bold text-[#8c6b38] bg-[#e3c086]/20 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                        <Shield size={12} /> 练习积分: {userProfile?.elo ?? '—'}
+                                    </span>
+                                )}
                             </div>
                         </div>
-                        {(() => {
+                        {session && (() => {
                             const badge = getRankBadge(userProfile?.elo ?? 0);
                             return (
                                 <div className={`w-9 h-9 rounded-full bg-white border-2 border-[#e3c086] flex items-center justify-center ${badge.color}`} title={badge.label}>
@@ -112,13 +114,13 @@ export const UserPage: React.FC<UserPageProps> = ({
 
                         {session ? (
                             <div className="flex flex-col gap-2">
-                                <button onClick={() => setIsEditing(true)} className="btn-retro w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-[#e3c086] border-[#c4ae88] text-[#5c4033]">
+                                <button onClick={() => setIsEditing(true)} className="btn-retro w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-[#e3c086] border-[#b88742] text-[#5c4033]">
                                     <UserIcon size={16}/> 修改昵称
                                 </button>
                                 <button onClick={onSignOutClick} className="btn-retro btn-brown w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2">
                                     <LogOut size={16}/> 退出登录
                                 </button>
-                                {isTapTapEnv() && (
+                                {isTapTapEnv() && onTapTapLeaderboardClick && (
                                     <button onClick={onTapTapLeaderboardClick} className="btn-retro w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-[#00cccc] border-[#009999] text-white">
                                         <ListOrdered size={16}/> TapTap 排行榜
                                     </button>
@@ -138,7 +140,7 @@ export const UserPage: React.FC<UserPageProps> = ({
                         <Medal size={16} className="text-[#8c6b38]" />
                         <span className="text-sm font-bold text-[#5c4033]">成就墙</span>
                         <span className="text-xs font-bold text-[#8c6b38] ml-auto">
-                            {Object.values(userAchievements).filter((u: any) => u.is_unlocked).length} / {achievementsList.length}
+                            {Object.values(userAchievements).filter(u => u.is_unlocked).length} / {achievementsList.length}
                         </span>
                     </div>
 

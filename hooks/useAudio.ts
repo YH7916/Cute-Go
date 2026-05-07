@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useRef, useEffect, useState, useCallback } from 'react';
 
 export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
@@ -151,7 +153,7 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
             try { 
                 bgmSourceRef.current.stop(); 
                 bgmSourceRef.current.disconnect(); 
-            } catch(e) {}
+            } catch {}
             bgmSourceRef.current = null;
         }
     }

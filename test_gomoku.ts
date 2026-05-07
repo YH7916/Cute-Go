@@ -1,5 +1,5 @@
 
-import { createBoard, getAIMove, attemptMove } from './utils/goLogic';
+import { createBoard, getAIMove } from './utils/goLogic';
 
 const runTest = () => {
   const size = 15;

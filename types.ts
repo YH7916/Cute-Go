@@ -33,7 +33,7 @@ export interface TsumegoProblem {
       ab?: string[]; // Add Black
       aw?: string[]; // Add White
   };
-  solution: any; // SGF Node logic
+  solution: unknown; // SGF Node logic
 }
 
 export interface TsumegoSet {
@@ -78,11 +78,4 @@ export interface HistoryItem {
 }
 
 export type AppMode = 'playing' | 'review' | 'setup';
-
-// 信令消息类型
-export type SignalMessage =
-  | { type: 'join' }
-  | { type: 'offer'; sdp: RTCSessionDescriptionInit }
-  | { type: 'answer'; sdp: RTCSessionDescriptionInit }
-  | { type: 'ice'; candidate: RTCIceCandidateInit };
 

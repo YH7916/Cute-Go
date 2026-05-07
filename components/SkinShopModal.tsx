@@ -118,7 +118,13 @@ export const SkinShopModal: React.FC<SkinShopModalProps> = ({
                                         {/* Preview Area */}
                                         <div 
                                             className="w-full h-28 rounded-xl shadow-inner relative overflow-hidden border-2 border-[#e3c086]"
-                                            style={{ background: theme.background }}
+                                            style={{
+                                                backgroundColor: theme.background,
+                                                backgroundImage: theme.backgroundImage,
+                                                backgroundSize: theme.backgroundSize,
+                                                backgroundRepeat: 'repeat',
+                                                borderColor: theme.borderColor,
+                                            }}
                                         >
                                             {/* Grid Preview */}
                                             <div className="absolute inset-0 flex items-center justify-center opacity-60">

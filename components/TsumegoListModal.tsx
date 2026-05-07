@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, BookOpen, ChevronRight, Play } from 'lucide-react';
+import React from 'react';
+import { X, BookOpen, ChevronRight } from 'lucide-react';
 import { SGFNode } from '../utils/sgfParser';
 
 export interface TsumegoSet {
@@ -36,12 +36,12 @@ export const TsumegoListModal: React.FC<TsumegoListModalProps> = ({
             <div className="bg-[#fcf6ea] w-full max-w-md rounded-[32px] shadow-2xl border-4 border-[#8c6b38] overflow-hidden flex flex-col max-h-[80vh]">
                 
                 {/* Header */}
-                <div className="bg-[#e3c086] p-4 flex items-center justify-between border-b-2 border-[#c4ae88]">
+                <div className="bg-[#e3c086] p-4 flex items-center justify-between border-b-2 border-[#b88742]">
                     <div className="flex items-center gap-2 text-[#5c4033] font-black text-lg">
                         <BookOpen className="w-6 h-6" />
                         <span>{collection ? currentSetTitle : "死活题练习"}</span>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-[#c4ae88] rounded-full transition-colors">
+                    <button onClick={onClose} className="p-2 hover:bg-[#b88742] rounded-full transition-colors">
                         <X className="w-6 h-6 text-[#5c4033]" />
                     </button>
                 </div>

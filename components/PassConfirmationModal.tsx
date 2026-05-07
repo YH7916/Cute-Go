@@ -20,9 +20,9 @@ export const PassConfirmationModal: React.FC<PassConfirmationModalProps> = ({
 
     return (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-            <div className="bg-[#fff8e1] border-4 border-[#cba367] text-[#5c4033] px-6 py-6 rounded-3xl shadow-2xl flex flex-col items-center animate-in zoom-in duration-300 w-64 pointer-events-auto">
+            <div className="bg-[#fff8e1] border-4 border-[#b88742] text-[#5c4033] px-6 py-6 rounded-3xl shadow-2xl flex flex-col items-center animate-in zoom-in duration-300 w-64 pointer-events-auto">
                 <div className="flex items-center gap-2 mb-4">
-                    <AlertCircle size={28} className="text-[#cba367]" />
+                    <AlertCircle size={28} className="text-[#b88742]" />
                     <span className="text-xl font-black">对手停着</span>
                 </div>
                 <p className="text-xs font-bold text-gray-500 text-center mb-6 leading-relaxed">对手认为无需再落子。<br/>点击空白处可继续。</p>

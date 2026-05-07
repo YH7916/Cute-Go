@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Play, Cpu, BookOpen, Globe, Download, Settings, Heart, Zap, Info, PenTool, User as UserIcon, Palette, Swords, Gamepad2 } from 'lucide-react';
-import { CURRENT_VERSION } from '../utils/constants';
+import { Play, Cpu, BookOpen, Globe, Download, Settings, Zap, Info, PenTool, User as UserIcon, Palette, Swords, Gamepad2, type LucideIcon } from 'lucide-react';
 import { TopBar } from './common/TopBar';
+import type { GameType } from '../types';
 
 type GameTabType = 'go' | 'gomoku';
+type StartGameHandler = (mode: 'PvP' | 'PvAI', aiType?: 'local' | 'fun', gameType?: GameType) => void;
+const tabToGameType = (tab: GameTabType): GameType => tab === 'go' ? 'Go' : 'Gomoku';
 
 interface StartScreenProps {
-    onStartGame: (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local' | 'fun') => void;
+    onStartGame: StartGameHandler;
     onOpenTsumego: () => void;
     onOpenTutorial: () => void;
     onOpenOnline: () => void;
     onOpenImport: () => void;
-    onOpenSettings: () => void;
+    onOpenSettings: (gameType?: GameType) => void;
     onOpenAbout: () => void;
     onStartSetup: () => void;
     onOpenUserPage: () => void;
@@ -36,7 +38,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
         <div className="absolute inset-0 z-30 bg-[#f7e7ce] flex flex-col items-center justify-start overflow-hidden animate-in fade-in duration-500">
             <TopBar
                 leftButtons={<>
-                    <button onClick={onOpenSettings} className="btn-retro btn-brown p-3 rounded-xl"><Settings size={20} /></button>
+                    <button onClick={() => onOpenSettings(tabToGameType(activeTab))} className="btn-retro btn-brown p-3 rounded-xl"><Settings size={20} /></button>
                     <button onClick={onOpenAbout} className="btn-retro btn-brown p-3 rounded-xl"><Info size={20} /></button>
                 </>}
                 rightContent={<>
@@ -69,22 +71,26 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                             onStartGame={onStartGame}
                             onOpenTutorial={onOpenTutorial}
                             onOpenOnline={onOpenOnline}
-                            onOpenImport={onOpenImport}
                             onStartSetup={onStartSetup}
                             onOpenUserPage={onOpenUserPage}
                             onOpenSkinShop={onOpenSkinShop}
                         />
                     )}
 
-                    <div className="mt-4 text-[#8c6b38]/60 text-xs font-medium pb-2">
-                        v{CURRENT_VERSION} • Designed with <Heart size={12} className="inline text-red-400 fill-current" /> by Yokaku
-                    </div>
                 </div>
             </div>
 
             {/* 底部悬浮 Tab 栏 */}
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10">
-                <div className="bg-[#e8c98a] border-[2px] border-[#c4a05a] rounded-full px-2 py-1.5 flex gap-1.5 shadow-[0_4px_0_#c4a05a,0_6px_12px_rgba(92,64,51,0.2)]">
+                <div className="relative bg-[#e3c086] border-[2px] border-[#b88742] border-b-[5px] rounded-full px-2 py-1.5 flex gap-1.5 shadow-[0_2px_8px_rgba(92,64,51,0.15)] overflow-hidden">
+                    <div
+                        className="absolute left-2 top-1.5 bottom-1.5 w-24 rounded-full bg-[#fcf6ea] shadow-[0_2px_4px_rgba(92,64,51,0.15)] transition-transform duration-300 ease-out"
+                        style={{
+                            transform: activeTab === 'gomoku'
+                                ? 'translateX(calc(6rem + 0.375rem))'
+                                : 'translateX(0)'
+                        }}
+                    />
                     <TabButton
                         label="围棋"
                         active={activeTab === 'go'}
@@ -104,9 +110,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
     <button
         onClick={onClick}
-        className={`px-7 py-2 rounded-full font-black text-sm transition-all duration-200 ${
+        className={`relative z-10 w-24 whitespace-nowrap px-4 py-2 rounded-full font-black text-sm transition-colors duration-200 ${
             active
-                ? 'bg-[#fcf6ea] text-[#5c4033] shadow-[0_2px_4px_rgba(92,64,51,0.15)]'
+                ? 'text-[#5c4033]'
                 : 'text-[#8c6b38] hover:text-[#5c4033]'
         }`}
     >
@@ -115,7 +121,7 @@ const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void 
 );
 
 interface GoContentProps {
-    onStartGame: (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local' | 'fun') => void;
+    onStartGame: StartGameHandler;
     onOpenTsumego: () => void;
     onOpenTutorial: () => void;
     onOpenOnline: () => void;
@@ -132,7 +138,7 @@ const GoContent: React.FC<GoContentProps> = ({
     <>
         <div className="grid grid-cols-1 gap-3 w-full lg:w-4/5">
             <button
-                onClick={() => onStartGame('PvP')}
+                onClick={() => onStartGame('PvP', undefined, 'Go')}
                 className="btn-retro bg-[#997c55] border-[#5c4033] text-[#fcf6ea] hover:bg-[#8a6f4c] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
             >
                 <div className="p-2 rounded-full bg-[#fcf6ea]/20 group-hover:scale-110 transition-transform shrink-0">
@@ -142,7 +148,7 @@ const GoContent: React.FC<GoContentProps> = ({
             </button>
 
             <button
-                onClick={() => onStartGame('PvAI', 'fun')}
+                onClick={() => onStartGame('PvAI', 'fun', 'Go')}
                 className="btn-retro bg-[#a8d5a2] border-[#5a8f55] text-[#2d5a28] hover:bg-[#96c490] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
             >
                 <div className="p-2 rounded-full bg-[#2d5a28]/10 group-hover:scale-110 transition-transform shrink-0">
@@ -152,8 +158,8 @@ const GoContent: React.FC<GoContentProps> = ({
             </button>
 
             <button
-                onClick={() => onStartGame('PvAI', 'local')}
-                className="btn-retro bg-[#e3c086] border-[#d4a866] text-[#5c4033] hover:border-[#bfa15f] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
+                onClick={() => onStartGame('PvAI', 'local', 'Go')}
+                className="btn-retro bg-[#e3c086] border-[#b88742] text-[#5c4033] hover:border-[#9f6f32] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
             >
                 <div className="p-2 rounded-full bg-[#5c4033]/10 group-hover:scale-110 transition-transform shrink-0">
                     <Cpu size={20} strokeWidth={2.5} />
@@ -184,10 +190,9 @@ const GoContent: React.FC<GoContentProps> = ({
 );
 
 interface GomokuContentProps {
-    onStartGame: (mode: 'PvP' | 'PvAI', aiType?: 'cloud' | 'local' | 'fun') => void;
+    onStartGame: StartGameHandler;
     onOpenTutorial: () => void;
     onOpenOnline: () => void;
-    onOpenImport: () => void;
     onStartSetup: () => void;
     onOpenUserPage: () => void;
     onOpenSkinShop: () => void;
@@ -195,12 +200,12 @@ interface GomokuContentProps {
 
 const GomokuContent: React.FC<GomokuContentProps> = ({
     onStartGame, onOpenTutorial, onOpenOnline,
-    onOpenImport, onStartSetup, onOpenUserPage, onOpenSkinShop,
+    onStartSetup, onOpenUserPage, onOpenSkinShop,
 }) => (
     <>
         <div className="grid grid-cols-1 gap-3 w-full lg:w-4/5">
             <button
-                onClick={() => onStartGame('PvP')}
+                onClick={() => onStartGame('PvP', undefined, 'Gomoku')}
                 className="btn-retro bg-[#997c55] border-[#5c4033] text-[#fcf6ea] hover:bg-[#8a6f4c] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
             >
                 <div className="p-2 rounded-full bg-[#fcf6ea]/20 group-hover:scale-110 transition-transform shrink-0">
@@ -210,8 +215,8 @@ const GomokuContent: React.FC<GomokuContentProps> = ({
             </button>
 
             <button
-                onClick={() => onStartGame('PvAI', 'local')}
-                className="btn-retro bg-[#e3c086] border-[#d4a866] text-[#5c4033] hover:border-[#bfa15f] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
+                onClick={() => onStartGame('PvAI', 'local', 'Gomoku')}
+                className="btn-retro bg-[#e3c086] border-[#b88742] text-[#5c4033] hover:border-[#9f6f32] h-16 rounded-xl flex items-center justify-center gap-4 transition-transform hover:-translate-y-1 group px-4"
             >
                 <div className="p-2 rounded-full bg-[#5c4033]/10 group-hover:scale-110 transition-transform shrink-0">
                     <Swords size={20} strokeWidth={2.5} />
@@ -239,7 +244,7 @@ const GomokuContent: React.FC<GomokuContentProps> = ({
     </>
 );
 
-const FeatureButton: React.FC<{ icon: any; label: string; onClick: () => void; color: string }> = ({
+const FeatureButton: React.FC<{ icon: LucideIcon; label: string; onClick: () => void; color: string }> = ({
     icon: Icon, label, onClick, color,
 }) => (
     <button

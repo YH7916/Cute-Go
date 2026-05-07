@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Star, Folder } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, Folder } from 'lucide-react';
 import { TsumegoCategory, TsumegoLevel, getLevelsFromCategory } from '../../utils/tsumegoData';
 
 interface LevelGridProps {
@@ -7,11 +7,7 @@ interface LevelGridProps {
     groupName?: string;
     completedIds: string[];
     onSelectLevel: (level: TsumegoLevel) => void;
-    onBack: () => void;
 }
-
-
-const ITEMS_PER_PAGE = 50;
 
 interface FolderItemProps {
     name: string;
@@ -64,13 +60,18 @@ const LevelItem = React.memo(({ level, isCompleted, name, onSelect }: LevelItemP
 });
 
 
-export const LevelGrid: React.FC<LevelGridProps> = ({ category, groupName, completedIds, onSelectLevel, onBack }) => {
+type LevelTreeNode =
+    | { type: 'folder'; name: string; children: Record<string, LevelTreeNode> }
+    | { type: 'file'; name: string; levelData: TsumegoLevel };
+type LevelFolderNode = Extract<LevelTreeNode, { type: 'folder' }>;
+
+export const LevelGrid: React.FC<LevelGridProps> = ({ category, groupName, completedIds, onSelectLevel }) => {
 // --- New Folder Navigation Logic ---
     const [currentPath, setCurrentPath] = useState<string[]>([]);
     
     // Parse files into tree structure
     const fileTree = useMemo(() => {
-        const root: any = { type: 'folder', name: 'root', children: {} };
+        const root: LevelFolderNode = { type: 'folder', name: 'root', children: {} };
         const levels = getLevelsFromCategory(category, groupName);
 
         levels.forEach(level => {
@@ -97,12 +98,16 @@ export const LevelGrid: React.FC<LevelGridProps> = ({ category, groupName, compl
             }
 
             const parts = relativePath.split('/');
-            let currentNode = root;
+            let currentNode: LevelFolderNode = root;
 
             for (let i = 0; i < parts.length; i++) {
                 const part = parts[i];
                 const isFile = i === parts.length - 1; // Assuming last part is file (SGF)
                 
+                if (currentNode.type !== 'folder') {
+                    break;
+                }
+
                 if (isFile) {
                    if (!currentNode.children[part]) { // Avoid overwrite
                        currentNode.children[part] = { type: 'file', name: part, levelData: level };
@@ -112,7 +117,10 @@ export const LevelGrid: React.FC<LevelGridProps> = ({ category, groupName, compl
                     if (!currentNode.children[part]) {
                         currentNode.children[part] = { type: 'folder', name: part, children: {} };
                     }
-                    currentNode = currentNode.children[part];
+                    const nextNode = currentNode.children[part];
+                    if (nextNode.type === 'folder') {
+                        currentNode = nextNode;
+                    }
                 }
             }
         });
@@ -124,14 +132,17 @@ export const LevelGrid: React.FC<LevelGridProps> = ({ category, groupName, compl
         let node = fileTree;
         for (const p of currentPath) {
             if (node.children[p]) {
-                node = node.children[p];
+                const nextNode = node.children[p];
+                if (nextNode.type !== 'folder') {
+                    return [];
+                }
+                node = nextNode;
             } else {
                 return []; // Invalid path
             }
         }
-        
-        // Convert map to array and Sort
-        return Object.values(node.children).sort((a: any, b: any) => {
+
+        return Object.values(node.children).sort((a, b) => {
             if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
             // Numeric Sort for names
             const numA = parseInt(a.name);
@@ -184,7 +195,7 @@ export const LevelGrid: React.FC<LevelGridProps> = ({ category, groupName, compl
                         </button>
                     )}
 
-                    {currentViewItems.map((item: any) => {
+                    {currentViewItems.map(item => {
                         if (item.type === 'folder') {
                             return (
                                 <FolderItem 

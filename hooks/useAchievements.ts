@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../utils/supabaseClient'; 
-import { DisplayAchievement, AchievementDef } from '../types';
-import { BoardState, Player } from '../types';
-import { unlockTapTapAchievement } from '../utils/tapTapBridge';
+import { DisplayAchievement, AchievementDef, Player, UserAchievement } from '../types';
+import { getPlatform } from '../services/platform';
 
 // 定义硬编码的成就列表 (为了减少 DB 读取，也可以选择从 DB 拉取)
 const ACHIEVEMENTS_LIST: AchievementDef[] = [
@@ -17,15 +15,16 @@ const ACHIEVEMENTS_LIST: AchievementDef[] = [
 ];
 
 export const useAchievements = (userId: string | undefined) => {
-  const [userAchievements, setUserAchievements] = useState<Record<string, any>>({});
+  const [userAchievements, setUserAchievements] = useState<Record<string, UserAchievement>>({});
   const [newUnlocked, setNewUnlocked] = useState<DisplayAchievement | null>(null);
+  const platform = getPlatform();
 
   // 1. 初始化加载用户进度 & 连续登录检测
   useEffect(() => {
     if (!userId) return;
     const fetchProgress = async () => {
-      const { data } = await supabase.from('user_achievements').select('*').eq('user_id', userId);
-      const map: Record<string, any> = {};
+      const data = await platform.achievements.loadForUser(userId);
+      const map: Record<string, UserAchievement> = {};
       data?.forEach(item => map[item.achievement_code] = item);
       setUserAchievements(map);
       
@@ -65,30 +64,24 @@ export const useAchievements = (userId: string | undefined) => {
     }));
 
     // 更新数据库
-    const { error } = await supabase.from('user_achievements').upsert({
-      user_id: userId,
-      achievement_code: code,
-      current_value: newValue,
-      is_unlocked: unlocked,
-      unlocked_at: unlocked ? new Date().toISOString() : null
+    const { error } = await platform.achievements.upsertProgress({
+      userId,
+      achievementCode: code,
+      currentValue: newValue,
+      isUnlocked: unlocked,
+      unlockedAt: unlocked ? new Date().toISOString() : null
     });
 
     if (!error && unlocked) {
       setNewUnlocked({ ...def, progress: { ...current, is_unlocked: true } });
-      
-      // [New] Sync to TapTap if applicable
-      const isTapTapUser = localStorage.getItem('is_taptap_user') === 'true';
-      if (isTapTapUser) {
-        unlockTapTapAchievement(code);
-      }
 
       const audio = new Audio('/achievement.mp3');
       audio.play().catch(() => {});
     }
-  }, [userId, userAchievements]);
+  }, [userId, userAchievements, platform]);
 
   // [新增] 连续登录逻辑 (支持多档位)
-  const checkLoginStreak = async (uid: string, currentAchievementsMap: Record<string, any>) => {
+  const checkLoginStreak = async (uid: string, currentAchievementsMap: Record<string, UserAchievement>) => {
     const today = new Date().toDateString(); // "Mon Jan 20 2026"
     const lastLoginDate = localStorage.getItem(`last_login_date_${uid}`);
 
@@ -137,12 +130,12 @@ export const useAchievements = (userId: string | undefined) => {
             continue;
         }
 
-        await supabase.from('user_achievements').upsert({
-            user_id: uid,
-            achievement_code: code,
-            current_value: newStreak,
-            is_unlocked: unlocked,
-            unlocked_at: unlocked ? new Date().toISOString() : null
+        await platform.achievements.upsertProgress({
+            userId: uid,
+            achievementCode: code,
+            currentValue: newStreak,
+            isUnlocked: unlocked,
+            unlockedAt: unlocked ? new Date().toISOString() : null
         });
 
         // 更新本地 state
@@ -160,12 +153,6 @@ export const useAchievements = (userId: string | undefined) => {
         // 为了体验，如果是第3天，只弹 COMPANION_3。如果是第10天，只弹 COMPANION_10。不会同时满足两个刚解锁的情况。
         if (isNewUnlock) {
             setNewUnlocked({ ...def, progress: { current_value: newStreak, is_unlocked: true, achievement_code: code, unlocked_at: new Date().toISOString() } });
-            
-            // [New] Sync to TapTap if applicable
-            const isTapTapUser = localStorage.getItem('is_taptap_user') === 'true';
-            if (isTapTapUser) {
-              unlockTapTapAchievement(code);
-            }
 
             const audio = new Audio('/achievement.mp3');
             audio.play().catch(() => {});
@@ -181,13 +168,12 @@ export const useAchievements = (userId: string | undefined) => {
       winner: Player | null,
       myColor: Player,
       score: { black: number, white: number } | null,
-      captures: { black: number, white: number },
-      boardSize: number
+      captures: { black: number, white: number }
     }
   ) => {
     if (!userId) return;
 
-    const { winner, myColor, score, captures, boardSize } = params;
+    const { winner, myColor, score, captures } = params;
     const isWin = winner === myColor;
 
     // 1. 里程碑：完成对局

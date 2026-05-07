@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { OnnxEngine, type AnalysisResult } from '../utils/onnx-engine';
 import { MicroBoard, type Sign } from '../utils/micro-board';
 import {
     getCandidateMoves,
     getGomokuScore,
     checkGomokuWin,
-    evaluatePositionStrength,
     GOMOKU_SCORES,
     attemptMove,
     getBoardHash,
@@ -58,7 +59,6 @@ const WATCHDOG_TIMEOUT = 30000; // 30s safety net
 // it is considered "confirmed enemy territory" and moves there are skipped.
 // 0.65 keeps it conservative so only clearly-dead positions are filtered.
 const OWNERSHIP_DEAD_THRESHOLD = 0.65;
-const WINRATE_TEMPERATURE = 5.0;
 
 const clearWatchdog = () => {
     if (initWatchdog) {
@@ -72,17 +72,8 @@ const clampPercent = (value: number) => {
     return Math.max(0, Math.min(100, value));
 };
 
-const toBlackPerspectiveLead = (lead: number, toPlay: Player) =>
-    toPlay === 'black' ? lead : -lead;
-
 const toBlackPerspectiveWinRate = (winRate: number, toPlay: Player) =>
     toPlay === 'black' ? clampPercent(winRate) : clampPercent(100 - winRate);
-
-const deriveBlackWinRateFromLead = (blackLead: number) => {
-    if (!Number.isFinite(blackLead)) return 50;
-    const probability = 1 / (1 + Math.exp(-blackLead / WINRATE_TEMPERATURE));
-    return clampPercent(probability * 100);
-};
 
 const sampleIndexByWeight = (weights: number[]) => {
     const total = weights.reduce((sum, weight) => sum + weight, 0);
@@ -529,8 +520,6 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 const movesToSearch = rootMoves.slice(0, searchWidth).map(m => m.pt);
 
                 let bestMove = movesToSearch[0];
-                let currentBestScore = -Infinity;
-
                 // --- Helper: Minimax (Local Recurse) ---
                 const performSearch = (depth: number) => {
                     let alpha = -Infinity; // Root Alpha
@@ -574,7 +563,6 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     // If we found a forced win, stop immediately
                     if (bestS >= GOMOKU_SCORES.WIN * 0.9) {
                         bestMove = bestM;
-                        currentBestScore = bestS;
                         break;
                     }
 
@@ -590,7 +578,6 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     }
 
                     bestMove = bestM;
-                    currentBestScore = bestS;
                 }
 
                 // Add slight randomness for Easy/Medium to vary play?
@@ -814,7 +801,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         // Otherwise 'reinit' thinks we are ready but session is null.
         if (engine) {
             console.error('[AI Worker] Resetting broken engine instance.');
-            try { engine.dispose(); } catch (e) { }
+            try { engine.dispose(); } catch {}
             engine = null;
         }
         ctx.postMessage({ type: 'error', message: err.message });
@@ -849,7 +836,6 @@ const minimaxGomokuRecursive = (
     const candidates = getCandidateMoves(board, size, 2);
     if (candidates.length === 0) return 0;
 
-    const myColor = player;
     const opColor = player === 'black' ? 'white' : 'black';
     // Current Mover Color
     const currentColor = isMaximizing ? player : opColor;

@@ -1,4 +1,4 @@
-import { BoardState, Player, Point } from '../../types';
+import { BoardState, Player } from '../../types';
 
 export const checkGomokuWin = (
   board: BoardState,

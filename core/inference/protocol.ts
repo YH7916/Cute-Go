@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Worker message protocol types — shared between main thread and ai.worker.ts
 
 export type WorkerInMessage =
@@ -21,7 +23,7 @@ export type WorkerInMessage =
         gameType?: 'Go' | 'Gomoku';
         simulations?: number;
         komi?: number;
-        difficulty?: 'Easy' | 'Medium' | 'Hard';
+        difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard';
         temperature?: number;
         mode?: 'play' | 'analyze';
       };

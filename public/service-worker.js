@@ -19,8 +19,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // 1. Supabase API & Non-GET -> Network Only (CRITICAL FIX)
-  if (url.hostname.includes('supabase.co') || request.method !== 'GET') {
+  // 1. Non-GET -> Network Only
+  if (request.method !== 'GET') {
     event.respondWith(fetch(request));
     return;
   }

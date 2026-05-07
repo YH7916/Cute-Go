@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, ChevronRight, ChevronLeft, BookOpen, CheckCircle2, RefreshCcw, LogOut } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ChevronRight, ChevronLeft, BookOpen, CheckCircle2, RefreshCcw, LogOut } from 'lucide-react';
 import { GameBoard, calculateBoardConstants } from './GameBoard';
 import { createBoard, calculateTerritory } from '../utils/goLogic';
 import { BoardState } from '../types';
@@ -17,7 +17,6 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose })
     const [feedback, setFeedback] = useState<string | null>(null);
     const [isCompleted, setIsCompleted] = useState(false);
     const [showQiOverride, setShowQiOverride] = useState(false);
-    const [qiFocus, setQiFocus] = useState<{x:number, y:number} | undefined>(undefined);
     
     // Territory Overlay State
     const [territory, setTerritory] = useState<{black: {x:number, y:number}[], white: {x:number, y:number}[]} | null>(null);
@@ -29,14 +28,13 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose })
     }, [currentStep, isOpen]);
 
     const initStep = (stepIdx: number) => {
-        const { board: newBoard, showQiOverride: newShowQi, qiFocus: newFocus, isCompleted: newCompleted } = initTutorialStep(stepIdx);
+        const { board: newBoard, showQiOverride: newShowQi, isCompleted: newCompleted } = initTutorialStep(stepIdx);
         
         setBoard(newBoard);
         setFeedback(null);
         setIsCompleted(newCompleted);
         setTerritory(null);
         setShowQiOverride(newShowQi);
-        setQiFocus(newFocus);
     };
 
     const handleTerritoryCheck = () => {
@@ -115,8 +113,7 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose })
             
             // Check if we already have a black stone (Move 1 done)
             let moves = 0;
-            let lastMove = null;
-            board.forEach(r => r.forEach(s => { if(s?.color==='black' && s.id.startsWith('move')) { moves++; lastMove=s; } }));
+            board.forEach(r => r.forEach(s => { if(s?.color==='black' && s.id.startsWith('move')) { moves++; } }));
             
             if (moves === 0) {
                 if (isStarPoint && !board[y][x]) {

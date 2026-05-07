@@ -1,5 +1,3 @@
-import { SGFNode } from './sgfParser';
-
 export interface TsumegoGroup {
     isGroup: true;
     name: string;
@@ -32,6 +30,23 @@ export interface TsumegoLevel {
     isLocked?: boolean;
     isCompleted?: boolean;
 }
+
+export const isTsumegoGroup = (
+    child: TsumegoGroup | TsumegoFile
+): child is TsumegoGroup => child.isGroup;
+
+export const getCategoryFiles = (category: TsumegoCategory, groupName?: string): string[] => {
+    if (groupName) {
+        const group = category.children.find(
+            child => isTsumegoGroup(child) && child.name === groupName
+        );
+        return group && isTsumegoGroup(group) ? group.files : [];
+    }
+
+    return category.children.flatMap(child =>
+        isTsumegoGroup(child) ? child.files : [child.file]
+    );
+};
 
 export const fetchProblemManifest = async (): Promise<TsumegoCategory[]> => {
     try {
@@ -69,7 +84,7 @@ export const fetchProblemSGF = async (filename: string): Promise<string> => {
         try {
             const decoder = new TextDecoder(charset);
             return decoder.decode(buffer);
-        } catch (e) {
+        } catch {
             console.warn(`Failed to decode with ${charset}, falling back to utf-8`);
             return new TextDecoder('utf-8').decode(buffer);
         }
@@ -85,10 +100,11 @@ export const getLevelsFromCategory = (category: TsumegoCategory, groupName?: str
     let targetFiles: {file: string, group?: string}[] = [];
     
     if (groupName) {
-        // Find specific group
-        const group = category.children.find(c => (c as any).isGroup && c.name === groupName);
-        if (group) {
-            targetFiles = (group as any).files.map((f: string) => ({ file: f, group: groupName }));
+        const group = category.children.find(
+            child => isTsumegoGroup(child) && child.name === groupName
+        );
+        if (group && isTsumegoGroup(group)) {
+            targetFiles = group.files.map(file => ({ file, group: groupName }));
         }
     } else {
         // Flatten all or just root files? 
@@ -98,13 +114,12 @@ export const getLevelsFromCategory = (category: TsumegoCategory, groupName?: str
         // OR if category has mixed content.
         
         category.children.forEach(child => {
-            if ((child as any).isGroup) {
-                const g = child as TsumegoGroup;
-                g.files.forEach(f => targetFiles.push({ file: f, group: g.name }));
-            } else {
-                const f = child as TsumegoFile;
-                targetFiles.push({ file: f.file });
+            if (isTsumegoGroup(child)) {
+                child.files.forEach(file => targetFiles.push({ file, group: child.name }));
+                return;
             }
+
+            targetFiles.push({ file: child.file });
         });
     }
 

@@ -1,6 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BoardState, Player, BoardSize, GameType } from '../types';
 import { logEvent } from '../utils/logger';
+import { getBeginnerAIMove, getBoardHash } from '../utils/goLogic';
 
 interface UseWebKataGoProps {
     boardSize: BoardSize;
@@ -11,7 +14,7 @@ interface UseWebKataGoProps {
     onAnalysisComplete?: (data: { winRate: number; lead: number; ownership: Float32Array | null }) => void; // [New] KataGo endgame judgment
 }
 
-export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiError, onAnalysisComplete }: UseWebKataGoProps) => {
+export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign: _onAiResign, onAiError, onAnalysisComplete }: UseWebKataGoProps) => {
     const [isWorkerReady, setIsWorkerReady] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
@@ -271,7 +274,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
         history: any[],
         simulations: number = 45,
         komi: number = 7.5,
-        difficulty: 'Easy' | 'Medium' | 'Hard' = 'Hard',
+        difficulty: 'Fun' | 'Easy' | 'Medium' | 'Hard' = 'Hard',
         temperature: number = 0,
         gameType: GameType = 'Go' // [New]
     ) => {
@@ -279,6 +282,34 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
         if (releaseTimeoutRef.current) {
             clearTimeout(releaseTimeoutRef.current);
             releaseTimeoutRef.current = null;
+        }
+
+        if (difficulty === 'Fun' && gameType === 'Go') {
+            if (expectingResponseRef.current) return;
+
+            logEvent('ai_request');
+            setIsThinking(true);
+            expectingResponseRef.current = true;
+            requestTypeRef.current = 'move';
+            setAiWinRate(50);
+            setAiLead(null);
+            setAiScoreStdev(null);
+            setAiTerritory(null);
+
+            window.setTimeout(() => {
+                if (!expectingResponseRef.current) return;
+
+                const lastHistoryItem = history.length > 0 ? history[history.length - 1] : null;
+                const previousBoardHash = lastHistoryItem?.board ? getBoardHash(lastHistoryItem.board) : null;
+                const move = getBeginnerAIMove(board, playerColor, previousBoardHash);
+
+                setIsThinking(false);
+                expectingResponseRef.current = false;
+
+                if (move) onAiMove(move.x, move.y);
+                else onAiPass();
+            }, 180);
+            return;
         }
 
         // 1. Check Readiness
@@ -381,7 +412,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign, onAiEr
             }
         }, 25000); // Increased to 25s for mobile hiccups
 
-    }, [isWorkerReady, isInitializing, initializeAI, onAiError]);
+    }, [isWorkerReady, isInitializing, initializeAI, onAiError, onAiMove, onAiPass]);
 
     const stopThinking = useCallback(() => {
         setIsThinking(false);

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useEffect, useCallback } from 'react';
 import { SGFNode, parseSGFToTree } from '../../utils/sgfParser';
 import { TsumegoCategory, TsumegoLevel, fetchProblemSGF } from '../../utils/tsumegoData';

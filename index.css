@@ -32,3 +32,242 @@
 body {
   font-family: "GenSenRounded", sans-serif;
 }
+
+.winrate-track {
+  background-color: #efe4cf;
+  border-color: #c9b08a;
+  box-shadow: inset 0 2px 4px rgba(104, 74, 47, 0.16);
+}
+
+.winrate-fill-dark {
+  background: linear-gradient(90deg, #2a2a2a 0%, #4b372d 55%, #6b4c3c 100%);
+}
+
+.theme-sakura {
+  --cg-bg: #f7e8ec;
+  --cg-bg-alt: #f2e1e6;
+  --cg-surface: #fcf3f5;
+  --cg-wood: #e4bcc7;
+  --cg-wood-soft: #ead4da;
+  --cg-border: #e4bcc7;
+  --cg-wood-border: #b98594;
+  --cg-border-dark: #62444d;
+  --cg-primary: #a87986;
+  --cg-primary-hover: #b48693;
+  --cg-primary-dark: #62444d;
+  --cg-primary-dark-hover: #73535d;
+  --cg-text: #62444d;
+  --cg-text-soft: #9a6a78;
+  --cg-slider-fill: #73535d;
+  --cg-slider-track: #d9adb8;
+}
+
+.theme-sakura,
+.theme-sakura [class~="bg-[#f7e7ce]"],
+.theme-sakura [class~="landscape:bg-[#f2e6d6]"] {
+  background-color: var(--cg-bg) !important;
+}
+
+.theme-sakura [class~="bg-[#fcf6ea]"],
+.theme-sakura [class~="bg-[#fff8e1]"] {
+  background-color: var(--cg-surface) !important;
+}
+
+.theme-sakura [class~="bg-[#e3c086]"],
+.theme-sakura [class~="bg-[#d4b075]"] {
+  background-color: var(--cg-wood) !important;
+}
+
+.theme-sakura [class~="bg-[#997c55]"],
+.theme-sakura [class~="bg-[#8a6f4c]"],
+.theme-sakura [class~="bg-[#8c6b38]"] {
+  background-color: var(--cg-primary) !important;
+}
+
+.theme-sakura [class~="bg-[#5c4033]"],
+.theme-sakura [class~="bg-[#5d4037]"] {
+  background-color: var(--cg-primary-dark) !important;
+}
+
+.theme-sakura [class~="bg-[#5c4033]/5"] {
+  background-color: rgba(98, 68, 77, 0.05) !important;
+}
+
+.theme-sakura [class~="bg-[#5c4033]/10"] {
+  background-color: rgba(98, 68, 77, 0.1) !important;
+}
+
+.theme-sakura [class~="bg-[#fcf6ea]/20"] {
+  background-color: rgba(252, 243, 245, 0.2) !important;
+}
+
+.theme-sakura [class~="bg-[#fcf6ea]/80"] {
+  background-color: rgba(252, 243, 245, 0.8) !important;
+}
+
+.theme-sakura [class~="bg-[#e3c086]/20"] {
+  background-color: rgba(228, 188, 199, 0.2) !important;
+}
+
+.theme-sakura [class~="bg-[#e3c086]/30"] {
+  background-color: rgba(228, 188, 199, 0.3) !important;
+}
+
+.theme-sakura [class~="bg-[#e3c086]/50"] {
+  background-color: rgba(228, 188, 199, 0.5) !important;
+}
+
+.theme-sakura [class~="border-[#e3c086]"] {
+  border-color: var(--cg-border) !important;
+}
+
+.theme-sakura [class~="landscape:border-[#e3c086]"] {
+  border-color: var(--cg-border) !important;
+}
+
+.theme-sakura [class~="border-[#b88742]"] {
+  border-color: var(--cg-wood-border) !important;
+}
+
+.theme-sakura [class~="border-[#8c6b38]"],
+.theme-sakura [class~="border-[#5c4033]"],
+.theme-sakura [class~="border-[#9f6f32]"],
+.theme-sakura [class~="border-[#3e2b22]"],
+.theme-sakura [class~="border-[#3e2723]"] {
+  border-color: var(--cg-border-dark) !important;
+}
+
+.theme-sakura [class~="border-[#e3c086]/30"] {
+  border-color: rgba(228, 188, 199, 0.3) !important;
+}
+
+.theme-sakura [class~="border-[#e3c086]/50"] {
+  border-color: rgba(228, 188, 199, 0.5) !important;
+}
+
+.theme-sakura [class~="border-[#5c4033]/30"] {
+  border-color: rgba(98, 68, 77, 0.3) !important;
+}
+
+.theme-sakura [class~="text-[#5c4033]"],
+.theme-sakura [class~="text-[#5d4037]"] {
+  color: var(--cg-text) !important;
+}
+
+.theme-sakura [class~="text-[#8c6b38]"],
+.theme-sakura [class~="text-[#7a5b49]"] {
+  color: var(--cg-text-soft) !important;
+}
+
+.theme-sakura [class~="text-[#f7e7ce]"],
+.theme-sakura [class~="text-[#fcf6ea]"],
+.theme-sakura [class~="text-[#fff8e1]"] {
+  color: var(--cg-surface) !important;
+}
+
+.theme-sakura [class~="text-[#5c4033]/50"] {
+  color: rgba(98, 68, 77, 0.5) !important;
+}
+
+.theme-sakura [class~="text-[#8c6b38]/30"] {
+  color: rgba(154, 106, 120, 0.3) !important;
+}
+
+.theme-sakura [class~="text-[#8c6b38]/60"] {
+  color: rgba(154, 106, 120, 0.6) !important;
+}
+
+.theme-sakura [class~="text-[#8c6b38]/70"] {
+  color: rgba(154, 106, 120, 0.7) !important;
+}
+
+.theme-sakura [class~="text-[#8c6b38]/80"] {
+  color: rgba(154, 106, 120, 0.8) !important;
+}
+
+.theme-sakura [class~="text-[#f7e7ce]/85"] {
+  color: rgba(252, 243, 245, 0.85) !important;
+}
+
+.theme-sakura [class~="ring-[#e3c086]"] {
+  --tw-ring-color: var(--cg-wood) !important;
+}
+
+.theme-sakura [class~="shadow-[0_2px_8px_rgba(92,64,51,0.15)]"] {
+  box-shadow: 0 2px 8px rgba(98, 68, 77, 0.15) !important;
+}
+
+.theme-sakura [class~="shadow-[0_2px_4px_rgba(92,64,51,0.15)]"] {
+  box-shadow: 0 2px 4px rgba(98, 68, 77, 0.15) !important;
+}
+
+.theme-sakura .btn-brown {
+  background-color: var(--cg-primary);
+  border-color: var(--cg-border-dark);
+  color: var(--cg-surface);
+}
+
+.theme-sakura .btn-brown:hover {
+  background-color: var(--cg-primary-hover);
+}
+
+.theme-sakura .btn-coffee {
+  background-color: var(--cg-primary-dark);
+  border-color: var(--cg-text);
+  color: var(--cg-surface);
+}
+
+.theme-sakura .btn-coffee:hover {
+  background-color: var(--cg-primary-dark-hover);
+}
+
+.theme-sakura .btn-sand {
+  background-color: var(--cg-wood-soft);
+  border-color: var(--cg-wood-border);
+  color: var(--cg-text);
+}
+
+.theme-sakura .btn-sand:hover {
+  background-color: #ffe1ea;
+}
+
+.theme-sakura .btn-beige {
+  background-color: var(--cg-surface);
+  border-color: var(--cg-wood-border);
+  color: var(--cg-text);
+}
+
+.theme-sakura .btn-beige:hover {
+  background-color: #ffffff;
+}
+
+.theme-sakura .inset-track {
+  background-color: var(--cg-wood);
+  border-bottom-color: var(--cg-surface);
+  border-top-color: var(--cg-border-dark);
+}
+
+.theme-sakura .slider-block {
+  background-color: var(--cg-surface);
+  box-shadow: 0 2px 0 var(--cg-wood-border), 0 4px 6px rgba(98, 68, 77, 0.16);
+  color: var(--cg-text);
+}
+
+.theme-sakura .cute-range::-webkit-slider-thumb {
+  background: var(--cg-surface);
+  border-color: var(--cg-primary-dark);
+}
+
+.theme-sakura .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(154, 106, 120, 0.24);
+}
+
+.theme-sakura .winrate-track {
+  background-color: #ead4da;
+  border-color: #b98594;
+  box-shadow: inset 0 2px 4px rgba(98, 68, 77, 0.16);
+}
+
+.theme-sakura .winrate-fill-dark {
+  background: linear-gradient(90deg, #62444d 0%, #73535d 55%, #8b6570 100%);
+}

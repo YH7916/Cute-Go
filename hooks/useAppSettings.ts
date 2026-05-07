@@ -13,7 +13,7 @@ const loadState = <T,>(key: string, fallback: T): T => {
 
 const loadDifficulty = (): Difficulty => {
   const saved = loadState<string>('difficulty', 'Easy');
-  return saved === 'Medium' || saved === 'Hard' ? saved : 'Easy';
+  return saved === 'Fun' || saved === 'Medium' || saved === 'Hard' ? saved : 'Easy';
 };
 
 const loadStoneSkin = (): StoneThemeId => {

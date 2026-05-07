@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCcw, SkipForward, Play, Eraser, Undo2, Lightbulb, Map, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, LogOut } from 'lucide-react';
+import { RotateCcw, SkipForward, Play, Eraser, Undo2, Lightbulb, Map, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { AppMode, HistoryItem, Player } from '../types';
 import { getSliderBackground } from '../utils/helpers';
 
@@ -57,7 +57,6 @@ export const GameControls: React.FC<GameControlsProps> = ({
     consecutivePasses,
     showTerritory,
     onToggleTerritory,
-    playClick,
     gameMode,
     gameType,
     // Tsumego Props
@@ -73,15 +72,15 @@ export const GameControls: React.FC<GameControlsProps> = ({
             {/* SETUP MODE CONTROLS */}
             {appMode === 'setup' && (
                 <div className="grid grid-cols-4 gap-2 mb-2">
-                    <button onClick={() => setSetupTool('black')} className={`btn-retro flex flex-col items-center justify-center p-2 rounded-2xl border-2 ${setupTool === 'black' ? 'bg-[#2a2a2a] text-[#f7e7ce] border-[#000]' : 'bg-[#e3c086] text-[#5c4033] border-[#c4ae88]'}`}>
+                    <button onClick={() => setSetupTool('black')} className={`btn-retro flex flex-col items-center justify-center p-2 rounded-2xl border-2 ${setupTool === 'black' ? 'bg-[#2a2a2a] text-[#f7e7ce] border-[#000]' : 'bg-[#e3c086] text-[#5c4033] border-[#b88742]'}`}>
                         <div className="w-4 h-4 rounded-full bg-black border border-gray-600 mb-1"></div>
                         <span className="text-[10px] font-bold">黑子</span>
                     </button>
-                    <button onClick={() => setSetupTool('white')} className={`btn-retro flex flex-col items-center justify-center p-2 rounded-2xl border-2 ${setupTool === 'white' ? 'bg-[#fcf6ea] text-[#5c4033] border-[#e3c086]' : 'bg-[#e3c086] text-[#5c4033] border-[#c4ae88]'}`}>
+                    <button onClick={() => setSetupTool('white')} className={`btn-retro flex flex-col items-center justify-center p-2 rounded-2xl border-2 ${setupTool === 'white' ? 'bg-[#fcf6ea] text-[#5c4033] border-[#e3c086]' : 'bg-[#e3c086] text-[#5c4033] border-[#b88742]'}`}>
                         <div className="w-4 h-4 rounded-full bg-white border border-gray-300 mb-1"></div>
                         <span className="text-[10px] font-bold">白子</span>
                     </button>
-                    <button onClick={() => setSetupTool('erase')} className={`btn-retro flex flex-col items-center justify-center p-2 rounded-2xl border-2 ${setupTool === 'erase' ? 'bg-[#e57373] text-white border-[#d32f2f]' : 'bg-[#e3c086] text-[#5c4033] border-[#c4ae88]'}`}>
+                    <button onClick={() => setSetupTool('erase')} className={`btn-retro flex flex-col items-center justify-center p-2 rounded-2xl border-2 ${setupTool === 'erase' ? 'bg-[#e57373] text-white border-[#d32f2f]' : 'bg-[#e3c086] text-[#5c4033] border-[#b88742]'}`}>
                         <Eraser size={16} className="mb-1" />
                         <span className="text-[10px] font-bold">擦除</span>
                     </button>
@@ -151,7 +150,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
                          <button 
                             onClick={() => { setAppMode('playing'); setGameOver(true); }} 
-                            className="btn-retro h-12 w-12 rounded-xl font-bold flex items-center justify-center border-[#c4ae88] bg-[#e3c086] text-[#5c4033] border-b-4 active:border-b-0 active:translate-y-1 hover:bg-[#d4b075] shrink-0"
+                            className="btn-retro h-12 w-12 rounded-xl font-bold flex items-center justify-center border-[#b88742] bg-[#e3c086] text-[#5c4033] border-b-4 active:border-b-0 active:translate-y-1 hover:bg-[#d4b075] shrink-0"
                             title="退出"
                         >
                             <LogOut size={20} />

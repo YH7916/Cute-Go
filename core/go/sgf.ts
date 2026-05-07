@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { BoardState, Player, GameType, BoardSize } from '../../types';
 import { createBoard } from '../board';
 import { attemptMove } from './rules';
@@ -31,8 +33,8 @@ export const serializeGame = (
   };
   try {
     return btoa(JSON.stringify(snapshot));
-  } catch (e) {
-    console.error(e);
+  } catch (error) {
+    console.error(error);
     return '';
   }
 };
@@ -66,7 +68,7 @@ export const deserializeGame = (
       blackCaptures: snapshot.bCaps,
       whiteCaptures: snapshot.wCaps,
     };
-  } catch (e) {
+  } catch {
     return null;
   }
 };

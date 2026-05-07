@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import * as ort from 'onnxruntime-web';
-import { MicroBoard, type Sign, type Point } from '../../utils/micro-board';
+import { MicroBoard, type Sign } from '../../utils/micro-board';
 
 export interface OnnxEngineConfig {
     modelPath: string;
@@ -14,7 +16,7 @@ export interface EngineAnalysisOptions {
     komi?: number;
     history?: { color: Sign; x: number; y: number }[];
     parent?: { color: Sign; x: number; y: number }[]; 
-    difficulty?: 'Easy' | 'Medium' | 'Hard'; // kept for logging
+    difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard'; // kept for logging
     temperature?: number; // [New] Softmax scaling
 }
 
@@ -130,7 +132,7 @@ export class OnnxEngine {
                     const total = this.config.modelParts.length;
                     onProgress?.(`正在下载模型 (${completed}/${total})...`);
 
-                    const buffers = await Promise.all(this.config.modelParts.map(async (partUrl, idx) => {
+                    const buffers = await Promise.all(this.config.modelParts.map(async (partUrl) => {
                         const res = await fetch(partUrl);
                         if (!res.ok) throw new Error(`Failed to fetch part: ${partUrl}`);
                         const buf = await res.arrayBuffer();
@@ -571,10 +573,8 @@ export class OnnxEngine {
             for (const m of moves) maxL = Math.max(maxL, m.logit);
             
             // 2. Sum Exponentials
-            let sumExp = 0;
             const weightedMoves = moves.map(m => {
                 const w = Math.exp((m.logit - maxL) / temperature);
-                sumExp += w;
                 return { ...m, weight: w };
             });
 

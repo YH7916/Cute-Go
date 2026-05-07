@@ -62,7 +62,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   lastMove,
   showQi,
   gameType,
-  gameMode,
   showCoordinates = false,
   extraSVG,
   autoShowQiAt,
@@ -735,7 +734,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const theme = STONE_THEMES[stoneSkin as StoneThemeId] || STONE_THEMES['classic'];
     const isMinimal = theme.id === 'minimal';
     const isSkeuomorphic = theme.id === 'skeuomorphic' || theme.useGradientFill;
-    const isGomoku = gameType === 'Gomoku';
     // [Refactor] "Separate" rendering path applied for Gomoku OR explicit separate setting
     // In this mode, we render stones individually with their own filters
     // [Fix] User requested Gomoku essentially behaves as "Separate Pieces" by default
@@ -995,7 +993,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   return (
     <div 
-        className="relative flex justify-center items-center w-full h-full max-w-full aspect-square rounded-xl overflow-hidden border-4 border-[#cba367] bg-[#e3c086] touch-none shadow-xl"
+        className="relative flex justify-center items-center w-full h-full max-w-full aspect-square rounded-xl overflow-hidden border-4 border-[#b88742] bg-[#e3c086] touch-none shadow-xl"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={() => {
@@ -1046,9 +1044,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         <div 
             className="absolute inset-0 transition-all duration-300"
             style={{
-                background: BOARD_THEMES[boardSkin as BoardThemeId]?.background || '#e3c086',
+                backgroundColor: BOARD_THEMES[boardSkin as BoardThemeId]?.background || '#e3c086',
                 backgroundImage: BOARD_THEMES[boardSkin as BoardThemeId]?.backgroundImage,
                 backgroundSize: BOARD_THEMES[boardSkin as BoardThemeId]?.backgroundSize,
+                backgroundRepeat: 'repeat',
                 zIndex: 0
             }}
         />

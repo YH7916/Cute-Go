@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * TapTap SDK Bridge Utility
  * Handles interactions with the global 'tap' object provided by TapTap environment.
@@ -9,6 +11,86 @@ declare global {
     tap?: any;
   }
 }
+
+type TapBattleManager = {
+  connect?: () => Promise<any>;
+  createRoom?: (options: Record<string, unknown>) => Promise<any>;
+  disconnect?: () => Promise<void>;
+  joinRoom?: (options: Record<string, unknown>) => Promise<any>;
+  registerListener?: (listeners: Record<string, unknown>) => void;
+  matchRoom?: (options: Record<string, unknown>) => Promise<any>;
+  sendCustomMessage?: (options: Record<string, unknown>) => Promise<any> | void;
+  leaveRoom?: () => Promise<void>;
+};
+
+export interface TapBattleRoomPlayer {
+  id: string;
+  customProperties?: string;
+}
+
+export interface TapBattleRoomInfo {
+  id: string;
+  ownerId?: string;
+  players: TapBattleRoomPlayer[];
+}
+
+export interface TapBattleMatchResult {
+  playerId: string;
+  roomInfo: TapBattleRoomInfo;
+  isHost: boolean;
+}
+
+export interface TapBattleListeners {
+  onDisconnected?: (info: any) => void;
+  playerEnterRoom?: (info: any) => void;
+  playerLeaveRoom?: (info: any) => void;
+  playerOffline?: (info: any) => void;
+  onCustomMessage?: (info: any) => void;
+}
+
+const resolveBattlePlayerId = (connectResult: any) =>
+  connectResult?.playerId || connectResult?.id || connectResult?.playerInfo?.id || null;
+
+const resolveRoomInfo = (result: any): TapBattleRoomInfo | null =>
+  result?.roomInfo || result?.data?.roomInfo || result?.room || result?.data || null;
+
+const resolveRoomPlayer = (info: any) =>
+  info?.playerInfo || info?.data?.playerInfo || info?.player || info?.data?.player || null;
+
+export const getTapTapRoomPlayerInfo = resolveRoomPlayer;
+
+export const getTapTapRoomMessagePayload = (info: any) =>
+  info?.msg || info?.message || info?.content || info?.data?.msg || info?.data?.message || info?.data?.content;
+
+const buildBattlePlayerConfig = (playerProperties: Record<string, unknown>) => ({
+  customProperties: JSON.stringify(playerProperties),
+});
+
+const buildBattleRoomConfig = (roomType: string) => ({
+  maxPlayerCount: 2,
+  type: roomType,
+  matchParams: {},
+});
+
+const toBattleMatchResult = (
+  playerId: string,
+  rawRoomInfo: any
+): TapBattleMatchResult | null => {
+  const roomInfo = rawRoomInfo
+    ? {
+      ...rawRoomInfo,
+      id: rawRoomInfo.id ?? rawRoomInfo.roomId ?? rawRoomInfo.roomID,
+      ownerId: rawRoomInfo.ownerId ?? rawRoomInfo.ownerID ?? rawRoomInfo.masterId ?? rawRoomInfo.masterID,
+      players: rawRoomInfo.players ?? rawRoomInfo.playerList ?? [],
+    }
+    : null;
+  if (!roomInfo?.id) return null;
+  return {
+    playerId,
+    roomInfo,
+    isHost: roomInfo.ownerId === playerId,
+  };
+};
 
 // TapTap Leaderboard ID from user configuration
 const ELO_LEADERBOARD_ID = 'bl6pglf32l46qbfwo5';
@@ -88,6 +170,12 @@ const getTap = () => {
   return null;
 };
 
+const getTapOnlineBattleManager = (): TapBattleManager | null => {
+  const tap = getTap();
+  if (!tap?.getOnlineBattleManager) return null;
+  return tap.getOnlineBattleManager();
+};
+
 /**
  * TapTap Login
  * Returns the user info including unionId
@@ -114,7 +202,7 @@ export const tapLogin = async () => {
     try {
         console.log('[TapTapBridge] Retrying tap.login() without scopes...');
         return await tap.login();
-    } catch (e) {
+    } catch {
         return null;
     }
   }
@@ -218,11 +306,10 @@ export const getTapPlayerId = async () => {
  * Disconnect Tap (Cleanup for session issues)
  */
 export const disconnectTap = async () => {
-  const tap = getTap();
-  if (tap && tap.getOnlineBattleManager) {
+  const manager = getTapOnlineBattleManager();
+  if (manager) {
     try {
-      const manager = tap.getOnlineBattleManager();
-      if (manager && manager.disconnect) {
+      if (manager.disconnect) {
         await manager.disconnect();
         console.log('[TapTapBridge] OnlineBattleManager disconnected');
       }
@@ -328,7 +415,144 @@ export const tapOpenPrivacyContract = async () => {
             console.warn('[TapTapBridge] Failed to open privacy contract:', e);
         }
     }
+  return false;
+};
+
+export const startTapTapNativeMatch = async (
+  roomType: string,
+  playerProperties: Record<string, unknown>,
+  listeners: TapBattleListeners = {}
+): Promise<TapBattleMatchResult | null> => {
+  const manager = getTapOnlineBattleManager();
+  if (!manager?.connect || !manager?.matchRoom) {
+    console.warn('[TapTapBridge] OnlineBattleManager connect/matchRoom is unavailable');
+    return null;
+  }
+
+  manager.registerListener?.(listeners as unknown as Record<string, unknown>);
+
+  const connectResult = await manager.connect();
+  const playerId = resolveBattlePlayerId(connectResult);
+  if (!playerId) {
+    console.warn('[TapTapBridge] connect() returned no playerId');
+    return null;
+  }
+
+  const matchResult = await manager.matchRoom({
+    data: {
+      roomCfg: buildBattleRoomConfig(roomType),
+      playerCfg: buildBattlePlayerConfig(playerProperties),
+    },
+  });
+
+  const result = toBattleMatchResult(playerId, resolveRoomInfo(matchResult));
+  if (!result) {
+    console.warn('[TapTapBridge] matchRoom() returned invalid roomInfo');
+    return null;
+  }
+
+  return result;
+};
+
+export const createTapTapNativeRoom = async (
+  roomType: string,
+  playerProperties: Record<string, unknown>,
+  listeners: TapBattleListeners = {}
+): Promise<TapBattleMatchResult | null> => {
+  const manager = getTapOnlineBattleManager();
+  if (!manager?.connect || !manager?.createRoom) {
+    console.warn('[TapTapBridge] OnlineBattleManager connect/createRoom is unavailable');
+    return null;
+  }
+
+  manager.registerListener?.(listeners as unknown as Record<string, unknown>);
+
+  const connectResult = await manager.connect();
+  const playerId = resolveBattlePlayerId(connectResult);
+  if (!playerId) {
+    console.warn('[TapTapBridge] connect() returned no playerId');
+    return null;
+  }
+
+  const createResult = await manager.createRoom({
+    data: {
+      roomCfg: buildBattleRoomConfig(roomType),
+      playerCfg: buildBattlePlayerConfig(playerProperties),
+    },
+  });
+
+  const result = toBattleMatchResult(playerId, resolveRoomInfo(createResult));
+  if (!result) {
+    console.warn('[TapTapBridge] createRoom() returned invalid roomInfo');
+    return null;
+  }
+
+  return result;
+};
+
+export const joinTapTapNativeRoom = async (
+  roomId: string,
+  playerProperties: Record<string, unknown>,
+  listeners: TapBattleListeners = {}
+): Promise<TapBattleMatchResult | null> => {
+  const manager = getTapOnlineBattleManager();
+  if (!manager?.connect || !manager?.joinRoom) {
+    console.warn('[TapTapBridge] OnlineBattleManager connect/joinRoom is unavailable');
+    return null;
+  }
+
+  manager.registerListener?.(listeners as unknown as Record<string, unknown>);
+
+  const connectResult = await manager.connect();
+  const playerId = resolveBattlePlayerId(connectResult);
+  if (!playerId) {
+    console.warn('[TapTapBridge] connect() returned no playerId');
+    return null;
+  }
+
+  const joinResult = await manager.joinRoom({
+    data: {
+      roomId,
+      playerCfg: buildBattlePlayerConfig(playerProperties),
+    },
+  });
+
+  const result = toBattleMatchResult(playerId, resolveRoomInfo(joinResult));
+  if (!result) {
+    console.warn('[TapTapBridge] joinRoom() returned invalid roomInfo');
+    return null;
+  }
+
+  return result;
+};
+
+export const sendTapTapRoomMessage = async (payload: unknown): Promise<boolean> => {
+  const manager = getTapOnlineBattleManager();
+  if (!manager?.sendCustomMessage) return false;
+
+  try {
+    await manager.sendCustomMessage({
+      data: {
+        msg: JSON.stringify(payload),
+        type: 0,
+      },
+    });
+    return true;
+  } catch (error) {
+    console.warn('[TapTapBridge] sendCustomMessage failed:', error);
     return false;
+  }
+};
+
+export const leaveTapTapRoom = async () => {
+  const manager = getTapOnlineBattleManager();
+  if (!manager?.leaveRoom) return;
+
+  try {
+    await manager.leaveRoom();
+  } catch (error) {
+    console.warn('[TapTapBridge] leaveRoom failed:', error);
+  }
 };
 
 /**

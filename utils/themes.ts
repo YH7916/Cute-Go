@@ -1,4 +1,4 @@
-export type BoardThemeId = 'wood' | 'realistic_wood';
+export type BoardThemeId = 'wood' | 'realistic_wood' | 'sakura_wood';
 export type StoneThemeId = 'classic' | 'skeuomorphic' | 'minimal';
 
 export interface BoardTheme {
@@ -48,6 +48,17 @@ export const BOARD_THEMES: Record<BoardThemeId, BoardTheme> = {
     labelColor: '#2d1b0e',
     starPointColor: '#2d1b0e',
     borderColor: '#e3c086'
+  },
+  sakura_wood: {
+    id: 'sakura_wood',
+    name: '樱花木',
+    background: '#e4bcc7',
+    backgroundImage: 'radial-gradient(circle, #dcaeb9 10%, transparent 10.5%)',
+    backgroundSize: '20px 20px',
+    lineColor: '#62444d',
+    labelColor: '#62444d',
+    starPointColor: '#62444d',
+    borderColor: '#e4bcc7'
   }
 };
 
