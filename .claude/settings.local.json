@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(gsd-explore)",
+      "Skill(gsd-new-project)",
+      "Bash(claude --dangerously-skip-permissions /plugin install superpowers@claude-plugins-official)",
+      "Bash(git checkout *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(ls D:\\\\\\\\Projects\\\\\\\\Games\\\\\\\\Cute-Go_Windows\\\\\\\\src\\\\\\\\ *)"
+    ]
+  }
+}

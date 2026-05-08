@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "taptap-minigame": {
+      "command": "npx",
+      "args": ["-y", "@mikoto_zero/minigame-open-mcp"],
+      "env": {
+        "TAPTAP_MCP_ENV": "production",
+        "TAPTAP_MCP_WORKSPACE_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}

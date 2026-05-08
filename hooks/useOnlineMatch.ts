@@ -80,6 +80,15 @@ export const useOnlineMatch = ({
   const matchTimerRef = useRef<number | null>(null);
   const liveMatchRef = useRef<PlatformLiveMatchSession | null>(null);
   const isManualDisconnect = useRef(false);
+  const matchmakingRequestIdRef = useRef(0);
+  const activeRoomConfigRef = useRef<{ boardSize: BoardSize; gameType: GameType } | null>(null);
+
+  const stopMatchTimer = useCallback(() => {
+    if (matchTimerRef.current) {
+      clearInterval(matchTimerRef.current);
+      matchTimerRef.current = null;
+    }
+  }, []);
 
   const sendData = useCallback((msg: NativeMatchMessage) => {
     if (liveMatchRef.current) {
@@ -103,6 +112,7 @@ export const useOnlineMatch = ({
     setRoomId(null);
     setIsCreatingRoom(false);
     setIsJoiningRoom(false);
+    activeRoomConfigRef.current = null;
   }, []);
 
   const handleNativeRoomMessage = useCallback((msg: NativeMatchMessage) => {
@@ -112,6 +122,7 @@ export const useOnlineMatch = ({
       settings.setBoardSize(msg.boardSize);
       boardSizeRef.current = msg.boardSize;
       settings.setGameType(msg.gameType);
+      gameTypeRef.current = msg.gameType;
       setMyColor(msg.startColor);
       if (msg.opponentInfo) {
         setOpponentProfile(msg.opponentInfo);
@@ -131,26 +142,31 @@ export const useOnlineMatch = ({
     else if (msg.type === 'RESTART') {
       resetGameRef.current(true, undefined, false);
     }
-  }, [boardSizeRef, executeMoveRef, handlePassRef, resetGameRef, session, settings, vibrate]);
+  }, [boardSizeRef, executeMoveRef, gameTypeRef, handlePassRef, resetGameRef, session, settings, vibrate]);
 
-  const startNativeHostGame = useCallback(async () => {
+  const startNativeHostGame = useCallback(async (boardSize = boardSizeRef.current, gameType = gameTypeRef.current) => {
     if (!liveMatchRef.current || !session) return;
     setOnlineStatus('connected');
     setIsMatching(false);
+    stopMatchTimer();
     setShowOnlineMenu(false);
     setShowMenu(false);
     setShowStartScreen(false);
+    settings.setBoardSize(boardSize);
+    boardSizeRef.current = boardSize;
+    settings.setGameType(gameType);
+    gameTypeRef.current = gameType;
     settings.setGameMode('PvP');
     setMyColor('white');
-    resetGameRef.current(true, boardSizeRef.current, false);
+    resetGameRef.current(true, boardSize, false);
     await liveMatchRef.current.send({
       type: 'SYNC',
-      boardSize: boardSizeRef.current,
-      gameType: gameTypeRef.current,
+      boardSize,
+      gameType,
       startColor: 'black',
       opponentInfo: { id: session.user.id },
     });
-  }, [boardSizeRef, gameTypeRef, resetGameRef, session, setShowMenu, setShowStartScreen, settings]);
+  }, [boardSizeRef, gameTypeRef, resetGameRef, session, setShowMenu, setShowStartScreen, settings, stopMatchTimer]);
 
   const buildNativeRoomHandlers = useCallback(() => ({
     onMessage: (payload: unknown) => {
@@ -163,7 +179,8 @@ export const useOnlineMatch = ({
       }
       setOpponentProfile(peer);
       if (liveMatchRef.current?.isHost) {
-        void startNativeHostGame();
+        const roomConfig = activeRoomConfigRef.current;
+        void startNativeHostGame(roomConfig?.boardSize, roomConfig?.gameType);
       }
     },
     onPeerLeave: () => {
@@ -192,16 +209,19 @@ export const useOnlineMatch = ({
       return;
     }
 
+    const requestId = matchmakingRequestIdRef.current + 1;
+    matchmakingRequestIdRef.current = requestId;
+    const gameTypeToMatch = settings.gameType;
+
+    cleanupOnline();
+    activeRoomConfigRef.current = { boardSize: sizeToMatch, gameType: gameTypeToMatch };
     setMatchBoardSize(sizeToMatch);
-    settings.setBoardSize(sizeToMatch);
-    boardSizeRef.current = sizeToMatch;
     setIsMatching(true);
     setMatchTime(0);
-    cleanupOnline();
 
     matchTimerRef.current = window.setInterval(() => setMatchTime(prev => prev + 1), 1000);
 
-    const roomType = `${settings.gameType.toLowerCase()}_${sizeToMatch}`;
+    const roomType = `${gameTypeToMatch.toLowerCase()}_${sizeToMatch}`;
     let matchResult: PlatformLiveMatchSession | null = null;
     try {
       matchResult = platform.multiplayer.startNativeMatch
@@ -212,22 +232,24 @@ export const useOnlineMatch = ({
         }), 'TapTap 匹配超时')
         : null;
     } catch (error) {
+      if (requestId !== matchmakingRequestIdRef.current) return;
       console.warn('[Online] matchmaking failed:', error);
       setIsMatching(false);
-      if (matchTimerRef.current) {
-        clearInterval(matchTimerRef.current);
-        matchTimerRef.current = null;
-      }
+      stopMatchTimer();
+      activeRoomConfigRef.current = null;
       setToastMsg('TapTap 匹配超时，请稍后重试');
+      return;
+    }
+
+    if (requestId !== matchmakingRequestIdRef.current) {
+      void matchResult?.leave();
       return;
     }
 
     if (!matchResult) {
       setIsMatching(false);
-      if (matchTimerRef.current) {
-        clearInterval(matchTimerRef.current);
-        matchTimerRef.current = null;
-      }
+      stopMatchTimer();
+      activeRoomConfigRef.current = null;
       setToastMsg('TapTap 匹配失败');
       return;
     }
@@ -238,17 +260,14 @@ export const useOnlineMatch = ({
       setOpponentProfile(matchResult.peers[0]);
       setOnlineStatus('connected');
       setIsMatching(false);
-      if (matchTimerRef.current) {
-        clearInterval(matchTimerRef.current);
-        matchTimerRef.current = null;
-      }
+      stopMatchTimer();
       setShowOnlineMenu(false);
       setShowMenu(false);
       setShowStartScreen(false);
       settings.setGameMode('PvP');
 
       if (matchResult.isHost) {
-        await startNativeHostGame();
+        await startNativeHostGame(sizeToMatch, gameTypeToMatch);
       }
     } else {
       setOnlineStatus('connecting');
@@ -264,6 +283,7 @@ export const useOnlineMatch = ({
     setShowStartScreen,
     setToastMsg,
     settings,
+    stopMatchTimer,
     userProfile,
   ]);
 
@@ -279,9 +299,9 @@ export const useOnlineMatch = ({
 
     const sizeToUse = boardSizeRef.current;
     setMatchBoardSize(sizeToUse);
-    settings.setBoardSize(sizeToUse);
     setIsCreatingRoom(true);
     cleanupOnline();
+    activeRoomConfigRef.current = { boardSize: sizeToUse, gameType: settings.gameType };
 
     const roomType = `${settings.gameType.toLowerCase()}_${sizeToUse}`;
     let room: PlatformLiveMatchSession | null = null;
@@ -294,6 +314,7 @@ export const useOnlineMatch = ({
     } catch (error) {
       console.warn('[Online] createRoom failed:', error);
       setIsCreatingRoom(false);
+      activeRoomConfigRef.current = null;
       setToastMsg('创建房间失败，请稍后重试');
       return;
     }
@@ -301,6 +322,7 @@ export const useOnlineMatch = ({
     setIsCreatingRoom(false);
 
     if (!room) {
+      activeRoomConfigRef.current = null;
       setToastMsg('创建房间失败');
       return;
     }
@@ -382,14 +404,13 @@ export const useOnlineMatch = ({
   ]);
 
   const cancelMatchmaking = useCallback(async () => {
-    if (matchTimerRef.current) {
-      clearInterval(matchTimerRef.current);
-      matchTimerRef.current = null;
-    }
+    matchmakingRequestIdRef.current += 1;
+    stopMatchTimer();
     setIsMatching(false);
     setMatchTime(0);
+    activeRoomConfigRef.current = null;
     cleanupOnline();
-  }, [cleanupOnline]);
+  }, [cleanupOnline, stopMatchTimer]);
 
   const startMatchmaking = useCallback(async (sizeOverride?: BoardSize) => {
     if (!session || !userProfile) {

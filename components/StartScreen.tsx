@@ -69,9 +69,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                     ) : (
                         <GomokuContent
                             onStartGame={onStartGame}
-                            onOpenTutorial={onOpenTutorial}
                             onOpenOnline={onOpenOnline}
-                            onStartSetup={onStartSetup}
                             onOpenUserPage={onOpenUserPage}
                             onOpenSkinShop={onOpenSkinShop}
                         />
@@ -191,16 +189,13 @@ const GoContent: React.FC<GoContentProps> = ({
 
 interface GomokuContentProps {
     onStartGame: StartGameHandler;
-    onOpenTutorial: () => void;
     onOpenOnline: () => void;
-    onStartSetup: () => void;
     onOpenUserPage: () => void;
     onOpenSkinShop: () => void;
 }
 
 const GomokuContent: React.FC<GomokuContentProps> = ({
-    onStartGame, onOpenTutorial, onOpenOnline,
-    onStartSetup, onOpenUserPage, onOpenSkinShop,
+    onStartGame, onOpenOnline, onOpenUserPage, onOpenSkinShop,
 }) => (
     <>
         <div className="grid grid-cols-1 gap-3 w-full lg:w-4/5">
@@ -237,8 +232,6 @@ const GomokuContent: React.FC<GomokuContentProps> = ({
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full lg:w-4/5">
             <FeatureButton icon={Palette} label="外观商店" onClick={onOpenSkinShop} color="btn-beige" />
-            <FeatureButton icon={PenTool} label="电子挂盘" onClick={onStartSetup} color="btn-beige" />
-            <FeatureButton icon={BookOpen} label="新手教程" onClick={onOpenTutorial} color="btn-beige" />
             <FeatureButton icon={UserIcon} label="个人中心" onClick={onOpenUserPage} color="btn-beige" />
         </div>
     </>
