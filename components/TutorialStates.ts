@@ -56,6 +56,12 @@ export const TUTORIAL_STEPS = [
         content: "“金角银边草肚皮”。开局抢占角部效率最高。\n请在棋盘角上的星位（高亮处）落子，然后我们试试经典的“小飞守角”。",
         puzzleType: 'final_shape',
         boardSize: 9
+    },
+    {
+        title: "下一步怎么玩",
+        content: "新手建议先用“娱乐模式”练一局，再去挑战 AI。\n棋盘支持双指缩放；设置里还能打开坐标、气显示、胜率显示等选项，改完直接关闭设置即可生效，不需要重开软件。",
+        puzzleType: 'next_play',
+        boardSize: 9
     }
 ];
 
@@ -143,6 +149,12 @@ export const initTutorialStep = (stepIdx: number): TutorialInitResult => {
     }
     else if (type === 'final_shape') {
         board[2][6] = { x: 6, y: 2, color: 'white', id: 'tut-w-corner' };
+    }
+    else if (type === 'next_play') {
+        board[2][2] = { x: 2, y: 2, color: 'black', id: 'next-b-1' };
+        board[6][6] = { x: 6, y: 6, color: 'white', id: 'next-w-1' };
+        board[3][4] = { x: 4, y: 3, color: 'black', id: 'next-b-2' };
+        isCompleted = true;
     }
 
     return { board, showQiOverride, qiFocus, isCompleted, setupType: type };

@@ -11,9 +11,13 @@ const loadState = <T,>(key: string, fallback: T): T => {
   }
 };
 
+const DEFAULT_BEGINNER_DIFFICULTY: Difficulty = 'Fun';
+
 const loadDifficulty = (): Difficulty => {
-  const saved = loadState<string>('difficulty', 'Easy');
-  return saved === 'Fun' || saved === 'Medium' || saved === 'Hard' ? saved : 'Easy';
+  const saved = loadState<string>('difficulty', DEFAULT_BEGINNER_DIFFICULTY);
+  return saved === 'Fun' || saved === 'Easy' || saved === 'Medium' || saved === 'Hard'
+    ? saved
+    : DEFAULT_BEGINNER_DIFFICULTY;
 };
 
 const loadStoneSkin = (): StoneThemeId => {
