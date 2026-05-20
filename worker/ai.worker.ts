@@ -9,7 +9,6 @@ import {
     GOMOKU_SCORES,
     attemptMove,
     getBoardHash,
-    calculateModelScore,
     getBeginnerAIMove,
 } from '../utils/goLogic';
 import { BoardState, Player, Point } from '../types';
@@ -75,6 +74,11 @@ const clampPercent = (value: number) => {
 const toBlackPerspectiveWinRate = (winRate: number, toPlay: Player) =>
     toPlay === 'black' ? clampPercent(winRate) : clampPercent(100 - winRate);
 
+const toBlackPerspectiveLead = (lead: number, toPlay: Player) => {
+    if (!Number.isFinite(lead)) return 0;
+    return toPlay === 'black' ? lead : -lead;
+};
+
 const sampleIndexByWeight = (weights: number[]) => {
     const total = weights.reduce((sum, weight) => sum + weight, 0);
     if (total <= 0) return 0;
@@ -103,6 +107,7 @@ type SearchNode = {
     prior: number;
     visits: number;
     valueSum: number;
+    scoreSum: number;
     children: SearchNode[];
     expanded: boolean;
     analysis: AnalysisResult | null;
@@ -186,6 +191,7 @@ const expandSearchNode = (
             prior: Math.max(move.prior, 0.0001),
             visits: 0,
             valueSum: 0,
+            scoreSum: 0,
             children: [],
             expanded: false,
             analysis: null
@@ -215,6 +221,7 @@ const runOwnershipSearch = async (
         prior: 1,
         visits: 0,
         valueSum: 0,
+        scoreSum: 0,
         children: [],
         expanded: false,
         analysis: null
@@ -249,11 +256,14 @@ const runOwnershipSearch = async (
         }
 
         let value = Math.max(0, Math.min(1, analysis.rootInfo.winrate / 100));
+        let scoreLead = Number.isFinite(analysis.rootInfo.lead) ? analysis.rootInfo.lead : 0;
         let current: SearchNode | null = node;
         while (current) {
             current.visits += 1;
             current.valueSum += value;
+            current.scoreSum += scoreLead;
             value = 1 - value;
+            scoreLead = -scoreLead;
             current = current.parent;
         }
     }
@@ -274,7 +284,7 @@ const runOwnershipSearch = async (
     return {
         move: bestChild?.move ?? null,
         winRate: root.visits > 0 ? (root.valueSum / root.visits) * 100 : fallbackAnalysis.rootInfo.winrate,
-        lead: fallbackAnalysis.rootInfo.lead,
+        lead: root.visits > 0 ? root.scoreSum / root.visits : fallbackAnalysis.rootInfo.lead,
         scoreStdev: fallbackAnalysis.rootInfo.scoreStdev,
         ownership: averagedOwnership,
         visits: root.visits
@@ -685,10 +695,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     simulations
                 );
 
-                const blackLead = (() => {
-                    const score = calculateModelScore(boardState as BoardState, analyzed.ownership ?? null, effectiveKomi);
-                    return score.black - score.white;
-                })();
+                const blackLead = toBlackPerspectiveLead(analyzed.lead, color);
                 // 直接用模型输出的真实胜率，不用 lead 推算
                 const blackWinRate = toBlackPerspectiveWinRate(analyzed.winRate, color);
 
@@ -770,12 +777,61 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             if (selectedMove === undefined) selectedMove = null; // Safety
 
             const isPass = selectedMove === null;
-            const blackLead = (() => {
-                const score = calculateModelScore(boardState as BoardState, result.rootInfo.ownership ?? null, effectiveKomi);
-                return score.black - score.white;
-            })();
+            let displayWinRate = result.rootInfo.winrate;
+            let displayLead = result.rootInfo.lead;
+            let displayScoreStdev = result.rootInfo.scoreStdev;
+            let displayOwnership = result.rootInfo.ownership;
+            let displayToPlay: Player = color;
+
+            // The selected move is chosen from the pre-move position, but the UI should
+            // show the evaluation of the board the user will actually see after AI moves.
+            try {
+                const nextPla: Sign = pla === 1 ? -1 : 1;
+                const nextColor: Player = color === 'black' ? 'white' : 'black';
+                const nextBoard = board.clone();
+                const nextHistory = [...historyMoves, { color: pla, x: selectedMove?.x ?? -1, y: selectedMove?.y ?? -1 }];
+
+                if (selectedMove && selectedMove.x >= 0 && selectedMove.y >= 0) {
+                    nextBoard.play(selectedMove.x, selectedMove.y, pla);
+                } else {
+                    nextBoard.ko = -1;
+                }
+
+                if ((simulations ?? 1) > 1) {
+                    const searched = await runOwnershipSearch(
+                        nextBoard,
+                        nextPla,
+                        nextHistory,
+                        size,
+                        effectiveKomi,
+                        difficulty,
+                        0,
+                        Math.min(simulations ?? 1, MAX_ANALYSIS_VISITS)
+                    );
+                    displayWinRate = searched.winRate;
+                    displayLead = searched.lead;
+                    displayScoreStdev = searched.scoreStdev;
+                    displayOwnership = searched.ownership;
+                } else {
+                    const nextAnalysis = await engine.analyze(nextBoard, nextPla, {
+                        history: nextHistory,
+                        komi: effectiveKomi,
+                        difficulty: difficulty,
+                        temperature: 0
+                    });
+                    displayWinRate = nextAnalysis.rootInfo.winrate;
+                    displayLead = nextAnalysis.rootInfo.lead;
+                    displayScoreStdev = nextAnalysis.rootInfo.scoreStdev;
+                    displayOwnership = nextAnalysis.rootInfo.ownership;
+                }
+                displayToPlay = nextColor;
+            } catch (postMoveError) {
+                console.warn('[AI Worker] Post-move analysis failed, falling back to pre-move evaluation:', postMoveError);
+            }
+
+            const blackLead = toBlackPerspectiveLead(displayLead, displayToPlay);
             // 直接用模型输出的真实胜率，不用 lead 推算
-            const blackWinRate = toBlackPerspectiveWinRate(result.rootInfo.winrate, color);
+            const blackWinRate = toBlackPerspectiveWinRate(displayWinRate, displayToPlay);
 
             // Only log if not null or valid object
             const moveStr = isPass ? 'Pass' : `(${selectedMove.x},${selectedMove.y})`;
@@ -787,8 +843,8 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     move: selectedMove,
                     winRate: blackWinRate,
                     lead: blackLead,
-                    scoreStdev: result.rootInfo.scoreStdev,
-                    ownership: result.rootInfo.ownership
+                    scoreStdev: displayScoreStdev,
+                    ownership: displayOwnership
                 }
             });
         } else if (msg.type === 'stop') {

@@ -14,6 +14,8 @@ interface UseWebKataGoProps {
     onAnalysisComplete?: (data: { winRate: number; lead: number; ownership: Float32Array | null }) => void; // [New] KataGo endgame judgment
 }
 
+const KATAGO_MODEL_PATH = 'models/kata_dynamic.onnx';
+
 export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign: _onAiResign, onAiError, onAnalysisComplete }: UseWebKataGoProps) => {
     const [isWorkerReady, setIsWorkerReady] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +63,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign: _onAiR
             baseUrl = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
         }
 
-        const modelUrl = new URL('models/kata_dynamic.onnx', baseUrl).href;
+        const modelUrl = new URL(KATAGO_MODEL_PATH, baseUrl).href;
         const wasmUrl = new URL('wasm/', baseUrl).href;
 
         // --- 2. Worker config ---
@@ -152,6 +154,9 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign: _onAiR
                         if (move) onAiMove(move.x, move.y);
                         else onAiPass();
                     } else {
+                        setAiWinRate(winRate);
+                        setAiLead(lead ?? null);
+                        setAiScoreStdev(scoreStdev ?? null);
                         console.log("[WebAI] Analysis complete.");
                         if (onAnalysisComplete) {
                             onAnalysisComplete({ winRate, lead: lead ?? 0, ownership: territory });

@@ -94,27 +94,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // --- ACTIVE QI STATE ---
   const [activeQiSegments, setActiveQiSegments] = useState<QiSegment[]>([]);
 
-  // [Perf] Track the ID of the most recently placed stone for animation targeting
-  // This prevents ALL stones from re-animating on every render
-  const [animatingStoneId, setAnimatingStoneId] = useState<string | null>(null);
+  const latestMoveStoneId = useMemo(() => {
+    if (!lastMove) return null;
+    return board[lastMove.y]?.[lastMove.x]?.id ?? null;
+  }, [board, lastMove]);
 
-  // Update animating stone when lastMove changes
+  const [settledStoneId, setSettledStoneId] = useState<string | null>(null);
+  const animatingStoneId = latestMoveStoneId && settledStoneId !== latestMoveStoneId
+    ? latestMoveStoneId
+    : null;
+
   useEffect(() => {
-    if (lastMove) {
-      const stone = board[lastMove.y]?.[lastMove.x];
-      if (stone) {
-        setAnimatingStoneId(stone.id);
-        // Clear after animation completes to prevent re-animation on unrelated re-renders
-        const timer = setTimeout(() => setAnimatingStoneId(null), 450);
-        return () => clearTimeout(timer);
-      }
+    if (!latestMoveStoneId) {
+      setSettledStoneId(null);
+      return;
     }
-  }, [lastMove, board]);
+
+    const timer = setTimeout(() => setSettledStoneId(latestMoveStoneId), 450);
+    return () => clearTimeout(timer);
+  }, [latestMoveStoneId]);
 
   useEffect(() => {
     setTransform({ scale: 1, x: 0, y: 0 });
     setActiveQiSegments([]); // 重置棋盘大小时清除气流
-    setAnimatingStoneId(null);
+    setSettledStoneId(null);
   }, [boardSize, showCoordinates]);
 
   // 当棋盘变化（落子）时，清除之前的气流显示
@@ -422,21 +425,47 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             mood: 'happy' as const,
             color: stone.color,
             scale: 1,
-            lookOffset: { x: 0, y: 0 }
+            lookOffset: { x: 0, y: 0 },
+            stoneIds: [stone.id]
         }));
     }
-
-    // const groups = getAllGroups(board); // Replaced by memo above
-
-    // const groups = getAllGroups(board); // Replaced by memo above
-
-    // [Fix] User requested "One Face Per Group" for Go, even if separate pieces is ON.
-    // Previously, separate pieces mode forced 1 face per stone. We now skip this block for Go.
-    /* 
     if (separatePieces) {
-       // ... (Legacy Separate Face Logic)
+        return groups.flatMap(group => {
+            let mood: 'happy' | 'neutral' | 'worried' = 'happy';
+            if (group.liberties === 1) mood = 'worried';
+            else if (group.liberties <= 3) mood = 'neutral';
+
+            return group.stones.map(stone => {
+                let lookOffset = { x: 0, y: 0 };
+                if (group.libertyPoints && group.libertyPoints.length > 0) {
+                    let lx = 0;
+                    let ly = 0;
+                    group.libertyPoints.forEach(p => {
+                        lx += p.x;
+                        ly += p.y;
+                    });
+                    lx /= group.libertyPoints.length;
+                    ly /= group.libertyPoints.length;
+
+                    const dx = lx - stone.x;
+                    const dy = ly - stone.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                    lookOffset = { x: dx / dist, y: dy / dist };
+                }
+
+                return {
+                    id: stone.id,
+                    x: stone.x,
+                    y: stone.y,
+                    mood,
+                    color: stone.color,
+                    scale: 1,
+                    lookOffset,
+                    stoneIds: [stone.id]
+                };
+            });
+        });
     }
-    */
 
     return groups.map(group => {
         let sumX = 0;
@@ -523,10 +552,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             mood,
             color: group.stones[0].color,
             scale: 1 + sizeBonus,
-            lookOffset
+            lookOffset,
+            stoneIds: group.stones.map(s => s.id)
         };
     });
-  }, [board, gameType, stones]);
+  }, [gameType, groups, separatePieces, stones]);
 
   const renderGridLines = () => {
     const lines = [];
@@ -766,38 +796,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         // [Visual] Slightly reduce radius in separate mode to further ensure separation
         const radius = useSeparateRendering ? STONE_RADIUS * 0.95 : STONE_RADIUS;
 
-        // NOTE: Skeuomorphic theme now uses the same path as Minimal (multi-layer shadow)
-        // but is handled in the if/else block at the end of renderStoneBody, NOT here.
-        // This ensures it goes through PATH B (Connected Groups) for stone fusion effect.
-
-        // --- PATH B: Separate Rendering (Gomoku / Separate Mode - Classic) ---
-        if (useSeparateRendering && !isSkeuomorphic && !isMinimal) {
+        // NOTE: When independent mode is off, Skeuomorphic uses the same connected-group path
+        // as Minimal so both can keep the fused-stone effect.
+        if (useSeparateRendering) {
             const myStones = stones.filter(s => s.color === color);
-            // [Optimization] Use Radial Gradients + Simple Shadow instead of Filters
-            // This is effectively instant to render (Vector vs Raster Filter)
-            const isBlack = color === 'black';
-            const fillUrl = isBlack ? 'url(#grad-separate-black)' : 'url(#grad-separate-white)';
-            const shadowColor = isBlack ? 'rgba(0,0,0,0.5)' : 'rgba(92,64,51,0.3)';
-            
-            // Note: SVG 2.0 supports `drop-shadow` CSS filter which is hardware accelerated
-            const simpleShadow = `drop-shadow(1px 2px 2px ${shadowColor})`; 
 
             return (
-                <g style={{ filter: simpleShadow }} opacity={opacity}>
-                        {myStones.map(s => (
+                <g opacity={opacity}>
+                    {myStones.map(s => (
+                        <g
+                            key={`${color}-separate-stone-${s.id}-${drawColor}`}
+                            filter={filterId}
+                            style={styleFilter}
+                        >
                             <circle
-                                key={`${color}-stone-${s.id}-${drawColor}`}
                                 cx={GRID_PADDING + s.x * CELL_SIZE}
                                 cy={GRID_PADDING + s.y * CELL_SIZE}
                                 r={radius}
-                                fill={fillUrl}
-                                // Stroke is usually not needed for gradient stones unless high contrast needed
+                                fill={drawColor}
                                 stroke={effectiveStroke}
                                 strokeWidth={effectiveStrokeWidth}
-                                // [Perf] Animate only the new stone
                                 className={animatingStoneId === s.id ? 'stone-enter' : undefined}
                             />
-                        ))}
+                        </g>
+                    ))}
                 </g>
             );
         }
@@ -924,8 +946,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         const baseColor = color === 'black' ? theme.blackColor : theme.whiteColor;
         const isGomoku = gameType === 'Gomoku';
 
-        // Gomoku: no silk lines
-        if (isGomoku) return null;
+        // Gomoku and explicit independent-stone mode do not draw connection silk.
+        if (isGomoku || separatePieces) return null;
 
         // [Perf] Use CSS drop-shadow instead of SVG goo-silk filter.
         // SVG filters force full re-rasterization on any geometry change (like stroke-width anim).
@@ -962,16 +984,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const renderedWhiteStones = useMemo(() => renderStoneBody('white'),
     [stones, groups, connections, stoneSkin, gameType, separatePieces, CELL_SIZE, GRID_PADDING, STONE_RADIUS, animatingStoneId]);
   const renderedBlackSilk = useMemo(() => renderLooseSilk('black'),
-    [connections, stoneSkin, gameType, CELL_SIZE, GRID_PADDING, STONE_RADIUS]);
+    [connections, stoneSkin, gameType, separatePieces, CELL_SIZE, GRID_PADDING, STONE_RADIUS]);
   const renderedWhiteSilk = useMemo(() => renderLooseSilk('white'),
-    [connections, stoneSkin, gameType, CELL_SIZE, GRID_PADDING, STONE_RADIUS]);
+    [connections, stoneSkin, gameType, separatePieces, CELL_SIZE, GRID_PADDING, STONE_RADIUS]);
   const renderedFaces = useMemo(() => (
     <g>
-    {groupFaces.map(face => (
-        <g 
-            key={`face-group-${face.id}`} 
-            className="face-enter transition-all duration-300 ease-out"
-            style={{ 
+    {groupFaces.map(face => {
+      const isEnteringFace = animatingStoneId !== null && face.stoneIds.includes(animatingStoneId);
+      return (
+        <g
+            key={`face-group-${face.id}`}
+            className={`transition-transform duration-200 ease-out ${isEnteringFace ? 'face-sync-enter' : ''}`}
+            style={{
                 transformOrigin: 'center',
                 transform: `translate(${GRID_PADDING + face.x * CELL_SIZE}px, ${GRID_PADDING + face.y * CELL_SIZE}px)`
             }}
@@ -987,9 +1011,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 />
             </g>
         </g>
-    ))}
+      );
+    })}
     </g>
-  ), [groupFaces, CELL_SIZE, GRID_PADDING]);
+  ), [groupFaces, CELL_SIZE, GRID_PADDING, animatingStoneId]);
 
   return (
     <div 
@@ -1031,6 +1056,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         .animate-dash-flow {
             stroke-dasharray: 4, 6;
             animation: dashFlow 1s linear infinite;
+        }
+
+        @keyframes faceSyncEnter {
+            0%, 35% { opacity: 0; }
+            60%, 100% { opacity: 1; }
+        }
+        .face-sync-enter {
+            opacity: 0;
+            animation: faceSyncEnter 0.4s ease-out forwards;
         }
       `}</style>
       <div 
@@ -1113,16 +1147,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     <feComposite in="shadow" in2="blob" operator="over" result="shadowedBlob"/>
                     <feComposite in="specularInBlob" in2="shadowedBlob" operator="over" />
                 </filter>
-
-                {/* [Optimized] Gradients for Separate/Gomoku mode (Zero Performance Cost) */}
-                <radialGradient id="grad-separate-black" cx="30%" cy="30%" r="50%" fx="30%" fy="30%">
-                    <stop offset="0%" stopColor="#666666" />
-                    <stop offset="100%" stopColor="#000000" />
-                </radialGradient>
-                <radialGradient id="grad-separate-white" cx="35%" cy="35%" r="50%" fx="35%" fy="35%">
-                    <stop offset="0%" stopColor="#ffffff" />
-                    <stop offset="100%" stopColor="#e0e0e0" />
-                </radialGradient>
 
                 {/* Skeuomorphic uses solid colors + shadow layers, no gradients needed */}
 

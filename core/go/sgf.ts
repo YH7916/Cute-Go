@@ -80,9 +80,9 @@ export const generateSGF = (
   initialStones: { x: number; y: number; color: Player }[] = []
 ): string => {
   const date = new Date().toISOString().split('T')[0];
-  let sgf = `(;GM[1]FF[4]CA[UTF-8]AP[CuteGo:1.0]ST[2]\n`;
+  let sgf = `(;GM[1]FF[4]CA[UTF-8]ST[2]\n`;
   sgf += `RU[Chinese]SZ[${boardSize}]KM[${komi}]\n`;
-  sgf += `DT[${date}]PW[White]PB[Black]GN[CuteGo Game]\n`;
+  sgf += `DT[${date}]PW[White]PB[Black]\n`;
 
   const toSgfCoord = (c: number) => String.fromCharCode(97 + c);
 
@@ -100,10 +100,10 @@ export const generateSGF = (
 
   history.forEach(h => {
     const color = h.currentPlayer === 'black' ? 'B' : 'W';
-    if (h.lastMove) {
-      const moveStr = toSgfCoord(h.lastMove.x) + toSgfCoord(h.lastMove.y);
-      sgf += `;${color}[${moveStr}]`;
-    }
+    const moveStr = h.lastMove
+      ? toSgfCoord(h.lastMove.x) + toSgfCoord(h.lastMove.y)
+      : '';
+    sgf += `;${color}[${moveStr}]`;
   });
 
   sgf += ')';
@@ -173,11 +173,11 @@ export const parseSGF = (
         const nextPlayer = player === 'black' ? 'white' : 'black';
         history.push({
           board,
-          currentPlayer: nextPlayer,
+          currentPlayer: player,
           lastMove: null,
           blackCaptures,
           whiteCaptures,
-          consecutivePasses: consecutivePasses + 1,
+          consecutivePasses,
         });
         consecutivePasses++;
         currentPlayer = nextPlayer;
@@ -190,19 +190,20 @@ export const parseSGF = (
       if (x >= 0 && x < size && y >= 0 && y < size) {
         const result = attemptMove(board, x, y, player);
         if (result) {
+          history.push({
+            board,
+            currentPlayer: player,
+            lastMove: { x, y },
+            blackCaptures,
+            whiteCaptures,
+            consecutivePasses,
+          });
+
           board = result.newBoard;
           if (player === 'black') blackCaptures += result.captured;
           else whiteCaptures += result.captured;
 
           const nextPlayer = player === 'black' ? 'white' : 'black';
-          history.push({
-            board,
-            currentPlayer: nextPlayer,
-            lastMove: { x, y },
-            blackCaptures,
-            whiteCaptures,
-            consecutivePasses: 0,
-          });
           consecutivePasses = 0;
           currentPlayer = nextPlayer;
         }

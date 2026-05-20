@@ -23,8 +23,10 @@ export interface EngineAnalysisOptions {
 export interface AnalysisResult {
     rootInfo: {
         winrate: number;
+        scoreMean: number;
         lead: number;
         scoreStdev: number;
+        varianceTime: number;
         ownership: Float32Array | null; // [New] Territory layout (-1 to 1)
     };
     moves: {
@@ -240,7 +242,7 @@ export class OnnxEngine {
 
         // 填充数据 (不再需要传递 modelBoardSize，因为 modelSize 就是 actualSize)
         this.fillBinInput(board, color, komi, history, binInputData, size);
-        this.fillGlobalInput(history, komi, color, globalInputData);
+        this.fillGlobalInput(history, komi, color, globalInputData, size);
 
         const tensorsToDispose: ort.Tensor[] = [];
         let results: ort.InferenceSession.OnnxValueMapType | null = null;
@@ -278,28 +280,29 @@ export class OnnxEngine {
 
             // [Simplify] 因为模型是动态的，输出直接对应当前棋盘，不需要重映射！
             // policyData 的最后一个值是 Pass
-            
+
             // 4. 处理 Ownership (如果存在)
-            // 动态模型输出已经直接对齐当前棋盘坐标。
-            // 这里仍然统一转换成绝对视角：黑为正，白为负。
+            // ONNX 导出的 ownership 是 raw logit；先 tanh 到 [-1, 1]。
+            // 该旧权重的 ownership 视角会随执子方翻转，所以再统一成绝对视角：黑为正，白为负。
             let finalOwnership: Float32Array | null = null;
             if (ownershipRaw) {
                  finalOwnership = new Float32Array(size * size);
                  for (let i = 0; i < size * size; i++) {
-                     // This older model's ownership head is relative to the side to play.
-                     // Normalize it back to absolute ownership for downstream code.
-                     const rawVal = ownershipRaw[i];
-                     finalOwnership[i] = (color === 1) ? rawVal : -rawVal;
+                     const normalized = Math.tanh(ownershipRaw[i]);
+                     finalOwnership[i] = (color === 1) ? normalized : -normalized;
                  }
             }
 
             // KataGo's misc head is a 4-float vector.
             // The official PyTorch export order is:
             // [scoreMeanRaw, scoreStdevRaw, leadRaw, varianceTimeRaw]
-            // We only consume lead/stdev here, and they are still uncalibrated raw values.
+            // KataGo's score heads are encoded in 20-point units.
+            // Stdev / variance are positive heads, so softplus the raw logits.
             const winrate = this.processWinrate(value);
-            const lead = misc[2] ?? 0;
-            const scoreStdev = misc[1] ?? 0;
+            const scoreMean = (misc[0] ?? 0) * 20.0;
+            const scoreStdev = this.softplus(misc[1] ?? 0) * 20.0;
+            const lead = (misc[2] ?? misc[0] ?? 0) * 20.0;
+            const varianceTime = this.softplus(misc[3] ?? 0);
 
             // 提取最佳着手
             // 直接传入 policyData，它已经是正确的大小了
@@ -312,7 +315,7 @@ export class OnnxEngine {
                 console.log(`[OnnxEngine] Analysis Complete. (Size: ${size}x${size}, Temp: ${options.temperature ?? 0})`);
                 console.log(`  - Win Rate: ${winrate.toFixed(1)}%`);
                 console.log(`  - Misc Raw: [${Array.from(misc).map(v => v.toFixed(3)).join(', ')}]`);
-                console.log(`  - Lead Raw: ${lead.toFixed(3)}`);
+                console.log(`  - Score Mean: ${scoreMean.toFixed(3)} Lead: ${lead.toFixed(3)} Stdev: ${scoreStdev.toFixed(3)}`);
                 console.log(`  - Top 3 Moves:`);
                 moveInfos.slice(0, 3).forEach((m, i) => {
                     const moveStr = m.x === -1 ? 'Pass' : `(${m.x},${m.y})`;
@@ -323,8 +326,10 @@ export class OnnxEngine {
             return {
                 rootInfo: {
                     winrate: winrate,
+                    scoreMean: scoreMean,
                     lead: lead,
                     scoreStdev: scoreStdev,
+                    varianceTime: varianceTime,
                     ownership: finalOwnership
                 },
                 moves: resultMoves
@@ -408,13 +413,16 @@ export class OnnxEngine {
         setHistory(3, 11);
         setHistory(4, 12);
         setHistory(5, 13);
+
+        this.fillAreaInput(board, pla, size, set);
     }
 
     private fillGlobalInput(
         history: { color: Sign; x: number; y: number }[],
         komi: number,
         pla: Sign,
-        data: Float32Array
+        data: Float32Array,
+        size: number
     ) {
         // Global features: 19 floats
         // 0-4: Pass history (if recent moves were passes)
@@ -443,6 +451,83 @@ export class OnnxEngine {
         
         const relativeKomi = (pla === -1) ? komi : -komi;
         setGlobal(5, relativeKomi / 20.0);
+
+        // Chinese/area rules: simple ko, no multi-stone suicide, area scoring, no tax.
+        // A pass ends the game after the opponent already passed.
+        const passWouldEndPhase = len >= 1 && history[len - 1].x < 0;
+        setGlobal(14, passWouldEndPhase ? 1.0 : 0.0);
+        setGlobal(18, this.calculateKomiParityWave(relativeKomi, size));
+    }
+
+    private fillAreaInput(
+        board: MicroBoard,
+        pla: Sign,
+        size: number,
+        set: (channel: number, y: number, x: number, value: number) => void
+    ) {
+        const opp: Sign = pla === 1 ? -1 : 1;
+        const visited = new Uint8Array(size * size);
+
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const color = board.get(x, y);
+                if (color === pla) set(18, y, x, 1.0);
+                else if (color === opp) set(19, y, x, 1.0);
+            }
+        }
+
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const startIdx = y * size + x;
+                if (visited[startIdx] || board.get(x, y) !== 0) continue;
+
+                const region: { x: number; y: number }[] = [];
+                const stack = [{ x, y }];
+                visited[startIdx] = 1;
+                let touchesPla = false;
+                let touchesOpp = false;
+
+                while (stack.length > 0) {
+                    const point = stack.pop()!;
+                    region.push(point);
+                    const neighbors = [
+                        { x: point.x - 1, y: point.y },
+                        { x: point.x + 1, y: point.y },
+                        { x: point.x, y: point.y - 1 },
+                        { x: point.x, y: point.y + 1 },
+                    ];
+
+                    for (const next of neighbors) {
+                        if (next.x < 0 || next.x >= size || next.y < 0 || next.y >= size) continue;
+                        const nextColor = board.get(next.x, next.y);
+                        if (nextColor === pla) touchesPla = true;
+                        else if (nextColor === opp) touchesOpp = true;
+                        else {
+                            const idx = next.y * size + next.x;
+                            if (!visited[idx]) {
+                                visited[idx] = 1;
+                                stack.push(next);
+                            }
+                        }
+                    }
+                }
+
+                if (touchesPla === touchesOpp) continue;
+                const channel = touchesPla ? 18 : 19;
+                for (const point of region) set(channel, point.y, point.x, 1.0);
+            }
+        }
+    }
+
+    private calculateKomiParityWave(selfKomi: number, size: number) {
+        const boardAreaIsEven = size % 2 === 0;
+        const komiFloor = boardAreaIsEven
+            ? Math.floor(selfKomi / 2.0) * 2.0
+            : Math.floor((selfKomi - 1.0) / 2.0) * 2.0 + 1.0;
+        const delta = Math.max(0, Math.min(2, selfKomi - komiFloor));
+        if (delta < 0.5) return delta;
+        if (delta < 1.5) return 1.0 - delta;
+        return delta - 2.0;
     }
 
     private processWinrate(valueData: Float32Array): number {
@@ -462,6 +547,12 @@ export class OnnxEngine {
         const sum = e0 + e1 + e2;
         
         return (e0 / sum) * 100; // Return percentage
+    }
+
+    private softplus(value: number): number {
+        if (value > 20) return value;
+        if (value < -20) return Math.exp(value);
+        return Math.log1p(Math.exp(value));
     }
 
     private calculateTerritoryScore(ownership: Float32Array, komi: number, size: number, playerColor: Sign): number {

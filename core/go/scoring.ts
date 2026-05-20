@@ -51,7 +51,15 @@ export const calculateScore = (
   return { black: blackScore, white: whiteScore };
 };
 
-const MODEL_TERRITORY_THRESHOLD = 0.3;
+const MODEL_TERRITORY_THRESHOLD = 0.25;
+const MODEL_DEAD_STONE_THRESHOLD = 0.85;
+
+const normalizeOwnership = (value: number | undefined): number => {
+  if (!Number.isFinite(value)) return 0;
+  const ownership = value as number;
+  if (ownership < -1 || ownership > 1) return Math.tanh(ownership);
+  return ownership;
+};
 
 export const calculateModelScore = (
   board: BoardState,
@@ -71,9 +79,11 @@ export const calculateModelScore = (
         if (stone.color === 'black') blackScore++; else whiteScore++;
         continue;
       }
-      const owner = ownership[y * size + x] ?? 0;
-      if (owner > MODEL_TERRITORY_THRESHOLD) blackScore++;
-      else if (owner < -MODEL_TERRITORY_THRESHOLD) whiteScore++;
+      const owner = normalizeOwnership(ownership[y * size + x]);
+      if (Math.abs(owner) > MODEL_TERRITORY_THRESHOLD) {
+        blackScore += (1 + owner) / 2;
+        whiteScore += (1 - owner) / 2;
+      }
     }
   }
 
@@ -88,11 +98,11 @@ export const cleanBoardWithTerritory = (board: BoardState, territory: Float32Arr
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const idx = y * size + x;
-      const owner = territory[idx];
+      const owner = normalizeOwnership(territory[idx]);
       const stone = newBoard[y][x];
       if (stone) {
-        if (stone.color === 'black' && owner < -0.5) newBoard[y][x] = null;
-        else if (stone.color === 'white' && owner > 0.5) newBoard[y][x] = null;
+        if (stone.color === 'black' && owner < -MODEL_DEAD_STONE_THRESHOLD) newBoard[y][x] = null;
+        else if (stone.color === 'white' && owner > MODEL_DEAD_STONE_THRESHOLD) newBoard[y][x] = null;
       }
     }
   }

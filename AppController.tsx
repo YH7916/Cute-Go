@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     calculateScore,
-    calculateModelScore,
     cleanBoardWithTerritory, // [New]
 } from './utils/goLogic';
 
@@ -222,9 +221,7 @@ const App: React.FC = () => {
             const komi = settings.boardSize === 9 ? 6.5 : 7.5;
             const finalBoard = gameState.boardRef.current;
             const cleanedBoard = data.ownership ? cleanBoardWithTerritory(finalBoard, data.ownership) : finalBoard;
-            const score = data.ownership
-                ? calculateModelScore(finalBoard, data.ownership, komi)
-                : calculateScore(cleanedBoard, undefined, komi);
+            const score = calculateScore(cleanedBoard, undefined, komi);
             const lead = score.black - score.white;
             gameState.setBoard(cleanedBoard);
             gameState.setFinalScore(score);

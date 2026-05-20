@@ -3,6 +3,8 @@ import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, Rota
 import { BoardSize, GameType, GameMode, Player, Difficulty } from '../types';
 import { getSliderBackground } from '../utils/helpers';
 
+type PlayStyle = 'PvP' | 'Fun' | 'PvAI';
+
 export interface GameSettingsData {
     boardSize: BoardSize;
     gameType: GameType;
@@ -40,6 +42,15 @@ interface SettingsModalProps {
     onOpenSkinShop: () => void;
 }
 
+const getPlayStyle = (settings: GameSettingsData): PlayStyle => {
+    if (settings.gameMode === 'PvAI' && settings.gameType === 'Go' && settings.difficulty === 'Fun') return 'Fun';
+    if (settings.gameMode === 'PvAI') return 'PvAI';
+    return 'PvP';
+};
+
+const getChallengeDifficulty = (difficulty: Difficulty): Difficulty =>
+    difficulty === 'Fun' ? 'Easy' : difficulty;
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
     isOpen,
     onClose,
@@ -57,28 +68,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onOpenSkinShop
 }) => {
     const [tempBoardSize, setTempBoardSize] = useState<BoardSize>(currentGameSettings.boardSize);
-    const [tempDifficulty, setTempDifficulty] = useState<Difficulty>(currentGameSettings.difficulty);
+    const [tempPlayStyle, setTempPlayStyle] = useState<PlayStyle>(() => getPlayStyle(currentGameSettings));
+    const [tempDifficulty, setTempDifficulty] = useState<Difficulty>(() => getChallengeDifficulty(currentGameSettings.difficulty));
     const [tempUserColor, setTempUserColor] = useState<Player>(currentGameSettings.userColor);
 
     useEffect(() => {
         if (!isOpen) return;
         setTempBoardSize(currentGameSettings.boardSize);
-        setTempDifficulty(currentGameSettings.difficulty);
+        setTempPlayStyle(getPlayStyle(currentGameSettings));
+        setTempDifficulty(getChallengeDifficulty(currentGameSettings.difficulty));
         setTempUserColor(currentGameSettings.userColor);
     }, [isOpen, currentGameSettings]);
 
     if (!isOpen) return null;
 
     const isGomokuSettings = currentGameSettings.gameType === 'Gomoku';
+    const isGoSettings = currentGameSettings.gameType === 'Go';
+    const playStyleOptions: { value: PlayStyle; label: string }[] = isGoSettings
+        ? [
+            { value: 'PvP', label: '双人' },
+            { value: 'Fun', label: '娱乐' },
+            { value: 'PvAI', label: '人机' },
+        ]
+        : [
+            { value: 'PvP', label: '双人' },
+            { value: 'PvAI', label: '人机' },
+        ];
+    const selectedPlayStyleIndex = Math.max(0, playStyleOptions.findIndex(option => option.value === tempPlayStyle));
     const isFunGoSettings =
-        currentGameSettings.gameType === 'Go' &&
-        currentGameSettings.gameMode === 'PvAI' &&
-        currentGameSettings.difficulty === 'Fun';
-    const isAiSettings = currentGameSettings.gameMode === 'PvAI';
+        isGoSettings &&
+        tempPlayStyle === 'Fun';
+    const isAiSettings = tempPlayStyle !== 'PvP';
     const isChallengeGoSettings =
-        currentGameSettings.gameType === 'Go' &&
-        currentGameSettings.gameMode === 'PvAI' &&
-        currentGameSettings.difficulty !== 'Fun';
+        isGoSettings &&
+        tempPlayStyle === 'PvAI';
     const title = isGomokuSettings
         ? '五子棋设置'
         : isFunGoSettings
@@ -86,17 +109,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             : isChallengeGoSettings
                 ? '挑战 AI 设置'
                 : '围棋设置';
-    const showAiDifficulty = isAiSettings && !isFunGoSettings;
+    const showAiDifficulty = tempPlayStyle === 'PvAI';
     const showWinRateSetting = isChallengeGoSettings;
-    const showGoOnlyAssist = currentGameSettings.gameType === 'Go';
-    const showImportExport = currentGameSettings.gameType === 'Go';
+    const showGoOnlyAssist = isGoSettings;
+    const showImportExport = isGoSettings;
+
+    const handlePlayStyleChange = (style: PlayStyle) => {
+        setTempPlayStyle(style);
+        if (style === 'PvAI') setTempDifficulty(prev => getChallengeDifficulty(prev));
+    };
 
     const handleApply = () => {
         onApplyGameSettings({
             boardSize: tempBoardSize,
             gameType: currentGameSettings.gameType,
-            gameMode: currentGameSettings.gameMode,
-            difficulty: tempDifficulty,
+            gameMode: tempPlayStyle === 'PvP' ? 'PvP' : 'PvAI',
+            difficulty: tempPlayStyle === 'Fun' ? 'Fun' : getChallengeDifficulty(tempDifficulty),
             userColor: tempUserColor
         });
     };
@@ -114,6 +142,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                    <div className="space-y-4">
                         <div className="space-y-4">
                             <h3 className="text-sm font-bold text-[#8c6b38] uppercase tracking-widest mb-1">对局设置</h3>
+
+                            <div className="space-y-4">
+                                <div className="inset-track rounded-xl p-1 relative h-12 flex items-center">
+                                    <div
+                                        className={`absolute top-1 bottom-1 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${
+                                            playStyleOptions.length === 3
+                                                ? 'left-1'
+                                                : selectedPlayStyleIndex === 1
+                                                    ? 'w-1/2 translate-x-full left-[-2px]'
+                                                    : 'w-1/2 left-1'
+                                        }`}
+                                        style={playStyleOptions.length === 3
+                                            ? {
+                                                width: 'calc((100% - 0.5rem) / 3)',
+                                                transform: `translateX(${selectedPlayStyleIndex * 100}%)`,
+                                            }
+                                            : undefined
+                                        }
+                                    />
+                                    {playStyleOptions.map(option => (
+                                        <button
+                                            key={option.value}
+                                            onClick={() => handlePlayStyleChange(option.value)}
+                                            className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 flex items-center justify-center ${
+                                                tempPlayStyle === option.value
+                                                ? 'text-[#5c4033]'
+                                                : 'text-[#8c6b38]/70 hover:text-[#5c4033]'
+                                            }`}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
 
                             {isAiSettings && (
                                 <div className="flex gap-2 items-center bg-[#fff] p-2 rounded-xl border-2 border-[#e3c086] animate-in fade-in slide-in-from-top-2">

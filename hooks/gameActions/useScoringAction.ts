@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { Player } from '../../types';
-import { calculateModelScore, calculateScore } from '../../utils/goLogic';
+import { calculateScore, cleanBoardWithTerritory } from '../../utils/goLogic';
 import type { UseGameActionsOptions } from './types';
 
 export const useScoringAction = ({
@@ -38,9 +38,10 @@ export const useScoringAction = ({
 
   setTimeout(() => {
     const komi = settings.boardSize === 9 ? 6.5 : 7.5;
-    const score = displayTerritory
-      ? calculateModelScore(gameState.boardRef.current, displayTerritory, komi)
-      : calculateScore(gameState.boardRef.current, undefined, komi);
+    const boardForScoring = displayTerritory
+      ? cleanBoardWithTerritory(gameState.boardRef.current, displayTerritory)
+      : gameState.boardRef.current;
+    const score = calculateScore(boardForScoring, undefined, komi);
     const lead = score.black - score.white;
     gameState.setFinalScore(score);
     setShowPassModal(false);

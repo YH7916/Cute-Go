@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { SettingsModal } from '../SettingsModal';
+import { SettingsModal, type GameSettingsData } from '../SettingsModal';
 import { UserPage } from '../UserPage';
 import { OnlineMenu } from '../OnlineMenu';
 import { ImportExportModal } from '../ImportExportModal';
@@ -104,6 +104,26 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
     userColor: settings.userColor,
   }), [settings.boardSize, settings.gameType, settings.gameMode, settings.difficulty, settings.userColor]);
 
+  const handleSettingsApply = (newSettings: GameSettingsData) => {
+    if (gameState.appMode !== 'setup') {
+      handleApplySettings(newSettings);
+      return;
+    }
+
+    if (newSettings.boardSize !== settings.boardSize) {
+      handleApplySettings(newSettings);
+      gameState.setAppMode('setup');
+      return;
+    }
+
+    settings.setGameType(newSettings.gameType);
+    settings.setDifficulty(newSettings.difficulty);
+    settings.setGameMode(newSettings.gameMode);
+    settings.setUserColor(newSettings.userColor);
+    setShowMenu(false);
+    vibrate(20);
+  };
+
   return (
     <>
       <TutorialModal
@@ -118,7 +138,7 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
         isOpen={showMenu}
         onClose={() => setShowMenu(false)}
         currentGameSettings={currentGameSettings}
-        onApplyGameSettings={handleApplySettings}
+        onApplyGameSettings={handleSettingsApply}
         showQi={settings.showQi} setShowQi={settings.setShowQi}
         showWinRate={settings.showWinRate} setShowWinRate={settings.setShowWinRate}
         showCoordinates={settings.showCoordinates} setShowCoordinates={settings.setShowCoordinates}
