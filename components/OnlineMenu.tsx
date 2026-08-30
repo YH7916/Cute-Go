@@ -111,7 +111,7 @@ export const OnlineMenu: React.FC<OnlineMenuProps> = ({
                                 ) : (
                                     <button
                                         onClick={onCreateRoom}
-                                        disabled={!canMatch || isBusy}
+                                        disabled={isBusy}
                                         className="btn-retro btn-beige w-full py-3 rounded-xl font-bold text-sm"
                                     >
                                         {isCreatingRoom ? '创建中...' : '创建房间'}

@@ -29,6 +29,10 @@ export const useUndoAction = ({
   if (gameState.history.length < stepsToUndo) stepsToUndo = gameState.history.length;
 
   const prev = gameState.history[gameState.history.length - stepsToUndo];
+  const newHistory = gameState.history.slice(0, gameState.history.length - stepsToUndo);
+  gameState.boardRef.current = prev.board;
+  gameState.currentPlayerRef.current = prev.currentPlayer;
+  gameState.historyRef.current = newHistory;
   gameState.setBoard(prev.board);
   gameState.setCurrentPlayer(prev.currentPlayer);
   gameState.setBlackCaptures(prev.blackCaptures);
@@ -53,11 +57,7 @@ export const useUndoAction = ({
     aiTimerRef.current = null;
   }
 
-  gameState.setHistory(prevHistory => {
-    const newHistory = prevHistory.slice(0, prevHistory.length - stepsToUndo);
-    gameState.historyRef.current = newHistory;
-    return newHistory;
-  });
+  gameState.setHistory(newHistory);
 }, [
   aiTimerRef,
   aiTurnLock,

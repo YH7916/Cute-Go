@@ -210,7 +210,7 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
         eloDiffStyle={eloDiffStyle}
         finalScore={gameState.finalScore}
         onRestart={() => resetGame(true)}
-        onReview={() => { gameState.setAppMode('review'); gameState.setReviewIndex(gameState.history.length - 1); gameState.setGameOver(false); }}
+        onReview={() => { gameState.setAppMode('review'); gameState.setReviewIndex(gameState.history.length); gameState.setGameOver(false); }}
       />
 
       <OfflineLoadingModal

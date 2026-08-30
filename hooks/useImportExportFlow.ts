@@ -20,6 +20,7 @@ interface ImportExportGameState {
   setCurrentPlayer: (player: Player) => void;
   setBlackCaptures: (captures: number) => void;
   setWhiteCaptures: (captures: number) => void;
+  setLastMove: (move: { x: number; y: number } | null) => void;
   setHistory: (history: HistoryItem[]) => void;
   setGameOver: (gameOver: boolean) => void;
   setWinner: (winner: Player | null) => void;
@@ -62,6 +63,7 @@ export const useImportExportFlow = ({
         settings.setBoardSize(sgfState.boardSize);
         gameState.setBlackCaptures(sgfState.blackCaptures);
         gameState.setWhiteCaptures(sgfState.whiteCaptures);
+        gameState.setLastMove(sgfState.lastMove);
         gameState.setHistory(sgfState.history);
         setInitialStones(sgfState.initialStones);
         gameState.setGameOver(false);
@@ -84,6 +86,7 @@ export const useImportExportFlow = ({
       settings.setBoardSize(gs.boardSize);
       gameState.setBlackCaptures(gs.blackCaptures);
       gameState.setWhiteCaptures(gs.whiteCaptures);
+      gameState.setLastMove(null);
       gameState.setHistory([]);
       gameState.setGameOver(false);
       gameState.setWinner(null);
@@ -99,27 +102,8 @@ export const useImportExportFlow = ({
   }, [exitTsumegoMode, gameState, importKey, playSfx, settings, vibrate]);
 
   const getFullHistory = useCallback(() => {
-    const fullHistory: HistoryItem[] = [...gameState.history];
-    if (gameState.lastMove) {
-      fullHistory.push({
-        board: gameState.board,
-        currentPlayer: gameState.currentPlayer,
-        blackCaptures: gameState.blackCaptures,
-        whiteCaptures: gameState.whiteCaptures,
-        lastMove: gameState.lastMove,
-        consecutivePasses: gameState.consecutivePasses,
-      });
-    }
-    return fullHistory;
-  }, [
-    gameState.blackCaptures,
-    gameState.board,
-    gameState.consecutivePasses,
-    gameState.currentPlayer,
-    gameState.history,
-    gameState.lastMove,
-    gameState.whiteCaptures,
-  ]);
+    return gameState.history;
+  }, [gameState.history]);
 
   const handleCopy = useCallback(() => {
     const sgf = generateSGF(getFullHistory(), settings.boardSize, 7.5, initialStones);

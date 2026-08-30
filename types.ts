@@ -69,11 +69,14 @@ export interface DisplayAchievement extends AchievementDef {
 
 // Undo History Item
 export interface HistoryItem {
+  // Complete game state immediately before `move` is applied.
   board: BoardState;
   currentPlayer: Player;
   blackCaptures: number;
   whiteCaptures: number;
   lastMove: { x: number, y: number } | null;
+  // The action taken from this snapshot; null represents a pass.
+  move: Point | null;
   consecutivePasses: number;
 }
 

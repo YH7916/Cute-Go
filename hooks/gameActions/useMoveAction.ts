@@ -21,8 +21,8 @@ export const useMoveAction = ({
   const currentType = gameTypeRef.current;
 
   let prevHash = null;
-  if (gameState.history.length >= 1) {
-    prevHash = getBoardHash(gameState.history[gameState.history.length - 1].board);
+  if (gameState.historyRef.current.length >= 1) {
+    prevHash = getBoardHash(gameState.historyRef.current[gameState.historyRef.current.length - 1].board);
   }
 
   if (settings.gameMode === 'Tsumego' && !isRemote && tsumegoCurrentNode) {
@@ -49,7 +49,7 @@ export const useMoveAction = ({
           x,
           y,
           color: activePlayer,
-          moveNumber: gameState.history.length + 1,
+          moveNumber: gameState.historyRef.current.length + 1,
           boardSize: settings.boardSize,
         });
       } catch (achError) {
@@ -62,17 +62,16 @@ export const useMoveAction = ({
       currentPlayer: activePlayer,
       blackCaptures: gameState.blackCaptures,
       whiteCaptures: gameState.whiteCaptures,
-      lastMove: { x, y },
+      lastMove: gameState.lastMove,
+      move: { x, y },
       consecutivePasses: gameState.consecutivePasses,
     };
 
-    if (!isRemote) {
-      gameState.setHistory(prev => [...prev, newHistoryItem]);
-    }
-
+    const nextHistory = [...gameState.historyRef.current, newHistoryItem];
     gameState.boardRef.current = result.newBoard;
-    gameState.historyRef.current = [...gameState.historyRef.current, newHistoryItem];
+    gameState.historyRef.current = nextHistory;
 
+    gameState.setHistory(nextHistory);
     gameState.setBoard(result.newBoard);
     gameState.setLastMove({ x, y });
     gameState.setConsecutivePasses(0);

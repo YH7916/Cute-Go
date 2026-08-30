@@ -9,8 +9,16 @@ export const attemptMove = (
   gameType: 'Go' | 'Gomoku' = 'Go',
   previousBoardStateHash: string | null = null
 ): { newBoard: BoardState; captured: number } | null => {
-  if (board[y][x] !== null) return null;
   const size = board.length;
+  if (
+    !Number.isInteger(x) ||
+    !Number.isInteger(y) ||
+    x < 0 ||
+    y < 0 ||
+    y >= size ||
+    x >= (board[y]?.length ?? 0)
+  ) return null;
+  if (board[y][x] !== null) return null;
 
   const safeBoard = board.map(row => [...row]);
   safeBoard[y][x] = { color: player, id: `${player}-${Date.now()}-${x}-${y}`, x, y };

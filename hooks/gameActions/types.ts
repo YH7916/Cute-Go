@@ -54,7 +54,7 @@ export interface UseGameActionsOptions {
     komi: number,
     gameType: GameType,
   ) => void;
-  sendData: (message: OnlineMessage) => void;
+  sendData: (message: OnlineMessage) => Promise<boolean>;
   session: AppSession | null;
   setEloDiffStyle: (style: 'gold' | 'normal' | 'negative' | null) => void;
   setEloDiffText: (text: string | null) => void;

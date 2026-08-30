@@ -99,14 +99,14 @@ export const GameControls: React.FC<GameControlsProps> = ({
                          <div className="flex justify-between items-end text-[#8c6b38] px-1">
                             <span className="text-xs font-bold opacity-80">当前手数</span>
                             <span className="font-black text-xl font-mono text-[#5c4033] tracking-wider">
-                                {reviewIndex} <span className="text-sm opacity-50 text-[#8c6b38] font-bold">/ {Math.max(0, history.length - 1)}</span>
+                                {reviewIndex} <span className="text-sm opacity-50 text-[#8c6b38] font-bold">/ {history.length}</span>
                             </span>
                          </div>
                          <input 
-                            type="range" min="0" max={history.length > 0 ? history.length - 1 : 0} 
+                            type="range" min="0" max={history.length}
                             value={reviewIndex} onChange={(e) => setReviewIndex(parseInt(e.target.value))}
                             className="cute-range w-full h-3 bg-[#e3c086]/30 rounded-full appearance-none cursor-pointer"
-                            style={{ background: getSliderBackground(reviewIndex, 0, history.length > 0 ? history.length - 1 : 1) }}
+                            style={{ background: getSliderBackground(reviewIndex, 0, history.length > 0 ? history.length : 1) }}
                          />
                      </div>
 
@@ -121,8 +121,8 @@ export const GameControls: React.FC<GameControlsProps> = ({
                         </button>
                         
                         <button 
-                            onClick={() => setReviewIndex(Math.min(history.length - 1, reviewIndex + 1))} 
-                            disabled={reviewIndex >= history.length - 1}
+                            onClick={() => setReviewIndex(Math.min(history.length, reviewIndex + 1))}
+                            disabled={reviewIndex >= history.length}
                             className="btn-retro btn-sand w-12 h-12 rounded-xl flex items-center justify-center disabled:opacity-50 transition-all active:scale-95 border-b-4 active:border-b-0 active:translate-y-1 shrink-0"
                         >
                             <ChevronRight size={24} />
@@ -130,22 +130,22 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
                          <button 
                             onClick={() => {
-                                const isAtEnd = reviewIndex === history.length - 1;
+                                const isAtEnd = reviewIndex === history.length;
                                 if (!isAtEnd) {
-                                    setReviewIndex(history.length - 1);
+                                    setReviewIndex(history.length);
                                     if (!showTerritory) onToggleTerritory?.();
                                 } else {
                                     onToggleTerritory?.();
                                 }
                             }}
                             className={`btn-retro h-12 px-4 rounded-xl font-bold flex flex-1 items-center justify-center gap-2 border-b-4 active:border-b-0 active:translate-y-1 transition-all ${
-                                (showTerritory && reviewIndex === history.length - 1)
+                                (showTerritory && reviewIndex === history.length)
                                 ? 'bg-[#5c4033] text-[#f7e7ce] border-[#3e2b22]' 
                                 : 'bg-[#fff] text-[#8c6b38] border-[#e3c086] hover:bg-[#fff9e6]'
                             }`}
                         >
                             <Map size={18} />
-                            <span>{(showTerritory && reviewIndex === history.length - 1) ? '隐藏' : '结果'}</span>
+                            <span>{(showTerritory && reviewIndex === history.length) ? '隐藏' : '结果'}</span>
                         </button>
 
                          <button 

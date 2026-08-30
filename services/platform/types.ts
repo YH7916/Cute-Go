@@ -48,6 +48,7 @@ export interface PlatformLiveMatchHandlers {
   onPeerLeave?: (peer: PlatformOpponentSummary) => void | Promise<void>;
   onPeerOffline?: (peer: PlatformOpponentSummary) => void | Promise<void>;
   onDisconnect?: () => void | Promise<void>;
+  onError?: (error: unknown) => void | Promise<void>;
 }
 
 export interface PlatformLiveMatchSession {

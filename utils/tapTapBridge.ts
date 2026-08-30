@@ -42,6 +42,7 @@ export interface TapBattleMatchResult {
 
 export interface TapBattleListeners {
   onDisconnected?: (info: any) => void;
+  onBattleServiceError?: (info: any) => void;
   playerEnterRoom?: (info: any) => void;
   playerLeaveRoom?: (info: any) => void;
   playerOffline?: (info: any) => void;
@@ -54,8 +55,14 @@ const resolveBattlePlayerId = (connectResult: any) =>
 const resolveRoomInfo = (result: any): TapBattleRoomInfo | null =>
   result?.roomInfo || result?.data?.roomInfo || result?.room || result?.data || null;
 
-const resolveRoomPlayer = (info: any) =>
-  info?.playerInfo || info?.data?.playerInfo || info?.player || info?.data?.player || null;
+const resolveRoomPlayer = (info: any) => {
+  const nestedPlayer =
+    info?.playerInfo || info?.data?.playerInfo || info?.player || info?.data?.player;
+  if (nestedPlayer) return nestedPlayer;
+
+  const id = info?.playerId || info?.id || info?.userId || info?.fromPlayerId;
+  return id ? { ...info, id } : null;
+};
 
 export const getTapTapRoomPlayerInfo = resolveRoomPlayer;
 
@@ -66,10 +73,14 @@ const buildBattlePlayerConfig = (playerProperties: Record<string, unknown>) => (
   customProperties: JSON.stringify(playerProperties),
 });
 
-const buildBattleRoomConfig = (roomType: string) => ({
+const buildBattleRoomConfig = (roomType: string, includeName = false) => ({
   maxPlayerCount: 2,
   type: roomType,
-  matchParams: {},
+  matchParams: {
+    level: roomType,
+    score: '0',
+  },
+  ...(includeName ? { name: `Cute-Go ${roomType}` } : {}),
 });
 
 const toBattleMatchResult = (
@@ -176,6 +187,96 @@ const getTapOnlineBattleManager = (): TapBattleManager | null => {
   return tap.getOnlineBattleManager();
 };
 
+let connectedBattleManager: TapBattleManager | null = null;
+let connectedBattlePlayerId: string | null = null;
+let pendingBattleManager: TapBattleManager | null = null;
+let battleConnectPromise: Promise<string> | null = null;
+let registeredBattleManager: TapBattleManager | null = null;
+let activeBattleListeners: TapBattleListeners = {};
+
+const resetBattleConnection = (manager?: TapBattleManager) => {
+  if (
+    manager &&
+    connectedBattleManager &&
+    connectedBattleManager !== manager &&
+    pendingBattleManager !== manager
+  ) return;
+  connectedBattleManager = null;
+  connectedBattlePlayerId = null;
+  pendingBattleManager = null;
+  battleConnectPromise = null;
+};
+
+const registerTapBattleListeners = (
+  manager: TapBattleManager,
+  listeners: TapBattleListeners
+) => {
+  activeBattleListeners = listeners;
+  if (!manager.registerListener || registeredBattleManager === manager) return;
+
+  registeredBattleManager = manager;
+  manager.registerListener({
+    onDisconnected: (info: any) => {
+      if (registeredBattleManager !== manager) return;
+      resetBattleConnection(manager);
+      activeBattleListeners.onDisconnected?.(info);
+    },
+    onBattleServiceError: (info: any) => {
+      if (registeredBattleManager !== manager) return;
+      activeBattleListeners.onBattleServiceError?.(info);
+    },
+    playerEnterRoom: (info: any) => {
+      if (registeredBattleManager !== manager) return;
+      activeBattleListeners.playerEnterRoom?.(info);
+    },
+    playerLeaveRoom: (info: any) => {
+      if (registeredBattleManager !== manager) return;
+      activeBattleListeners.playerLeaveRoom?.(info);
+    },
+    playerOffline: (info: any) => {
+      if (registeredBattleManager !== manager) return;
+      activeBattleListeners.playerOffline?.(info);
+    },
+    onCustomMessage: (info: any) => {
+      if (registeredBattleManager !== manager) return;
+      activeBattleListeners.onCustomMessage?.(info);
+    },
+  });
+};
+
+const connectTapBattle = async (manager: TapBattleManager): Promise<string> => {
+  if (connectedBattleManager === manager && connectedBattlePlayerId) {
+    return connectedBattlePlayerId;
+  }
+  if (pendingBattleManager === manager && battleConnectPromise) {
+    return battleConnectPromise;
+  }
+  if (!manager.connect) {
+    throw new Error('TapTap OnlineBattleManager.connect is unavailable');
+  }
+
+  pendingBattleManager = manager;
+  const currentPromise = manager.connect().then(result => {
+    const playerId = resolveBattlePlayerId(result);
+    if (!playerId) {
+      throw new Error('TapTap connect() returned no playerId');
+    }
+    connectedBattleManager = manager;
+    connectedBattlePlayerId = playerId;
+    return playerId;
+  });
+  battleConnectPromise = currentPromise;
+
+  try {
+    return await currentPromise;
+  } finally {
+    if (battleConnectPromise === currentPromise) {
+      battleConnectPromise = null;
+      pendingBattleManager = null;
+    }
+  }
+};
+
 /**
  * TapTap Login
  * Returns the user info including unionId
@@ -188,23 +289,13 @@ export const tapLogin = async () => {
   }
 
   try {
-    console.log('[TapTapBridge] Triggering tap.login() with scopes...');
-    // Standard TapTap Minigame login with common scopes
-    const res = await tap.login({ 
-        scopes: ['public_profile', 'user_info'], // Common scopes
-        scope: 'public_profile' // Fallback for some versions
-    });
+    console.log('[TapTapBridge] Triggering tap.login()...');
+    const res = await tap.login();
     console.log('[TapTapBridge] tap.login result:', JSON.stringify(res));
     return res;
   } catch (error) {
     console.error('[TapTapBridge] Login promise rejected:', error);
-    // Try fallback without params if error occurs
-    try {
-        console.log('[TapTapBridge] Retrying tap.login() without scopes...');
-        return await tap.login();
-    } catch {
-        return null;
-    }
+    return null;
   }
 };
 
@@ -237,7 +328,18 @@ export const getTapUserInfo = async (retryIfUnauthorized = true): Promise<any> =
   if (tap && tap.getUserInfo) {
     try {
       console.log('[TapTapBridge] Calling tap.getUserInfo()...');
-      const res = await tap.getUserInfo();
+      const res = await new Promise<any>((resolve, reject) => {
+        const maybePromise = tap.getUserInfo({
+          success: (result: any) => resolve(result?.userInfo ?? result),
+          fail: reject,
+        });
+        if (maybePromise?.then) {
+          void maybePromise.then(
+            (result: any) => resolve(result?.userInfo ?? result),
+            reject
+          );
+        }
+      });
       console.log('[TapTapBridge] getUserInfo result:', JSON.stringify(res));
       return res;
     } catch (e: any) {
@@ -287,12 +389,9 @@ export const getTapPlayerId = async () => {
     const manager = tap.getOnlineBattleManager ? tap.getOnlineBattleManager() : null;
     if (manager) {
       console.log('[TapTapBridge] Attempting to get playerId via OnlineBattleManager...');
-      // IMPORTANT: In some SDK versions, if already connected, it might throw error or return cached
-      const res = await manager.connect();
-      console.log('[TapTapBridge] connect() full response:', JSON.stringify(res));
-      const pId = res.playerId || res.id || (res.playerInfo && res.playerInfo.id);
-      console.log('[TapTapBridge] connect() extracted ID:', pId);
-      return pId || null;
+      const playerId = await connectTapBattle(manager);
+      console.log('[TapTapBridge] connect() extracted ID:', playerId);
+      return playerId;
     } else {
       console.warn('[TapTapBridge] OnlineBattleManager not found on tap object');
     }
@@ -315,6 +414,9 @@ export const disconnectTap = async () => {
       }
     } catch (e) {
       console.warn('[TapTapBridge] Disconnect failed', e);
+    } finally {
+      activeBattleListeners = {};
+      resetBattleConnection(manager);
     }
   }
 };
@@ -429,14 +531,8 @@ export const startTapTapNativeMatch = async (
     return null;
   }
 
-  manager.registerListener?.(listeners as unknown as Record<string, unknown>);
-
-  const connectResult = await manager.connect();
-  const playerId = resolveBattlePlayerId(connectResult);
-  if (!playerId) {
-    console.warn('[TapTapBridge] connect() returned no playerId');
-    return null;
-  }
+  registerTapBattleListeners(manager, listeners);
+  const playerId = await connectTapBattle(manager);
 
   const matchResult = await manager.matchRoom({
     data: {
@@ -465,18 +561,12 @@ export const createTapTapNativeRoom = async (
     return null;
   }
 
-  manager.registerListener?.(listeners as unknown as Record<string, unknown>);
-
-  const connectResult = await manager.connect();
-  const playerId = resolveBattlePlayerId(connectResult);
-  if (!playerId) {
-    console.warn('[TapTapBridge] connect() returned no playerId');
-    return null;
-  }
+  registerTapBattleListeners(manager, listeners);
+  const playerId = await connectTapBattle(manager);
 
   const createResult = await manager.createRoom({
     data: {
-      roomCfg: buildBattleRoomConfig(roomType),
+      roomCfg: buildBattleRoomConfig(roomType, true),
       playerCfg: buildBattlePlayerConfig(playerProperties),
     },
   });
@@ -501,14 +591,8 @@ export const joinTapTapNativeRoom = async (
     return null;
   }
 
-  manager.registerListener?.(listeners as unknown as Record<string, unknown>);
-
-  const connectResult = await manager.connect();
-  const playerId = resolveBattlePlayerId(connectResult);
-  if (!playerId) {
-    console.warn('[TapTapBridge] connect() returned no playerId');
-    return null;
-  }
+  registerTapBattleListeners(manager, listeners);
+  const playerId = await connectTapBattle(manager);
 
   const joinResult = await manager.joinRoom({
     data: {

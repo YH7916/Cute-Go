@@ -3,13 +3,8 @@ import type { MutableRefObject } from 'react';
 import { BoardSize, GameMode, GameType, Player } from '../types';
 import { platform } from '../services/platform';
 import type { AppProfile, AppSession, PlatformLiveMatchSession, PlatformOpponentSummary } from '../services/platform';
-
-type NativeMatchMessage =
-  | { type: 'MOVE'; x: number; y: number }
-  | { type: 'PASS' }
-  | { type: 'SYNC'; boardSize: BoardSize; gameType: GameType; startColor: Player; opponentInfo?: PlatformOpponentSummary }
-  | { type: 'SYNC_REPLY'; opponentInfo?: PlatformOpponentSummary }
-  | { type: 'RESTART' };
+import { parseNativeMatchMessage } from '../services/platform/nativeMatchMessages';
+import type { NativeMatchMessage } from '../services/platform/nativeMatchMessages';
 
 const ONLINE_REQUEST_TIMEOUT_MS = 15000;
 
@@ -27,6 +22,27 @@ const withTimeout = async <T,>(promise: Promise<T>, message: string): Promise<T>
   }
 };
 
+const formatOnlineError = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object') return '未知错误';
+
+  const details = error as {
+    code?: string | number;
+    errno?: string | number;
+    errorCode?: string | number;
+    message?: string;
+    errMsg?: string;
+    errorMessage?: string;
+  };
+  const code = details.errno ?? details.errorCode ?? details.code;
+  const message = details.errMsg ?? details.errorMessage ?? details.message;
+  if (code !== undefined && message) return `${message}（错误码 ${code}）`;
+  if (message) return message;
+  if (code !== undefined) return `错误码 ${code}`;
+  return '未知错误';
+};
+
 interface OnlineSettings {
   boardSize: BoardSize;
   gameType: GameType;
@@ -41,6 +57,8 @@ interface UseOnlineMatchOptions {
   userProfile: AppProfile | null;
   boardSizeRef: MutableRefObject<BoardSize>;
   gameTypeRef: MutableRefObject<GameType>;
+  currentPlayerRef: MutableRefObject<Player>;
+  myColorRef: MutableRefObject<Player | null>;
   resetGameRef: MutableRefObject<(keepOnline?: boolean, explicitSize?: number, shouldBroadcast?: boolean) => void>;
   executeMoveRef: MutableRefObject<(x: number, y: number, isRemote: boolean) => void>;
   handlePassRef: MutableRefObject<(isRemote?: boolean) => void>;
@@ -57,6 +75,8 @@ export const useOnlineMatch = ({
   userProfile,
   boardSizeRef,
   gameTypeRef,
+  currentPlayerRef,
+  myColorRef,
   resetGameRef,
   executeMoveRef,
   handlePassRef,
@@ -90,44 +110,70 @@ export const useOnlineMatch = ({
     }
   }, []);
 
-  const sendData = useCallback((msg: NativeMatchMessage) => {
-    if (liveMatchRef.current) {
-      void liveMatchRef.current.send(msg);
+  const sendData = useCallback(async (msg: NativeMatchMessage): Promise<boolean> => {
+    const liveMatch = liveMatchRef.current;
+    if (!liveMatch) {
+      setToastMsg('联机尚未建立，消息未发送');
+      return false;
     }
-  }, []);
 
-  const cleanupOnline = useCallback((isManual = false) => {
+    try {
+      const sent = await liveMatch.send(msg);
+      if (!sent) setToastMsg('联机消息发送失败，请检查网络');
+      return sent;
+    } catch (error) {
+      console.warn('[Online] Failed to send room message:', error);
+      setToastMsg('联机消息发送失败，请检查网络');
+      return false;
+    }
+  }, [setToastMsg]);
+
+  const cleanupOnline = useCallback(async (isManual = false) => {
     if (isManual) {
       isManualDisconnect.current = true;
     } else {
       isManualDisconnect.current = false;
     }
-    if (liveMatchRef.current) {
-      void liveMatchRef.current.leave();
-      liveMatchRef.current = null;
-    }
+    const previousMatch = liveMatchRef.current;
+    liveMatchRef.current = null;
     setOnlineStatus('disconnected');
     setOpponentProfile(null);
     setMyColor(null);
+    myColorRef.current = null;
     setRoomId(null);
     setIsCreatingRoom(false);
     setIsJoiningRoom(false);
     activeRoomConfigRef.current = null;
-  }, []);
+    if (previousMatch) await previousMatch.leave();
+  }, [myColorRef]);
 
-  const handleNativeRoomMessage = useCallback((msg: NativeMatchMessage) => {
-    if (msg.type === 'MOVE') executeMoveRef.current(msg.x, msg.y, true);
-    else if (msg.type === 'PASS') handlePassRef.current(true);
+  const handleNativeRoomMessage = useCallback((payload: unknown) => {
+    const msg = parseNativeMatchMessage(payload, boardSizeRef.current);
+    if (!msg) {
+      console.warn('[Online] Ignored invalid TapTap room message:', payload);
+      return;
+    }
+
+    if (msg.type === 'MOVE' || msg.type === 'PASS') {
+      if (myColorRef.current === null || currentPlayerRef.current === myColorRef.current) {
+        console.warn('[Online] Ignored out-of-turn TapTap room message:', msg.type);
+        return;
+      }
+      if (msg.type === 'MOVE') executeMoveRef.current(msg.x, msg.y, true);
+      else void handlePassRef.current(true);
+    }
     else if (msg.type === 'SYNC') {
+      if (liveMatchRef.current?.isHost) return;
       settings.setBoardSize(msg.boardSize);
       boardSizeRef.current = msg.boardSize;
       settings.setGameType(msg.gameType);
       gameTypeRef.current = msg.gameType;
       setMyColor(msg.startColor);
+      myColorRef.current = msg.startColor;
       if (msg.opponentInfo) {
         setOpponentProfile(msg.opponentInfo);
         if (session) {
-          void liveMatchRef.current?.send({
+          void sendData({
             type: 'SYNC_REPLY',
             opponentInfo: { id: session.user.id },
           });
@@ -137,40 +183,48 @@ export const useOnlineMatch = ({
       vibrate(20);
     }
     else if (msg.type === 'SYNC_REPLY') {
+      if (!liveMatchRef.current?.isHost) return;
       if (msg.opponentInfo) setOpponentProfile(msg.opponentInfo);
     }
     else if (msg.type === 'RESTART') {
       resetGameRef.current(true, undefined, false);
     }
-  }, [boardSizeRef, executeMoveRef, gameTypeRef, handlePassRef, resetGameRef, session, settings, vibrate]);
+  }, [boardSizeRef, currentPlayerRef, executeMoveRef, gameTypeRef, handlePassRef, myColorRef, resetGameRef, sendData, session, settings, vibrate]);
 
   const startNativeHostGame = useCallback(async (boardSize = boardSizeRef.current, gameType = gameTypeRef.current) => {
     if (!liveMatchRef.current || !session) return;
-    setOnlineStatus('connected');
-    setIsMatching(false);
-    stopMatchTimer();
-    setShowOnlineMenu(false);
-    setShowMenu(false);
-    setShowStartScreen(false);
     settings.setBoardSize(boardSize);
     boardSizeRef.current = boardSize;
     settings.setGameType(gameType);
     gameTypeRef.current = gameType;
     settings.setGameMode('PvP');
     setMyColor('white');
+    myColorRef.current = 'white';
     resetGameRef.current(true, boardSize, false);
-    await liveMatchRef.current.send({
+    const sent = await sendData({
       type: 'SYNC',
       boardSize,
       gameType,
       startColor: 'black',
       opponentInfo: { id: session.user.id },
     });
-  }, [boardSizeRef, gameTypeRef, resetGameRef, session, setShowMenu, setShowStartScreen, settings, stopMatchTimer]);
+    if (!sent) {
+      await cleanupOnline();
+      setShowOnlineMenu(true);
+      return;
+    }
+
+    setOnlineStatus('connected');
+    setIsMatching(false);
+    stopMatchTimer();
+    setShowOnlineMenu(false);
+    setShowMenu(false);
+    setShowStartScreen(false);
+  }, [boardSizeRef, cleanupOnline, gameTypeRef, myColorRef, resetGameRef, sendData, session, setShowMenu, setShowStartScreen, settings, stopMatchTimer]);
 
   const buildNativeRoomHandlers = useCallback(() => ({
     onMessage: (payload: unknown) => {
-      handleNativeRoomMessage(payload as NativeMatchMessage);
+      handleNativeRoomMessage(payload);
     },
     onPeerJoin: (peer: PlatformOpponentSummary) => {
       if (peer.id === liveMatchRef.current?.playerId) {
@@ -195,7 +249,10 @@ export const useOnlineMatch = ({
       setOnlineStatus('disconnected');
       if (!isManualDisconnect.current) alert("联机已断开");
     },
-  }), [handleNativeRoomMessage, startNativeHostGame]);
+    onError: (error: unknown) => {
+      setToastMsg(`TapTap 联机错误：${formatOnlineError(error)}`);
+    },
+  }), [handleNativeRoomMessage, setToastMsg, startNativeHostGame]);
 
   const buildPlayerProfile = useCallback((sizeToUse: BoardSize) => ({
     nickname: userProfile?.nickname,
@@ -213,7 +270,7 @@ export const useOnlineMatch = ({
     matchmakingRequestIdRef.current = requestId;
     const gameTypeToMatch = settings.gameType;
 
-    cleanupOnline();
+    await cleanupOnline();
     activeRoomConfigRef.current = { boardSize: sizeToMatch, gameType: gameTypeToMatch };
     setMatchBoardSize(sizeToMatch);
     setIsMatching(true);
@@ -237,7 +294,7 @@ export const useOnlineMatch = ({
       setIsMatching(false);
       stopMatchTimer();
       activeRoomConfigRef.current = null;
-      setToastMsg('TapTap 匹配超时，请稍后重试');
+      setToastMsg(`TapTap 匹配失败：${formatOnlineError(error)}`);
       return;
     }
 
@@ -299,8 +356,8 @@ export const useOnlineMatch = ({
 
     const sizeToUse = boardSizeRef.current;
     setMatchBoardSize(sizeToUse);
+    await cleanupOnline();
     setIsCreatingRoom(true);
-    cleanupOnline();
     activeRoomConfigRef.current = { boardSize: sizeToUse, gameType: settings.gameType };
 
     const roomType = `${settings.gameType.toLowerCase()}_${sizeToUse}`;
@@ -315,7 +372,7 @@ export const useOnlineMatch = ({
       console.warn('[Online] createRoom failed:', error);
       setIsCreatingRoom(false);
       activeRoomConfigRef.current = null;
-      setToastMsg('创建房间失败，请稍后重试');
+      setToastMsg(`创建房间失败：${formatOnlineError(error)}`);
       return;
     }
 
@@ -357,8 +414,8 @@ export const useOnlineMatch = ({
       return;
     }
 
+    await cleanupOnline();
     setIsJoiningRoom(true);
-    cleanupOnline();
 
     let room: PlatformLiveMatchSession | null = null;
     try {
@@ -370,7 +427,7 @@ export const useOnlineMatch = ({
     } catch (error) {
       console.warn('[Online] joinRoom failed:', error);
       setIsJoiningRoom(false);
-      setToastMsg('加入房间超时，请确认房间号正确且不要用同一账号测试');
+      setToastMsg(`加入房间失败：${formatOnlineError(error)}`);
       return;
     }
 
@@ -409,7 +466,7 @@ export const useOnlineMatch = ({
     setIsMatching(false);
     setMatchTime(0);
     activeRoomConfigRef.current = null;
-    cleanupOnline();
+    await cleanupOnline(true);
   }, [cleanupOnline, stopMatchTimer]);
 
   const startMatchmaking = useCallback(async (sizeOverride?: BoardSize) => {

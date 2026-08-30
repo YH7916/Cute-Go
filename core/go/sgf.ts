@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { BoardState, Player, GameType, BoardSize } from '../../types';
+import { BoardState, Player, GameType, BoardSize, HistoryItem, Point } from '../../types';
 import { createBoard } from '../board';
 import { attemptMove } from './rules';
 
@@ -74,7 +72,7 @@ export const deserializeGame = (
 };
 
 export const generateSGF = (
-  history: { board: BoardState; currentPlayer: Player; lastMove: { x: number; y: number } | null }[],
+  history: Pick<HistoryItem, 'currentPlayer' | 'move'>[],
   boardSize: number,
   komi = 7.5,
   initialStones: { x: number; y: number; color: Player }[] = []
@@ -100,10 +98,8 @@ export const generateSGF = (
 
   history.forEach(h => {
     const color = h.currentPlayer === 'black' ? 'B' : 'W';
-    if (h.lastMove) {
-      const moveStr = toSgfCoord(h.lastMove.x) + toSgfCoord(h.lastMove.y);
-      sgf += `;${color}[${moveStr}]`;
-    }
+    const moveStr = h.move ? toSgfCoord(h.move.x) + toSgfCoord(h.move.y) : '';
+    sgf += `;${color}[${moveStr}]`;
   });
 
   sgf += ')';
@@ -119,9 +115,10 @@ export const parseSGF = (
   boardSize: BoardSize;
   blackCaptures: number;
   whiteCaptures: number;
-  history: any[];
+  history: HistoryItem[];
   komi: number;
   initialStones: { x: number; y: number; color: Player }[];
+  lastMove: Point | null;
 } | null => {
   try {
     const szMatch = sgf.match(/SZ\[(\d+)\]/);
@@ -131,9 +128,10 @@ export const parseSGF = (
 
     let board = createBoard(size);
     let currentPlayer: Player = 'black';
-    const history: any[] = [];
+    const history: HistoryItem[] = [];
     let blackCaptures = 0, whiteCaptures = 0;
     let consecutivePasses = 0;
+    let lastMove: Point | null = null;
     const initialStones: { x: number; y: number; color: Player }[] = [];
 
     const abMatch = sgf.match(/AB((?:\[[a-z]{2}\])+)/);
@@ -173,13 +171,15 @@ export const parseSGF = (
         const nextPlayer = player === 'black' ? 'white' : 'black';
         history.push({
           board,
-          currentPlayer: nextPlayer,
-          lastMove: null,
+          currentPlayer: player,
+          lastMove,
+          move: null,
           blackCaptures,
           whiteCaptures,
-          consecutivePasses: consecutivePasses + 1,
+          consecutivePasses,
         });
         consecutivePasses++;
+        lastMove = null;
         currentPlayer = nextPlayer;
         continue;
       }
@@ -190,20 +190,22 @@ export const parseSGF = (
       if (x >= 0 && x < size && y >= 0 && y < size) {
         const result = attemptMove(board, x, y, player);
         if (result) {
+          history.push({
+            board,
+            currentPlayer: player,
+            lastMove,
+            move: { x, y },
+            blackCaptures,
+            whiteCaptures,
+            consecutivePasses,
+          });
           board = result.newBoard;
           if (player === 'black') blackCaptures += result.captured;
           else whiteCaptures += result.captured;
 
           const nextPlayer = player === 'black' ? 'white' : 'black';
-          history.push({
-            board,
-            currentPlayer: nextPlayer,
-            lastMove: { x, y },
-            blackCaptures,
-            whiteCaptures,
-            consecutivePasses: 0,
-          });
           consecutivePasses = 0;
+          lastMove = { x, y };
           currentPlayer = nextPlayer;
         }
       }
@@ -219,6 +221,7 @@ export const parseSGF = (
       history,
       komi,
       initialStones,
+      lastMove,
     };
   } catch (e) {
     console.error('SGF Parse Failed', e);

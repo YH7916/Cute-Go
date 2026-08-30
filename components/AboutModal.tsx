@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { X, Heart, Check, ChevronLeft } from 'lucide-react';
+import { X, Heart, Check, ChevronLeft, Github, ExternalLink } from 'lucide-react';
 import { isTapTapEnv } from '../utils/tapTapBridge';
+
+const PROJECT_REPOSITORY_URL = 'https://github.com/YH7916/Cute-Go';
 
 interface AboutModalProps {
     isOpen: boolean;
@@ -99,8 +101,28 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                              </div>
                              <span className="text-[10px] font-bold text-[#5c4033]">抖音</span>
                          </button>
+
                     </div>
                 </div>
+
+                <a
+                    href={PROJECT_REPOSITORY_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => vibrate(10)}
+                    className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086] text-left flex items-center gap-3 group hover:bg-[#fffaf2] transition-colors"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-[#24292f] text-white flex items-center justify-center shrink-0 group-active:scale-95 transition-transform">
+                        <Github size={22} aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs font-black text-[#5c4033]">本项目开源地址</p>
+                        <p className="text-[10px] font-bold text-[#8c6b38] break-all mt-0.5">
+                            github.com/YH7916/Cute-Go
+                        </p>
+                    </div>
+                    <ExternalLink size={16} className="text-[#8c6b38] shrink-0" aria-hidden="true" />
+                </a>
 
 
                 {!isTapTapEnv() && (

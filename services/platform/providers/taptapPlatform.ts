@@ -271,7 +271,9 @@ const signInWithTapTap = async (): Promise<PlatformAuthResult> => {
 
 export const taptapPlatform: PlatformProvider = {
   name: 'taptap',
-  isNative: isTapTapEnv(),
+  get isNative() {
+    return isTapTapEnv();
+  },
   auth: {
     async restoreSession() {
       return getCurrentAuthState();
@@ -369,7 +371,9 @@ export const taptapPlatform: PlatformProvider = {
     },
   },
   multiplayer: {
-    usesNativeMatchmaking: isTapTapEnv(),
+    get usesNativeMatchmaking() {
+      return isTapTapEnv();
+    },
 
     async startNativeMatch(input): Promise<PlatformLiveMatchSession | null> {
       if (!isTapTapEnv()) return null;
@@ -399,6 +403,9 @@ export const taptapPlatform: PlatformProvider = {
         },
         onDisconnected: () => {
           void input.handlers.onDisconnect?.();
+        },
+        onBattleServiceError: info => {
+          void input.handlers.onError?.(info);
         },
       });
 
@@ -434,6 +441,9 @@ export const taptapPlatform: PlatformProvider = {
         onDisconnected: () => {
           void input.handlers.onDisconnect?.();
         },
+        onBattleServiceError: info => {
+          void input.handlers.onError?.(info);
+        },
       });
 
       return buildLiveMatchSession(matchResult);
@@ -467,6 +477,9 @@ export const taptapPlatform: PlatformProvider = {
         },
         onDisconnected: () => {
           void input.handlers.onDisconnect?.();
+        },
+        onBattleServiceError: info => {
+          void input.handlers.onError?.(info);
         },
       });
 

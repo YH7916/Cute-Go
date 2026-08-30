@@ -144,6 +144,8 @@ const App: React.FC = () => {
         userProfile,
         boardSizeRef,
         gameTypeRef,
+        currentPlayerRef: gameState.currentPlayerRef,
+        myColorRef,
         resetGameRef,
         executeMoveRef,
         handlePassRef,
