@@ -4,7 +4,9 @@ import test from 'node:test';
 import { createBoard } from '../core/board/index.ts';
 import { attemptMove } from '../core/go/rules.ts';
 import { generateSGF, parseSGF } from '../core/go/sgf.ts';
+import { replayHistoryForInference } from '../core/inference/history.ts';
 import { parseNativeMatchMessage } from '../services/platform/nativeMatchMessages.ts';
+import type { HistoryItem } from '../types.ts';
 
 test('attemptMove rejects invalid coordinates without throwing', () => {
   const board = createBoard(9);
@@ -43,6 +45,77 @@ test('SGF history stores pre-action snapshots and preserves moves and passes', (
 
   const exported = generateSGF(parsed.history, 9);
   assert.match(exported, /;B\[aa\];W\[\];B\[bb\]/);
+});
+
+test('AI history replay uses move actions instead of previous-move markers', () => {
+  const initialBoard = createBoard(9);
+  const blackResult = attemptMove(initialBoard, 4, 4, 'black');
+  assert.ok(blackResult);
+  const whiteResult = attemptMove(blackResult.newBoard, 3, 3, 'white');
+  assert.ok(whiteResult);
+
+  const history: HistoryItem[] = [
+    {
+      board: initialBoard,
+      currentPlayer: 'black',
+      blackCaptures: 0,
+      whiteCaptures: 0,
+      lastMove: null,
+      move: { x: 4, y: 4 },
+      consecutivePasses: 0,
+    },
+    {
+      board: blackResult.newBoard,
+      currentPlayer: 'white',
+      blackCaptures: 0,
+      whiteCaptures: 0,
+      lastMove: { x: 4, y: 4 },
+      move: { x: 3, y: 3 },
+      consecutivePasses: 0,
+    },
+  ];
+
+  const replayed = replayHistoryForInference(history, 9);
+
+  assert.deepEqual(replayed.historyMoves, [
+    { color: 1, x: 4, y: 4 },
+    { color: -1, x: 3, y: 3 },
+  ]);
+  assert.deepEqual(replayed.failures, []);
+  assert.equal(replayed.board.get(4, 4), 1);
+  assert.equal(replayed.board.get(3, 3), -1);
+});
+
+test('AI history replay treats only an explicit null move as a pass', () => {
+  const board = createBoard(9);
+  const history: HistoryItem[] = [
+    {
+      board,
+      currentPlayer: 'black',
+      blackCaptures: 0,
+      whiteCaptures: 0,
+      lastMove: { x: 8, y: 8 },
+      move: { x: 4, y: 4 },
+      consecutivePasses: 0,
+    },
+    {
+      board,
+      currentPlayer: 'white',
+      blackCaptures: 0,
+      whiteCaptures: 0,
+      lastMove: { x: 4, y: 4 },
+      move: null,
+      consecutivePasses: 0,
+    },
+  ];
+
+  const replayed = replayHistoryForInference(history, 9);
+
+  assert.deepEqual(replayed.historyMoves, [
+    { color: 1, x: 4, y: 4 },
+    { color: -1, x: -1, y: -1 },
+  ]);
+  assert.deepEqual(replayed.failures, []);
 });
 
 test('TapTap room message parser rejects malformed and out-of-bounds payloads', () => {

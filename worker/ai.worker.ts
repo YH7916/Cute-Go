@@ -2,6 +2,7 @@
 
 import { OnnxEngine, type AnalysisResult } from '../utils/onnx-engine';
 import { MicroBoard, type Sign } from '../utils/micro-board';
+import { replayHistoryForInference } from '../core/inference/history';
 import {
     getCandidateMoves,
     getGomokuScore,
@@ -12,7 +13,7 @@ import {
     calculateModelScore,
     getBeginnerAIMove,
 } from '../utils/goLogic';
-import { BoardState, Player, Point } from '../types';
+import { BoardState, HistoryItem, Player, Point } from '../types';
 
 
 // Define message types
@@ -29,7 +30,7 @@ type WorkerMessage =
     | {
         type: 'compute'; data: {
             board: any[][]; // BoardState
-            history: any[]; // HistoryItem[]
+            history: HistoryItem[];
             color: 'black' | 'white';
             size: number;
             gameType?: 'Go' | 'Gomoku'; // [New]
@@ -641,31 +642,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             // Logic: Replaying the entire history is the only way to ensure the internal 'ko' 
             // and group states of MicroBoard are perfectly synced. 
             // This is extremely fast (< 0.5ms for hundreds of moves).
-            const board = new MicroBoard(size);
-            const historyMoves: { color: Sign; x: number; y: number }[] = [];
-
-            for (const item of gameHistory) {
-                if (item.lastMove) {
-                    const moveColor = item.currentPlayer === 'black' ? 1 : -1;
-                    // Use .play() to ensure captures and ko points are calculated
-                    const ok = board.play(item.lastMove.x, item.lastMove.y, moveColor);
-                    if (!ok) console.warn(`[AI Worker] Move replay failed: (${item.lastMove.x}, ${item.lastMove.y}) color=${moveColor}`);
-
-                    historyMoves.push({
-                        color: moveColor,
-                        x: item.lastMove.x,
-                        y: item.lastMove.y
-                    });
-                } else {
-                    // It was a PASS move in history
-                    historyMoves.push({
-                        color: item.currentPlayer === 'black' ? 1 : -1,
-                        x: -1,
-                        y: -1
-                    });
-                    // Reset ko on pass as per rules
-                    board.ko = -1;
-                }
+            const { board, historyMoves, failures } = replayHistoryForInference(gameHistory, size);
+            for (const failure of failures) {
+                console.warn(
+                    `[AI Worker] Move replay failed at history[${failure.index}]: ` +
+                    `(${failure.x}, ${failure.y}) color=${failure.color}`
+                );
             }
 
             // 3. Run Analysis
