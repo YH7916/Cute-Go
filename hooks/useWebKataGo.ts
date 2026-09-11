@@ -1,3 +1,4 @@
+import { getDefaultKomi } from '../core/go/config';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -9,12 +10,11 @@ interface UseWebKataGoProps {
     boardSize: BoardSize;
     onAiMove: (x: number, y: number) => void;
     onAiPass: () => void;
-    onAiResign: () => void;
     onAiError?: (error: string) => void;
     onAnalysisComplete?: (data: { winRate: number; lead: number; ownership: Float32Array | null }) => void; // [New] KataGo endgame judgment
 }
 
-export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign: _onAiResign, onAiError, onAnalysisComplete }: UseWebKataGoProps) => {
+export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiError, onAnalysisComplete }: UseWebKataGoProps) => {
     const [isWorkerReady, setIsWorkerReady] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
@@ -209,7 +209,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign: _onAiR
         board: BoardState,
         playerColor: Player,
         history: any[],
-        komi: number = 7.5,
+        komi: number = getDefaultKomi(board.length),
         gameType: GameType = 'Go'
     ) => {
         if (!workerRef.current || !isWorkerReadyRef.current) {
@@ -273,7 +273,7 @@ export const useWebKataGo = ({ boardSize, onAiMove, onAiPass, onAiResign: _onAiR
         playerColor: Player,
         history: any[],
         simulations: number = 45,
-        komi: number = 7.5,
+        komi: number = getDefaultKomi(board.length),
         difficulty: 'Fun' | 'Easy' | 'Medium' | 'Hard' = 'Hard',
         temperature: number = 0,
         gameType: GameType = 'Go' // [New]

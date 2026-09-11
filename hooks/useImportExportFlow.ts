@@ -1,3 +1,4 @@
+import { getDefaultKomi } from '../core/go/config';
 import { useCallback, useState } from 'react';
 import { BoardSize, GameType, HistoryItem, Player } from '../types';
 import { deserializeGame, generateSGF, parseSGF } from '../utils/goLogic';
@@ -106,7 +107,7 @@ export const useImportExportFlow = ({
   }, [gameState.history]);
 
   const handleCopy = useCallback(() => {
-    const sgf = generateSGF(getFullHistory(), settings.boardSize, 7.5, initialStones);
+    const sgf = generateSGF(getFullHistory(), settings.boardSize, getDefaultKomi(settings.boardSize), initialStones);
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(sgf).then(() => {
@@ -123,7 +124,7 @@ export const useImportExportFlow = ({
   }, [getFullHistory, initialStones, settings.boardSize, vibrate]);
 
   const handleExportSGF = useCallback(() => {
-    const sgf = generateSGF(getFullHistory(), settings.boardSize, 7.5, initialStones);
+    const sgf = generateSGF(getFullHistory(), settings.boardSize, getDefaultKomi(settings.boardSize), initialStones);
 
     const blob = new Blob([sgf], { type: 'application/x-go-sgf' });
     const url = URL.createObjectURL(blob);

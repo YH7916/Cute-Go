@@ -1,3 +1,4 @@
+import { getDefaultKomi } from '../../core/go/config';
 import { useCallback } from 'react';
 import type { Player } from '../../types';
 import { calculateModelScore, calculateScore } from '../../utils/goLogic';
@@ -30,17 +31,17 @@ export const useScoringAction = ({
       gameState.boardRef.current,
       gameState.currentPlayerRef.current,
       gameState.historyRef.current,
-      settings.boardSize === 9 ? 6.5 : 7.5,
+      getDefaultKomi(settings.boardSize),
       'Go'
     );
     return;
   }
 
   setTimeout(() => {
-    const komi = settings.boardSize === 9 ? 6.5 : 7.5;
+    const komi = getDefaultKomi(settings.boardSize);
     const score = displayTerritory
-      ? calculateModelScore(gameState.boardRef.current, displayTerritory, komi)
-      : calculateScore(gameState.boardRef.current, undefined, komi);
+      ? calculateModelScore(gameState.boardRef.current, displayTerritory, komi, { black: gameState.blackCaptures, white: gameState.whiteCaptures })
+      : calculateScore(gameState.boardRef.current, undefined, komi, { black: gameState.blackCaptures, white: gameState.whiteCaptures });
     const lead = score.black - score.white;
     gameState.setFinalScore(score);
     setShowPassModal(false);

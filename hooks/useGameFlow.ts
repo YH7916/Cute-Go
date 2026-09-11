@@ -1,3 +1,4 @@
+import { getDefaultKomi } from '../core/go/config';
 import { useEffect, useMemo, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { BoardState, Difficulty, GameMode, GameType, HistoryItem, Player } from '../types';
@@ -178,7 +179,7 @@ export const useGameFlow = ({
         let sims = aiConfig.simulations;
         if (sims < 1) sims = 1;
 
-        const komi = settings.boardSize === 9 ? 6.5 : 7.5;
+        const komi = getDefaultKomi(settings.boardSize);
         const t = aiConfig.temperature ?? 0;
 
         requestWebAiMove(

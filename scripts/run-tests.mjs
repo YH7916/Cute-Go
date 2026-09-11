@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
@@ -7,7 +8,7 @@ import { build } from 'esbuild';
 const testDirectory = new URL('../tests/', import.meta.url);
 const testFiles = (await readdir(testDirectory))
   .filter((file) => file.endsWith('.test.ts'))
-  .map((file) => new URL(file, testDirectory).pathname);
+  .map((file) => fileURLToPath(new URL(file, testDirectory)));
 
 if (testFiles.length === 0) {
   throw new Error('No TypeScript test files found');

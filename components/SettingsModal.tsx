@@ -1,3 +1,4 @@
+import { getDefaultKomi } from '../core/go/config';
 import React, { useState, useEffect } from 'react';
 import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, RotateCcw, Palette, FileUp, Home, CircleDot } from 'lucide-react';
 import { BoardSize, GameType, GameMode, Player, Difficulty } from '../types';
@@ -183,6 +184,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
                         </div>
 
+                        {!isGomokuSettings && <p className="text-xs font-bold text-[#8c6b38] px-1">
+                            数目法：围空＋提子＋死子；白贴 {getDefaultKomi(tempBoardSize)} 目
+                        </p>}
                         <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50 landscape:hidden"></div>
                    </div>
                 </div>

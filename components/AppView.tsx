@@ -1,3 +1,4 @@
+import { getDefaultKomi } from '../core/go/config';
 import React from 'react';
 import { Settings, User as UserIcon, Home } from 'lucide-react';
 import { GameBoard } from './GameBoard';
@@ -231,7 +232,7 @@ export const AppView: React.FC<AppViewProps> = ({ vm }) => {
                   ? (currentItem.currentPlayer === 'black' ? 'white' : 'black')
                   : gameState.currentPlayer;
 
-                webAiEngine.requestAnalysis(boardToAnalyze, playerToAnalyze, historySlice, 7.5, settings.gameType);
+                webAiEngine.requestAnalysis(boardToAnalyze, playerToAnalyze, historySlice, getDefaultKomi(settings.boardSize), settings.gameType);
               }
             }}
           />

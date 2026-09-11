@@ -1,14 +1,24 @@
+import { getDefaultKomi } from './config';
 import { BoardState, Point } from '../../types';
 import { getNeighbors, getAllGroups } from '../board';
 
 export const calculateScore = (
   board: BoardState,
   ownership?: Float32Array | null,
-  komi = 7.5
+  komi = getDefaultKomi(board.length),
+  captures: { black: number; white: number } = { black: 0, white: 0 }
 ): { black: number; white: number } => {
-  if (ownership && ownership.length > 0) board = cleanBoardWithTerritory(board, ownership);
+  const original = board;
+  if (ownership && ownership.length === board.length * board.length) board = cleanBoardWithTerritory(board, ownership);
   const size = board.length;
-  let blackScore = 0, whiteScore = 0;
+  let blackScore = captures.black, whiteScore = captures.white;
+  // Removed dead stones count as prisoners, and their empty intersections as territory.
+  for (let y = 0; y < board.length; y++) for (let x = 0; x < board.length; x++) {
+    if (original[y][x] && !board[y][x]) {
+      if (original[y][x]!.color === 'black') whiteScore++;
+      else blackScore++;
+    }
+  }
   const visited = new Set<number>();
 
   for (let y = 0; y < size; y++) {
@@ -18,7 +28,6 @@ export const calculateScore = (
 
       const stone = board[y][x];
       if (stone) {
-        if (stone.color === 'black') blackScore++; else whiteScore++;
         visited.add(idx);
       } else {
         const region: Point[] = [];
@@ -51,50 +60,23 @@ export const calculateScore = (
   return { black: blackScore, white: whiteScore };
 };
 
-const MODEL_TERRITORY_THRESHOLD = 0.3;
-
+// Ownership is only used to identify dead groups. Final territory is flood-filled,
+// never awarded by thresholding predictions at individual empty intersections.
 export const calculateModelScore = (
   board: BoardState,
   ownership: Float32Array | null,
-  komi = 7.5
-): { black: number; white: number } => {
-  if (!ownership || ownership.length === 0) return calculateScore(board, undefined, komi);
-
-  const cleanedBoard = cleanBoardWithTerritory(board, ownership);
-  const size = cleanedBoard.length;
-  let blackScore = 0, whiteScore = 0;
-
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const stone = cleanedBoard[y][x];
-      if (stone) {
-        if (stone.color === 'black') blackScore++; else whiteScore++;
-        continue;
-      }
-      const owner = ownership[y * size + x] ?? 0;
-      if (owner > MODEL_TERRITORY_THRESHOLD) blackScore++;
-      else if (owner < -MODEL_TERRITORY_THRESHOLD) whiteScore++;
-    }
-  }
-
-  whiteScore += komi;
-  return { black: blackScore, white: whiteScore };
-};
+  komi = getDefaultKomi(board.length),
+  captures: { black: number; white: number } = { black: 0, white: 0 }
+): { black: number; white: number } => calculateScore(board, ownership, komi, captures);
 
 export const cleanBoardWithTerritory = (board: BoardState, territory: Float32Array): BoardState => {
-  const size = board.length;
+  if (territory.length !== board.length * board.length) return board;
   const newBoard = board.map(row => row.map(s => (s ? { ...s } : null)));
-
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = y * size + x;
-      const owner = territory[idx];
-      const stone = newBoard[y][x];
-      if (stone) {
-        if (stone.color === 'black' && owner < -0.5) newBoard[y][x] = null;
-        else if (stone.color === 'white' && owner > 0.5) newBoard[y][x] = null;
-      }
-    }
+  for (const group of getAllGroups(board)) {
+    const sign = group.stones[0].color === 'black' ? 1 : -1;
+    // Require unanimous strong evidence: do not split a connected chain.
+    const dead = group.stones.every(s => territory[s.y * board.length + s.x] * sign < -0.9);
+    if (dead) for (const stone of group.stones) newBoard[stone.y][stone.x] = null;
   }
   return newBoard;
 };

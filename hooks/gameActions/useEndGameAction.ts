@@ -1,6 +1,7 @@
+import { getDefaultKomi } from '../../core/go/config';
 import { useCallback } from 'react';
 import type { Player } from '../../types';
-import { calculateScore, cleanBoardWithTerritory } from '../../utils/goLogic';
+import { calculateScore } from '../../utils/goLogic';
 import { calculateElo, calculateNewRating, getAiRating } from '../../utils/helpers';
 import { platform } from '../../services/platform';
 import type { UseGameActionsOptions } from './types';
@@ -40,15 +41,9 @@ export const useEndGameAction = ({
   if (session?.user?.id && (settings.gameMode === 'PvAI' || onlineStatus === 'connected')) {
     const myPlayerColor = onlineStatus === 'connected' ? myColor : settings.userColor;
 
-    let finalBoard = gameState.boardRef.current;
-    if (settings.gameMode === 'PvAI' && displayTerritory && displayTerritory.length === settings.boardSize * settings.boardSize) {
-      console.log("[EndGame] Applying AI Dead Stone Removal...");
-      finalBoard = cleanBoardWithTerritory(finalBoard, displayTerritory);
-      gameState.setBoard(finalBoard);
-    }
-
-    const komi = settings.boardSize === 9 ? 6.5 : 7.5;
-    const currentScore = calculateScore(finalBoard, undefined, komi);
+    const finalBoard = gameState.boardRef.current;
+    const komi = getDefaultKomi(settings.boardSize);
+    const currentScore = calculateScore(finalBoard, displayTerritory, komi, { black: gameState.blackCaptures, white: gameState.whiteCaptures });
     checkEndGameAchievements({
       winner: winnerColor,
       myColor: myPlayerColor || 'black',

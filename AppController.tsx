@@ -1,3 +1,4 @@
+import { getDefaultKomi } from './core/go/config';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -215,18 +216,17 @@ const App: React.FC = () => {
             }, 200);
         },
         onAiPass: () => handlePass(false),
-        onAiResign: () => endGame(settings.userColor, 'AI 认为胜率过低，投子认输'),
         onAiError: handleAiError,
         onAnalysisComplete: (data) => {
             if (!pendingEndGameRef.current) return;
             pendingEndGameRef.current = false;
             console.log('[App] KataGo Endgame Analysis:', data);
-            const komi = settings.boardSize === 9 ? 6.5 : 7.5;
+            const komi = getDefaultKomi(settings.boardSize);
             const finalBoard = gameState.boardRef.current;
             const cleanedBoard = data.ownership ? cleanBoardWithTerritory(finalBoard, data.ownership) : finalBoard;
             const score = data.ownership
-                ? calculateModelScore(finalBoard, data.ownership, komi)
-                : calculateScore(cleanedBoard, undefined, komi);
+                ? calculateModelScore(finalBoard, data.ownership, komi, { black: gameState.blackCaptures, white: gameState.whiteCaptures })
+                : calculateScore(cleanedBoard, undefined, komi, { black: gameState.blackCaptures, white: gameState.whiteCaptures });
             const lead = score.black - score.white;
             gameState.setBoard(cleanedBoard);
             gameState.setFinalScore(score);

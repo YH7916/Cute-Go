@@ -1,3 +1,4 @@
+import { getDefaultKomi } from './config';
 import { BoardState, Player, GameType, BoardSize, HistoryItem, Point } from '../../types';
 import { createBoard } from '../board';
 import { attemptMove } from './rules';
@@ -74,12 +75,12 @@ export const deserializeGame = (
 export const generateSGF = (
   history: Pick<HistoryItem, 'currentPlayer' | 'move'>[],
   boardSize: number,
-  komi = 7.5,
+  komi = getDefaultKomi(boardSize),
   initialStones: { x: number; y: number; color: Player }[] = []
 ): string => {
   const date = new Date().toISOString().split('T')[0];
   let sgf = `(;GM[1]FF[4]CA[UTF-8]AP[CuteGo:1.0]ST[2]\n`;
-  sgf += `RU[Chinese]SZ[${boardSize}]KM[${komi}]\n`;
+  sgf += `RU[CuteGo Territory]SZ[${boardSize}]KM[${komi}]\n`;
   sgf += `DT[${date}]PW[White]PB[Black]GN[CuteGo Game]\n`;
 
   const toSgfCoord = (c: number) => String.fromCharCode(97 + c);
@@ -124,7 +125,7 @@ export const parseSGF = (
     const szMatch = sgf.match(/SZ\[(\d+)\]/);
     const size = szMatch ? parseInt(szMatch[1]) : 19;
     const komiMatch = sgf.match(/KM\[([\d.]+)\]/);
-    const komi = komiMatch ? parseFloat(komiMatch[1]) : 7.5;
+    const komi = komiMatch ? parseFloat(komiMatch[1]) : getDefaultKomi(size);
 
     let board = createBoard(size);
     let currentPlayer: Player = 'black';

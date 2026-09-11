@@ -1,3 +1,5 @@
+import { extractPolicyMoves } from './policy';
+import { getDefaultKomi } from '../../core/go/config';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as ort from 'onnxruntime-web';
@@ -224,7 +226,7 @@ export class OnnxEngine {
 
         const size = board.size;
         this.boardSize = size;
-        const komi = options.komi ?? 7.5;
+        const komi = options.komi ?? getDefaultKomi(board.size);
         const history = options.history || [];
 
         const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
@@ -303,9 +305,9 @@ export class OnnxEngine {
 
             // 提取最佳着手
             // 直接传入 policyData，它已经是正确的大小了
-            const moveInfos = this.extractMoves(policyData, size, board, color, options.temperature ?? 0);
+            const moveInfos = extractPolicyMoves(policyData, size, board, color, options.temperature ?? 0);
             
-            const resultMoves = isMobile ? moveInfos.slice(0, 1) : moveInfos;
+            const resultMoves = moveInfos;
 
             // Log detailed results (Desktop Only)
             if (!isMobile) {
@@ -443,6 +445,7 @@ export class OnnxEngine {
         
         const relativeKomi = (pla === -1) ? komi : -komi;
         setGlobal(5, relativeKomi / 20.0);
+        setGlobal(9, 1.0); // Territory scoring, no tax (KataGo input v7).
     }
 
     private processWinrate(valueData: Float32Array): number {
@@ -496,99 +499,6 @@ export class OnnxEngine {
         const T = 5.0; 
         const winProbability = 1 / (1 + Math.exp(-scoreLead / T));
         return winProbability * 100;
-    }
-
-    private extractMoves(policy: Float32Array, size: number, board: MicroBoard, color: Sign, temperature: number) {
-        // Policy is just a flat array of logits?
-        
-        // Find max for stability
-        let maxLogit = -Infinity;
-        for (let i = 0; i < policy.length; i++) {
-            if (policy[i] > maxLogit) maxLogit = policy[i];
-        }
-
-        const probs = new Float32Array(policy.length);
-        let sumProbs = 0;
-        for (let i = 0; i < policy.length; i++) {
-            probs[i] = Math.exp(policy[i] - maxLogit);
-            sumProbs += probs[i];
-        }
-        // Normalize
-        for (let i = 0; i < policy.length; i++) {
-            probs[i] /= sumProbs;
-        }
-
-        const moves: any[] = [];
-        for (let y = 0; y < size; y++) {
-            for (let x = 0; x < size; x++) {
-                const idx = y * size + x;
-                const p = probs[idx];
-                
-                // Only return legal moves with some probability
-                if (p > 0.0001) { // Lower threshold to allow checking more moves
-                     // Use isLegal to check for Suicides and Ko
-                     if (board.isLegal(x, y, color)) { 
-                          moves.push({
-                             x, y,
-                             prior: p,
-                             logit: policy[idx], // Save Logit for temperature
-                             winrate: 0,
-                             vists: 0,
-                             u: 0, scoreMean: 0, scoreStdev: 0, lead: 0
-                          });
-                     } else {
-                         // console.log(`[Debug] Illegal move skipped: ${x},${y} (Prob: ${p})`);
-                     }
-                 }
-            }
-        }
-        
-        // Pass move
-        const passIdx = size * size;
-        if (probs.length > passIdx) {
-             const passProb = probs[passIdx];
-             if (passProb > 0.001) {
-                 moves.push({ x: -1, y: -1, prior: passProb, winrate: 0, lead: 0, vists: 0, u: 0, scoreMean: 0, scoreStdev: 0 });
-             }
-        }
-
-        // Sort by prob (Argmax)
-        moves.sort((a, b) => b.prior - a.prior);
-
-        // [Fix] Force Pass if it's the best move
-        // If the AI thinks Passing is the best move (highest probability), 
-        // we should respect it immediately and not let Temperature sample a stupid move (like filling own territory).
-        // Refusing to pass when the game is done is "Broken", not "Weak".
-        if (moves.length > 0 && moves[0].x === -1) {
-            return [moves[0]];
-        }
-
-        // Temperature Sampling
-        if (temperature > 0) {
-            // Re-calculate probabilities using softmax with temperature
-            // P = exp(logit / T) / Sum
-            
-            // 1. Find max (for numerical stability)
-            let maxL = -Infinity;
-            for (const m of moves) maxL = Math.max(maxL, m.logit);
-            
-            // 2. Sum Exponentials
-            const weightedMoves = moves.map(m => {
-                const w = Math.exp((m.logit - maxL) / temperature);
-                return { ...m, weight: w };
-            });
-
-            // 3. Sample
-            // 3. Sample
-            // [Refactor] Instead of returning one move, we return ALL weighted moves so the caller (worker) 
-            // can iterate through them and validte legality (suicide, superko) which the engine might miss.
-            // We sort them by weight (descending) solely for debug/logging clarity, 
-            // but the caller should sample using weights.
-            weightedMoves.sort((a,b) => b.weight - a.weight);
-            return weightedMoves;
-        }
-
-        return moves;
     }
 
     dispose() {

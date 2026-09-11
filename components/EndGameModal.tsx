@@ -59,13 +59,13 @@ export const EndGameModal: React.FC<EndGameModalProps> = ({
                     {finalScore && (
                          <div className="flex gap-8 mb-6 landscape:mb-4 text-sm font-bold text-[#5c4033]">
                             <div className="flex flex-col items-center">
-                                <span className="text-xs text-[#8c6b38] uppercase">黑方得分</span>
-                                <span className="text-xl text-black">{finalScore.black}</span>
+                                <span className="text-xs text-[#8c6b38] uppercase">黑方目数</span>
+                                <span className="text-xl text-black">{finalScore.black} 目</span>
                             </div>
                             <div className="w-px bg-[#e3c086]"></div>
                             <div className="flex flex-col items-center">
-                                <span className="text-xs text-[#8c6b38] uppercase">白方得分</span>
-                                <span className="text-xl text-gray-500">{finalScore.white}</span>
+                                <span className="text-xs text-[#8c6b38] uppercase">白方目数（含贴目）</span>
+                                <span className="text-xl text-gray-500">{finalScore.white} 目</span>
                             </div>
                          </div>
                     )}

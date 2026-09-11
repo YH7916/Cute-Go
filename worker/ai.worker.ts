@@ -1,7 +1,11 @@
+import { runOwnershipSearch } from '../core/inference/search';
+import { selectMoveByDifficulty } from '../core/inference/selection';
+import { canPass } from '../core/inference/policy';
+import { getDefaultKomi } from '../core/go/config';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { OnnxEngine, type AnalysisResult } from '../utils/onnx-engine';
-import { MicroBoard, type Sign } from '../utils/micro-board';
+import type { Sign } from '../utils/micro-board';
 import { replayHistoryForInference } from '../core/inference/history';
 import {
     getCandidateMoves,
@@ -55,12 +59,6 @@ let initPromise: Promise<void> | null = null;
 let initWatchdog: any = null;
 const WATCHDOG_TIMEOUT = 30000; // 30s safety net
 
-// Ownership threshold for dead stone filtering.
-// If a position's ownership magnitude exceeds this value for the opponent,
-// it is considered "confirmed enemy territory" and moves there are skipped.
-// 0.65 keeps it conservative so only clearly-dead positions are filtered.
-const OWNERSHIP_DEAD_THRESHOLD = 0.65;
-
 const clearWatchdog = () => {
     if (initWatchdog) {
         clearTimeout(initWatchdog);
@@ -75,272 +73,6 @@ const clampPercent = (value: number) => {
 
 const toBlackPerspectiveWinRate = (winRate: number, toPlay: Player) =>
     toPlay === 'black' ? clampPercent(winRate) : clampPercent(100 - winRate);
-
-const sampleIndexByWeight = (weights: number[]) => {
-    const total = weights.reduce((sum, weight) => sum + weight, 0);
-    if (total <= 0) return 0;
-
-    let roll = Math.random() * total;
-    for (let i = 0; i < weights.length; i++) {
-        roll -= weights[i];
-        if (roll <= 0) return i;
-    }
-    return weights.length - 1;
-};
-
-const getDifficultyPoolSize = (difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard') => {
-    if (difficulty === 'Medium') return 8;
-    return Infinity;
-};
-
-type SearchHistoryMove = { color: Sign; x: number; y: number };
-
-type SearchNode = {
-    parent: SearchNode | null;
-    move: { x: number; y: number } | null;
-    board: MicroBoard;
-    history: SearchHistoryMove[];
-    toPlay: Sign;
-    prior: number;
-    visits: number;
-    valueSum: number;
-    children: SearchNode[];
-    expanded: boolean;
-    analysis: AnalysisResult | null;
-};
-
-const MAX_ANALYSIS_VISITS = 32;
-const MAX_ANALYSIS_BRANCH = 10;
-const ANALYSIS_CPUCT = 1.35;
-
-const cloneOwnership = (ownership: Float32Array | null | undefined) =>
-    ownership ? new Float32Array(ownership) : null;
-
-const addOwnershipInPlace = (target: Float32Array, source: Float32Array) => {
-    const len = Math.min(target.length, source.length);
-    for (let i = 0; i < len; i++) target[i] += source[i];
-};
-
-const scaleOwnership = (source: Float32Array, factor: number) => {
-    const out = new Float32Array(source.length);
-    for (let i = 0; i < source.length; i++) out[i] = source[i] * factor;
-    return out;
-};
-
-const selectSearchChild = (node: SearchNode) => {
-    let bestChild: SearchNode | null = null;
-    let bestScore = -Infinity;
-    const sqrtVisits = Math.sqrt(Math.max(1, node.visits));
-
-    for (const child of node.children) {
-        const q = child.visits > 0 ? 1 - (child.valueSum / child.visits) : 0.5;
-        const u = ANALYSIS_CPUCT * child.prior * (sqrtVisits / (1 + child.visits));
-        const score = q + u;
-        if (score > bestScore) {
-            bestScore = score;
-            bestChild = child;
-        }
-    }
-
-    return bestChild;
-};
-
-const expandSearchNode = (
-    node: SearchNode,
-    analysis: AnalysisResult
-) => {
-    node.expanded = true;
-    node.analysis = analysis;
-
-    const sortedMoves = [...analysis.moves]
-        .filter((move) => move.x >= 0 && move.y >= 0)
-        .sort((a, b) => b.prior - a.prior);
-
-    const limitedMoves = sortedMoves.slice(0, MAX_ANALYSIS_BRANCH);
-    const passMove = analysis.moves.find((move) => move.x === -1 && move.y === -1);
-    if (passMove) limitedMoves.push(passMove);
-
-    for (const move of limitedMoves) {
-        const childBoard = node.board.clone();
-        let moveOk = true;
-
-        if (move.x >= 0 && move.y >= 0) {
-            moveOk = childBoard.play(move.x, move.y, node.toPlay);
-        } else {
-            childBoard.ko = -1;
-        }
-
-        if (!moveOk) continue;
-
-        const childHistory = [...node.history, {
-            color: node.toPlay,
-            x: move.x,
-            y: move.y
-        }];
-
-        node.children.push({
-            parent: node,
-            move: move.x >= 0 && move.y >= 0 ? { x: move.x, y: move.y } : null,
-            board: childBoard,
-            history: childHistory,
-            toPlay: (node.toPlay === 1 ? -1 : 1),
-            prior: Math.max(move.prior, 0.0001),
-            visits: 0,
-            valueSum: 0,
-            children: [],
-            expanded: false,
-            analysis: null
-        });
-    }
-};
-
-const runOwnershipSearch = async (
-    rootBoard: MicroBoard,
-    rootToPlay: Sign,
-    historyMoves: SearchHistoryMove[],
-    boardSize: number,
-    komi: number,
-    difficulty: 'Fun' | 'Easy' | 'Medium' | 'Hard' | undefined,
-    temperature: number | undefined,
-    requestedVisits: number | undefined
-) => {
-    if (!engine) throw new Error('AI Engine unavailable for ownership search.');
-
-    const visitBudget = Math.max(1, Math.min(requestedVisits ?? 16, MAX_ANALYSIS_VISITS));
-    const root: SearchNode = {
-        parent: null,
-        move: null,
-        board: rootBoard.clone(),
-        history: [...historyMoves],
-        toPlay: rootToPlay,
-        prior: 1,
-        visits: 0,
-        valueSum: 0,
-        children: [],
-        expanded: false,
-        analysis: null
-    };
-
-    let ownershipSum: Float32Array | null = null;
-    let ownershipCount = 0;
-
-    for (let visit = 0; visit < visitBudget; visit++) {
-        let node = root;
-
-        while (node.expanded && node.children.length > 0) {
-            const next = selectSearchChild(node);
-            if (!next) break;
-            node = next;
-        }
-
-        const analysis = await engine.analyze(node.board, node.toPlay, {
-            history: node.history,
-            komi,
-            difficulty,
-            temperature
-        });
-
-        expandSearchNode(node, analysis);
-
-        const ownership = cloneOwnership(analysis.rootInfo.ownership);
-        if (ownership) {
-            if (!ownershipSum) ownershipSum = new Float32Array(ownership.length);
-            addOwnershipInPlace(ownershipSum, ownership);
-            ownershipCount++;
-        }
-
-        let value = Math.max(0, Math.min(1, analysis.rootInfo.winrate / 100));
-        let current: SearchNode | null = node;
-        while (current) {
-            current.visits += 1;
-            current.valueSum += value;
-            value = 1 - value;
-            current = current.parent;
-        }
-    }
-
-    const rootChildren = [...root.children].sort((a, b) => b.visits - a.visits);
-    const bestChild = rootChildren[0] ?? null;
-    const averagedOwnership = ownershipSum && ownershipCount > 0
-        ? scaleOwnership(ownershipSum, 1 / ownershipCount)
-        : root.analysis?.rootInfo.ownership ?? null;
-
-    const fallbackAnalysis = root.analysis ?? await engine.analyze(root.board, root.toPlay, {
-        history: root.history,
-        komi,
-        difficulty,
-        temperature
-    });
-
-    return {
-        move: bestChild?.move ?? null,
-        winRate: root.visits > 0 ? (root.valueSum / root.visits) * 100 : fallbackAnalysis.rootInfo.winrate,
-        lead: fallbackAnalysis.rootInfo.lead,
-        scoreStdev: fallbackAnalysis.rootInfo.scoreStdev,
-        ownership: averagedOwnership,
-        visits: root.visits
-    };
-};
-
-const getDifficultyRankBias = (difficulty: 'Fun' | 'Easy' | 'Medium' | 'Hard' | undefined, rank: number) => {
-    if (difficulty === 'Easy') {
-        // 峰值在 rank 8-12，让 AI 倾向于选较差的棋而不是最好的
-        // rank 0-3（最好的棋）权重很低，rank 8-12 权重最高
-        const table = [0.05, 0.08, 0.12, 0.18, 0.35, 0.55, 0.75, 0.90, 1.0, 1.0, 0.95, 0.85, 0.70, 0.50, 0.30, 0.15, 0.08, 0.05, 0.03, 0.02];
-        return table[rank] ?? 0.01;
-    }
-
-    if (difficulty === 'Medium') {
-        // 峰值在 rank 2-3，偶尔选次优棋
-        const table = [0.5, 0.85, 1.0, 0.9, 0.6, 0.35, 0.15, 0.05];
-        return table[rank] ?? 0.03;
-    }
-
-    return 1;
-};
-
-const selectMoveByDifficulty = (
-    candidates: RankedMove[],
-    validationBoard: BoardState,
-    color: Player,
-    previousBoardHash: string | null,
-    difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard'
-) => {
-    const poolSize = Math.min(candidates.length, getDifficultyPoolSize(difficulty));
-    const weightedPool = candidates
-        .slice(0, poolSize)
-        .map((candidate, rank) => ({ candidate, rank }));
-
-    while (weightedPool.length > 0) {
-        const weights = weightedPool.map(({ candidate, rank }) => {
-            const baseWeight = Math.max((candidate as any).weight || candidate.prior || 0.0001, 0.0001);
-            return baseWeight * getDifficultyRankBias(difficulty, rank);
-        });
-
-        const selectedIndex = sampleIndexByWeight(weights);
-        const [{ candidate }] = weightedPool.splice(selectedIndex, 1);
-
-        if (candidate.x === -1) {
-            if (difficulty === 'Easy' || difficulty === 'Medium') {
-                continue;
-            }
-            return null;
-        }
-
-        if (attemptMove(validationBoard, candidate.x, candidate.y, color, 'Go', previousBoardHash)) {
-            return { x: candidate.x, y: candidate.y };
-        }
-    }
-
-    for (const candidate of candidates) {
-        if (candidate.x === -1) return null;
-        if (attemptMove(validationBoard, candidate.x, candidate.y, color, 'Go', previousBoardHash)) {
-            return { x: candidate.x, y: candidate.y };
-        }
-    }
-
-    return undefined;
-};
 
 const ctx: Worker = self as any;
 
@@ -652,12 +384,19 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
             // 3. Run Analysis
             console.log("[AI Worker] Calling engine.analyze...");
-            const effectiveKomi = komi ?? 7.5;
+            const effectiveKomi = komi ?? getDefaultKomi(size);
+            const last = gameHistory[gameHistory.length - 1];
+            const captures = { black: last?.blackCaptures ?? 0, white: last?.whiteCaptures ?? 0 };
+            if (last?.move) {
+                const previousOpponent = last.board.flat().filter(s => s && s.color !== last.currentPlayer).length;
+                const currentOpponent = boardState.flat().filter(s => s && s.color !== last.currentPlayer).length;
+                captures[last.currentPlayer] += Math.max(0, previousOpponent - currentOpponent);
+            }
 
             if (mode === 'analyze') {
                 console.log("[AI Worker] Analysis Mode: Running Kaya-style root search...");
                 const analyzed = await runOwnershipSearch(
-                    board,
+                    engine, board,
                     pla,
                     historyMoves,
                     size,
@@ -668,7 +407,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 );
 
                 const blackLead = (() => {
-                    const score = calculateModelScore(boardState as BoardState, analyzed.ownership ?? null, effectiveKomi);
+                    const score = calculateModelScore(boardState as BoardState, analyzed.ownership ?? null, effectiveKomi, captures);
                     return score.black - score.white;
                 })();
                 // 直接用模型输出的真实胜率，不用 lead 推算
@@ -687,11 +426,15 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 return;
             }
 
-            const result = await engine.analyze(board, pla, {
-                history: historyMoves,
-                komi: effectiveKomi,
-                difficulty: difficulty,
-                temperature: temperature
+            const searched = difficulty === 'Hard'
+                ? await runOwnershipSearch(engine, board, pla, historyMoves, size, effectiveKomi, difficulty, 0, simulations)
+                : null;
+            const result = searched ? {
+                ...searched.rootAnalysis,
+                moves: [...searched.rankedMoves, ...searched.rootAnalysis.moves.filter(m =>
+                    !searched.rankedMoves.some(r => r.x === m.x && r.y === m.y))]
+            } : await engine.analyze(board, pla, {
+                history: historyMoves, komi: effectiveKomi, difficulty, temperature
             });
             console.log("[AI Worker] Analysis returned.");
 
@@ -713,25 +456,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 // Candidates list
                 let candidates = [...result.moves];
 
-                // --- Dead Stone Filter (Ownership-Based) ---
-                // Skip moves inside clearly dead groups using the model's ownership output.
-                const ownership = result.rootInfo.ownership;
-                if (ownership && ownership.length > 0) {
-                    const plaSign = (color === 'black') ? 1 : -1;
-                    const filteredCandidates = candidates.filter(m => {
-                        if (m.x < 0) return true;
-                        const ownerVal = ownership[m.y * size + m.x] ?? 0;
-                        const isEnemyTerritory = (plaSign === 1)
-                            ? (ownerVal < -OWNERSHIP_DEAD_THRESHOLD)
-                            : (ownerVal > OWNERSHIP_DEAD_THRESHOLD);
-                        return !isEnemyTerritory;
-                    });
-                    const skipped = candidates.length - filteredCandidates.length;
-                    if (skipped > 0) console.log('[AI Worker] Dead stone filter: skipped ' + skipped + '/' + candidates.length + ' moves.');
-                    if (filteredCandidates.length > 0) candidates = filteredCandidates;
-                }
-
-                if (difficulty === 'Easy' || difficulty === 'Medium') {
+                const passAllowed = canPass(size, gameHistory.length, gameHistory[gameHistory.length - 1]?.move === null);
+                if (!passAllowed) candidates = candidates.filter(m => m.x >= 0);
+                // Ownership predicts the outcome, not move legality; never delete tactical replies.
+                if (passAllowed && candidates[0]?.x === -1) {
+                    selectedMove = null;
+                } else if (difficulty === 'Easy' || difficulty === 'Medium') {
                     selectedMove = selectMoveByDifficulty(candidates as RankedMove[], validationBoard, color, prevHash, difficulty);
                 } else if (temperature && temperature > 0) {
                     selectedMove = selectMoveByDifficulty(candidates as RankedMove[], validationBoard, color, prevHash, difficulty);
@@ -749,11 +479,21 @@ ctx.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 selectedMove = null; // Pass
             }
 
+            if (selectedMove == null && !canPass(size, gameHistory.length, gameHistory[gameHistory.length - 1]?.move === null)) {
+                const prevHash = gameHistory.length ? getBoardHash(gameHistory[gameHistory.length - 1].board) : null;
+                outer: for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+                    if (attemptMove(boardState as BoardState, x, y, color, 'Go', prevHash)) {
+                        selectedMove = { x, y };
+                        break outer;
+                    }
+                }
+            }
+
             if (selectedMove === undefined) selectedMove = null; // Safety
 
             const isPass = selectedMove === null;
             const blackLead = (() => {
-                const score = calculateModelScore(boardState as BoardState, result.rootInfo.ownership ?? null, effectiveKomi);
+                const score = calculateModelScore(boardState as BoardState, result.rootInfo.ownership ?? null, effectiveKomi, captures);
                 return score.black - score.white;
             })();
             // 直接用模型输出的真实胜率，不用 lead 推算
