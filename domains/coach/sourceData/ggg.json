@@ -1,0 +1,4748 @@
+{
+  "sourceCommit": "eee12b2e39d59dbe81a8b9eaa7d4f103978d9224",
+  "problems": [
+    {
+      "id": "ggg-easy-25",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-25.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 13,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 12,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 12,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 11,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 12,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 11,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 11,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 12,
+          "y": 18,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 18,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 14,
+              "y": 18
+            },
+            "correct": true,
+            "wrong": false,
+            "text": "正确。",
+            "boardMarks": [],
+            "children": []
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 14,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 14,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 13,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 14,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-06",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-06.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 13,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 18,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 17
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 16,
+                      "y": 15
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 16,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-10",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-10.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 15,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 13,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 11,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 12,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 17,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 13,
+                      "y": 18
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "color": "white",
+                "point": {
+                  "x": 13,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 16
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 13,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-15",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-15.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 14,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 12,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 11,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 11,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 11,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 12,
+          "y": 18,
+          "color": "white"
+        },
+        {
+          "x": 12,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 18,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 18,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 17,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 17,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 18,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 16,
+                      "y": 18
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 13,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 17,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 18,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 17,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 18,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 17,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-20",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-20.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 17,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 18,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 18,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 17,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 17,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 17,
+                      "y": 16
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "color": "white",
+                "point": {
+                  "x": 17,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 18
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 17,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 17,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 17,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-47",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-47.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 15,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 18,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 18,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 17,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 14,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 16,
+                      "y": 18
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 17,
+                      "y": 17
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "color": "white",
+                "point": {
+                  "x": 16,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 14,
+                      "y": 18
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 14,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 17,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 17
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 16,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-11",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-11.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 14,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 18,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 17,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 17,
+                      "y": 17
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 17,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 18,
+                  "y": 17
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 17,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 18,
+                  "y": 17
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 18,
+                      "y": 16
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 17
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 17,
+                      "y": 17
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 18,
+                          "y": 16
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-05",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-05.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 18,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 18,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 18,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 17
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 16,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 17
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 16
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 15,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 15,
+                          "y": 16
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 16,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-35",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-35.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 2,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 0,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 1,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 1,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 2,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 0,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 3,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 3,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 1,
+          "y": 13,
+          "color": "white"
+        },
+        {
+          "x": 2,
+          "y": 13,
+          "color": "white"
+        },
+        {
+          "x": 3,
+          "y": 13,
+          "color": "white"
+        },
+        {
+          "x": 1,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 4,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 3,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 4,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 2,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 4,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 4,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 1,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 2,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 1,
+                      "y": 17
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 1,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 1,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 2,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 2,
+                          "y": 17
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 0,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 2,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 2,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 1,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 3,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 2,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-89",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-89.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 15,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 12,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 12,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 18,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 16,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 15
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 15
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 16
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 18,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 12,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-74",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-74.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 4,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 4,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 3,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 6,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 7,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 0,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 2,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 3,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 7,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 1,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 6,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 2,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 3,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 1,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 2,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 4,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 1,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 4,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 5,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 6,
+          "y": 17,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 4,
+              "y": 18
+            },
+            "correct": true,
+            "wrong": false,
+            "text": "正确。白棋不能在 A 处切断，因为那样会让自己只剩一口气。",
+            "boardMarks": [
+              {
+                "point": {
+                  "x": 5,
+                  "y": 18
+                },
+                "label": "A"
+              }
+            ],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 3,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 2,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 0,
+                          "y": 16
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": [
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 5,
+                              "y": 16
+                            },
+                            "correct": true,
+                            "wrong": false,
+                            "text": "正确。",
+                            "boardMarks": [],
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 5,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 3,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 2,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 0,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 5,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 2,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 5,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 3,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 5,
+                      "y": 16
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 2,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 2,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 0,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "现在白棋可以打劫，但黑棋本来可以避免这一点。",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 4,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 0,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 5,
+                      "y": 16
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 0,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 5,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 0,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 3,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 4,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-71",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-71.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 1,
+          "y": 12,
+          "color": "black"
+        },
+        {
+          "x": 0,
+          "y": 13,
+          "color": "black"
+        },
+        {
+          "x": 1,
+          "y": 13,
+          "color": "black"
+        },
+        {
+          "x": 1,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 2,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 1,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 2,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 1,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 1,
+          "y": 9,
+          "color": "white"
+        },
+        {
+          "x": 1,
+          "y": 11,
+          "color": "white"
+        },
+        {
+          "x": 2,
+          "y": 11,
+          "color": "white"
+        },
+        {
+          "x": 0,
+          "y": 12,
+          "color": "white"
+        },
+        {
+          "x": 2,
+          "y": 12,
+          "color": "white"
+        },
+        {
+          "x": 2,
+          "y": 13,
+          "color": "white"
+        },
+        {
+          "x": 3,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 4,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 3,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 2,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 3,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 1,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 0,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 2,
+                  "y": 15
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 0,
+                      "y": 17
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。如果白棋下在 A，黑棋可以在 B 提子。如果白棋下在 B，黑棋就在 A 连接，因此黑棋有两只眼，可以活棋。",
+                    "boardMarks": [
+                      {
+                        "point": {
+                          "x": 1,
+                          "y": 15
+                        },
+                        "label": "A"
+                      },
+                      {
+                        "point": {
+                          "x": 3,
+                          "y": 15
+                        },
+                        "label": "B"
+                      }
+                    ],
+                    "children": []
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 1,
+                      "y": 15
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 0,
+                          "y": 17
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": [
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 3,
+                              "y": 15
+                            },
+                            "correct": false,
+                            "wrong": false,
+                            "text": "",
+                            "boardMarks": [],
+                            "children": [
+                              {
+                                "color": "white",
+                                "point": {
+                                  "x": 4,
+                                  "y": 14
+                                },
+                                "correct": false,
+                                "wrong": false,
+                                "text": "",
+                                "boardMarks": [],
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "color": "white",
+                "point": {
+                  "x": 0,
+                  "y": 17
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 2,
+                      "y": 15
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 2,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 0,
+                  "y": 15
+                },
+                "correct": false,
+                "wrong": true,
+                "text": "现在黑棋无法做出两只眼。",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 0,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 0,
+                  "y": 15
+                },
+                "correct": false,
+                "wrong": true,
+                "text": "这是要点。白棋下在这里后，黑棋就会死。",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-91",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-91.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 17,
+          "y": 10,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 11,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 12,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 13,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 13,
+          "color": "black"
+        },
+        {
+          "x": 18,
+          "y": 13,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 10,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 10,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 11,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 11,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 11,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 12,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 13,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 18,
+          "y": 14,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 18,
+              "y": 10
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 17,
+                  "y": 9
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 16,
+                      "y": 15
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。白棋气不够，无法在 A 或 B 打吃，因此黑棋会赢得对杀。",
+                    "boardMarks": [
+                      {
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "label": "A"
+                      },
+                      {
+                        "point": {
+                          "x": 18,
+                          "y": 12
+                        },
+                        "label": "B"
+                      }
+                    ],
+                    "children": []
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 17,
+                      "y": 15
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 18,
+                      "y": 15
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 16,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 18,
+                  "y": 12
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 17,
+                      "y": 15
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 18,
+                      "y": 15
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 18,
+                      "y": 10
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 17,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 18,
+                  "y": 12
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 16,
+                      "y": 15
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 18,
+                      "y": 15
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 18,
+                      "y": 10
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 18,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 18,
+                  "y": 12
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 17,
+                      "y": 15
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 16,
+                      "y": 15
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 18,
+                      "y": 10
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 17,
+              "y": 9
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 18,
+                  "y": 12
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 18,
+                      "y": 10
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 17,
+                          "y": 12
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-76",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-76.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 2,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 3,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 4,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 4,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 2,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 3,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 5,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 1,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 2,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 3,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 5,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 4,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 6,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 5,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 1,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 1,
+                  "y": 15
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 1,
+                      "y": 14
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。白棋只有两口气，而黑棋各块棋的气都比这多。无论白棋接下来怎样下，黑棋都能打吃。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 1,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 1,
+                  "y": 17
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 1,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 3,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": [
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 2,
+                              "y": 18
+                            },
+                            "correct": false,
+                            "wrong": false,
+                            "text": "",
+                            "boardMarks": [],
+                            "children": [
+                              {
+                                "color": "white",
+                                "point": {
+                                  "x": 0,
+                                  "y": 18
+                                },
+                                "correct": false,
+                                "wrong": false,
+                                "text": "",
+                                "boardMarks": [],
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 0,
+                              "y": 16
+                            },
+                            "correct": false,
+                            "wrong": false,
+                            "text": "",
+                            "boardMarks": [],
+                            "children": [
+                              {
+                                "color": "white",
+                                "point": {
+                                  "x": 2,
+                                  "y": 18
+                                },
+                                "correct": false,
+                                "wrong": false,
+                                "text": "",
+                                "boardMarks": [],
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 0,
+                              "y": 17
+                            },
+                            "correct": false,
+                            "wrong": false,
+                            "text": "",
+                            "boardMarks": [],
+                            "children": [
+                              {
+                                "color": "white",
+                                "point": {
+                                  "x": 2,
+                                  "y": 18
+                                },
+                                "correct": false,
+                                "wrong": false,
+                                "text": "",
+                                "boardMarks": [],
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 0,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 1,
+                  "y": 15
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 1,
+                      "y": 14
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 1,
+                          "y": 17
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": [
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 1,
+                              "y": 18
+                            },
+                            "correct": false,
+                            "wrong": false,
+                            "text": "",
+                            "boardMarks": [],
+                            "children": [
+                              {
+                                "color": "white",
+                                "point": {
+                                  "x": 3,
+                                  "y": 18
+                                },
+                                "correct": false,
+                                "wrong": false,
+                                "text": "这条变化对黑棋比前一条还差，因为白棋已经安全，而黑棋仍须担心白棋在 A 切断。",
+                                "boardMarks": [
+                                  {
+                                    "point": {
+                                      "x": 2,
+                                      "y": 14
+                                    },
+                                    "label": "A"
+                                  }
+                                ],
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-104",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-104.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 16,
+          "y": 12,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 17,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 10,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 11,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 12,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 13,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 14,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 17,
+          "color": "black"
+        },
+        {
+          "x": 16,
+          "y": 18,
+          "color": "black"
+        },
+        {
+          "x": 15,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 11,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 16,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 12,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 13,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 14,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 15,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 17,
+          "y": 18,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 14,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 11,
+                          "y": 17
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": [
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 10,
+                              "y": 17
+                            },
+                            "correct": true,
+                            "wrong": false,
+                            "text": "正确。",
+                            "boardMarks": [],
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 16
+                    },
+                    "correct": true,
+                    "wrong": false,
+                    "text": "正确。",
+                    "boardMarks": [],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 18
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 14,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "这一手使黑棋气紧。",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 13,
+                      "y": 18
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 15,
+                          "y": 16
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": [
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 14,
+                              "y": 18
+                            },
+                            "correct": false,
+                            "wrong": false,
+                            "text": "",
+                            "boardMarks": [],
+                            "children": [
+                              {
+                                "color": "white",
+                                "point": {
+                                  "x": 11,
+                                  "y": 17
+                                },
+                                "correct": false,
+                                "wrong": false,
+                                "text": "怎样才能避免这种情况？",
+                                "boardMarks": [],
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 15,
+                      "y": 16
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 15,
+                          "y": 17
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "这是倒扑。",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 15,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 18
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 18,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 15,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ggg-easy-99",
+      "sourceUrl": "https://github.com/gogameguru/go-problems/blob/eee12b2e39d59dbe81a8b9eaa7d4f103978d9224/weekly-go-problems/easy/ggg-easy-99.sgf",
+      "boardSize": 19,
+      "toPlay": "black",
+      "initialStones": [
+        {
+          "x": 3,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 4,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 5,
+          "y": 14,
+          "color": "black"
+        },
+        {
+          "x": 2,
+          "y": 15,
+          "color": "black"
+        },
+        {
+          "x": 2,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 3,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 6,
+          "y": 16,
+          "color": "black"
+        },
+        {
+          "x": 2,
+          "y": 12,
+          "color": "white"
+        },
+        {
+          "x": 1,
+          "y": 13,
+          "color": "white"
+        },
+        {
+          "x": 2,
+          "y": 14,
+          "color": "white"
+        },
+        {
+          "x": 1,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 3,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 4,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 8,
+          "y": 15,
+          "color": "white"
+        },
+        {
+          "x": 5,
+          "y": 16,
+          "color": "white"
+        },
+        {
+          "x": 6,
+          "y": 17,
+          "color": "white"
+        },
+        {
+          "x": 7,
+          "y": 17,
+          "color": "white"
+        }
+      ],
+      "root": {
+        "color": null,
+        "point": null,
+        "correct": false,
+        "wrong": false,
+        "text": "黑先。\n\n黑棋怎样吃掉切断黑棋的白子？",
+        "boardMarks": [],
+        "children": [
+          {
+            "color": "black",
+            "point": {
+              "x": 5,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 4,
+                  "y": 17
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 4,
+                      "y": 16
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 5,
+                          "y": 18
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": [
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 5,
+                              "y": 15
+                            },
+                            "correct": true,
+                            "wrong": false,
+                            "text": "正确。",
+                            "boardMarks": [],
+                            "children": []
+                          },
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 6,
+                              "y": 15
+                            },
+                            "correct": false,
+                            "wrong": false,
+                            "text": "这样也可以，但不是最佳下法。白棋在 A 推进时，黑棋不能在 B 挡住，因为白棋可以在 C 切断。",
+                            "boardMarks": [
+                              {
+                                "point": {
+                                  "x": 1,
+                                  "y": 16
+                                },
+                                "label": "A"
+                              },
+                              {
+                                "point": {
+                                  "x": 1,
+                                  "y": 17
+                                },
+                                "label": "B"
+                              },
+                              {
+                                "point": {
+                                  "x": 2,
+                                  "y": 17
+                                },
+                                "label": "C"
+                              }
+                            ],
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "color": "white",
+                "point": {
+                  "x": 6,
+                  "y": 15
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 5,
+                      "y": 15
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 7,
+                          "y": 16
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": [
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 4,
+                              "y": 16
+                            },
+                            "correct": true,
+                            "wrong": false,
+                            "text": "正确。",
+                            "boardMarks": [],
+                            "children": []
+                          },
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 4,
+                              "y": 17
+                            },
+                            "correct": true,
+                            "wrong": false,
+                            "text": "这样也正确。",
+                            "boardMarks": [],
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 4,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 5,
+                  "y": 15
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 5,
+                      "y": 17
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 6,
+                          "y": 15
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": [
+                          {
+                            "color": "black",
+                            "point": {
+                              "x": 6,
+                              "y": 14
+                            },
+                            "correct": false,
+                            "wrong": false,
+                            "text": "",
+                            "boardMarks": [],
+                            "children": [
+                              {
+                                "color": "white",
+                                "point": {
+                                  "x": 7,
+                                  "y": 15
+                                },
+                                "correct": false,
+                                "wrong": false,
+                                "text": "",
+                                "boardMarks": [],
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 5,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 4,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": [
+                  {
+                    "color": "black",
+                    "point": {
+                      "x": 5,
+                      "y": 17
+                    },
+                    "correct": false,
+                    "wrong": false,
+                    "text": "",
+                    "boardMarks": [],
+                    "children": [
+                      {
+                        "color": "white",
+                        "point": {
+                          "x": 4,
+                          "y": 17
+                        },
+                        "correct": false,
+                        "wrong": false,
+                        "text": "",
+                        "boardMarks": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 6,
+              "y": 15
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 4,
+                  "y": 16
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 4,
+              "y": 17
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 5,
+                  "y": 17
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "color": "black",
+            "point": {
+              "x": 1,
+              "y": 16
+            },
+            "correct": false,
+            "wrong": false,
+            "text": "",
+            "boardMarks": [],
+            "children": [
+              {
+                "color": "white",
+                "point": {
+                  "x": 4,
+                  "y": 17
+                },
+                "correct": false,
+                "wrong": false,
+                "text": "",
+                "boardMarks": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

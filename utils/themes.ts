@@ -1,5 +1,5 @@
 export type BoardThemeId = 'wood' | 'realistic_wood' | 'sakura_wood';
-export type StoneThemeId = 'classic' | 'skeuomorphic' | 'minimal';
+export type StoneThemeId = 'classic' | 'skeuomorphic';
 
 export interface BoardTheme {
   id: BoardThemeId;
@@ -81,13 +81,5 @@ export const STONE_THEMES: Record<StoneThemeId, StoneTheme> = {
     filter: 'none',
     useGradientFill: false,
     useShadowLayers: true
-  },
-  minimal: {
-    id: 'minimal',
-    name: '极简风格',
-    blackColor: '#1a1a1a',
-    whiteColor: '#ffffff',
-    blackBorder: '#1a1a1a',
-    whiteBorder: '#cccccc'
   }
 };

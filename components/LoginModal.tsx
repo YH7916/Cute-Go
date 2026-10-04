@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Gamepad2 } from 'lucide-react';
-import { isTapTapEnv } from '../utils/tapTapBridge';
+import { isTapTapEnv } from '../services/platform/environment';
 
 interface LoginModalProps {
     isOpen: boolean;

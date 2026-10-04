@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/gogameguru/go-problems",
+  "commit": "eee12b2e39d59dbe81a8b9eaa7d4f103978d9224",
+  "upstreamBranch": "master",
+  "retrievedOn": "2026-10-03",
+  "license": "CC-BY-NC-SA-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "authors": [
+    "An Younggil (8 dan pro)",
+    "David Ormerod"
+  ],
+  "authorshipEvidence": "UPSTREAM-README.md: About These Go Problems",
+  "upstreamEasyFileCount": 140,
+  "review": {
+    "scope": "Original SGF comments and outcome annotations reviewed; this is not professional review of the adaptation.",
+    "language": "zh-CN",
+    "translationBy": "Cute-Go contributors (AI-assisted translation)",
+    "unannotatedLeaves": "unknown",
+    "sourceCoordinatesPreserved": true
+  },
+  "problems": [
+    {
+      "id": "ggg-easy-25",
+      "file": "sgf/ggg-easy-25.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-25.sgf",
+      "sha256": "6fd6879f5ef346af202258f2ef2ceb22806fb46ad2ca481fd3cf6878feb7eb43",
+      "selectionNoteZh": "1 手正解、最深 2 手，先体验短变化。",
+      "reviewedCorrectNodes": [
+        "r.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-06",
+      "file": "sgf/ggg-easy-06.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-06.sgf",
+      "sha256": "6503cbb5f39545cce5148d5cb563016dcbc223dc6f1995c0a5d4fb7ea17cf631",
+      "selectionNoteZh": "3 手正解、2 条变化，练习完整读完一个黑白回合。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-10",
+      "file": "sgf/ggg-easy-10.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-10.sgf",
+      "sha256": "d2244e1ee6abeb79f7396aebc941e2494c612b6b52da51404ec899cbe15e6159",
+      "selectionNoteZh": "两种白方应手分别保留正确后续；最深 3 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0",
+        "r.0.1.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-15",
+      "file": "sgf/ggg-easy-15.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-15.sgf",
+      "sha256": "a7dea68588a23510af56824c034781c21ff14b5d45ae1b1edce50558ff3ae22d",
+      "selectionNoteZh": "3 手正解；保留提子后在原位置再次落子的变化。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-20",
+      "file": "sgf/ggg-easy-20.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-20.sgf",
+      "sha256": "484f46647811dc1a91ea04d04d2101db50ff5b9a39b967623dcb2d18a8189cdc",
+      "selectionNoteZh": "两种白方应手、两个正确终点；最深 3 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0",
+        "r.0.1.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-47",
+      "file": "sgf/ggg-easy-47.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-47.sgf",
+      "sha256": "b9f090576c49ea9a5f87a11d9887e8672b727107aea80f6933337c42e2bac922",
+      "selectionNoteZh": "同一白方应手后有两个正确落点；最深 4 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0",
+        "r.0.0.1",
+        "r.0.1.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-11",
+      "file": "sgf/ggg-easy-11.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-11.sgf",
+      "sha256": "180b0b94aea24b23a7bcdeb147dde89c9c28197df7d726cac615307f8634f308",
+      "selectionNoteZh": "3 手正解、4 个变化终点；错误变化最多 4 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-05",
+      "file": "sgf/ggg-easy-05.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-05.sgf",
+      "sha256": "1c21f1716ad2a8ed4763e103382367d76b707d2749719637dd8c3825dc0baa1b",
+      "selectionNoteZh": "3 手正解；保留同一候选后的两种白方反击。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-35",
+      "file": "sgf/ggg-easy-35.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-35.sgf",
+      "sha256": "4a3c01d3dfdb15881ca5bf104dc4becb178bf7bd6ee9dac82c689c66e7a2558c",
+      "selectionNoteZh": "3 手正解、5 个变化终点；最深 4 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-89",
+      "file": "sgf/ggg-easy-89.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-89.sgf",
+      "sha256": "1c8525c906f01f411c86b17dd65f51ca498f797e86d7f50b41daf22908a89d7c",
+      "selectionNoteZh": "两种白方应手；含提子后在原位置再次落子的短变化。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0",
+        "r.0.1.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-74",
+      "file": "sgf/ggg-easy-74.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-74.sgf",
+      "sha256": "468d773f5e0444531d3fddbe816e1d1a6fde51239a8c2d4de116f2118173d05f",
+      "selectionNoteZh": "原文明确解释无法切断与自紧气；第一手正确后仍有后续示范。",
+      "reviewedCorrectNodes": [
+        "r.0",
+        "r.0.0.0.0.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-71",
+      "file": "sgf/ggg-easy-71.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-71.sgf",
+      "sha256": "43ae6c30762824a61f0d6d3819acd73613063207cfc7e2a1a18c3a18210346f8",
+      "selectionNoteZh": "原文明确解释两眼、连接与失败原因；正解 3 手，最深 6 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0",
+        "r.0.1.0"
+      ],
+      "reviewedWrongNodes": [
+        "r.1.0",
+        "r.2.0"
+      ]
+    },
+    {
+      "id": "ggg-easy-91",
+      "file": "sgf/ggg-easy-91.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-91.sgf",
+      "sha256": "4ce205e76862be62d9bdaf1e6aaa3ac4957efd3fc064538552fc4710f1b69412",
+      "selectionNoteZh": "原文明确解释对杀与无法打吃；正解 3 手，最深 4 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0",
+        "r.0.0.1",
+        "r.0.0.2"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-76",
+      "file": "sgf/ggg-easy-76.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-76.sgf",
+      "sha256": "0f55a5630289a9f12d3cebf1e15cb4425f1c69e4c2e7b2207e41038f7c4a1d89",
+      "selectionNoteZh": "原文比较双方气数并解释后续打吃；正解 3 手，最深 6 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-104",
+      "file": "sgf/ggg-easy-104.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-104.sgf",
+      "sha256": "8f1e0ac04b327a2b190afcadd118ab0b0f3db56eb717efee7f6931832089eea0",
+      "selectionNoteZh": "原文明确指出气紧与倒扑；正解 3–5 手，最深 6 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0.0.0",
+        "r.0.1.0"
+      ],
+      "reviewedWrongNodes": []
+    },
+    {
+      "id": "ggg-easy-99",
+      "file": "sgf/ggg-easy-99.sgf",
+      "upstreamPath": "weekly-go-problems/easy/ggg-easy-99.sgf",
+      "sha256": "aa36f252cd81a96fc0c625826e8c4a4529c5fe8cf3d9816653b2974d87f54a5c",
+      "selectionNoteZh": "题干明确要求吃断子；保留 Also correct 与可下但非最佳的区别；正解 5 手。",
+      "reviewedCorrectNodes": [
+        "r.0.0.0.0.0",
+        "r.0.1.0.0.0",
+        "r.0.1.0.0.1"
+      ],
+      "reviewedWrongNodes": []
+    }
+  ],
+  "upstreamDocuments": [
+    {
+      "file": "LICENSE",
+      "upstreamPath": "LICENSE",
+      "sha256": "4abf7d7cf5783faa169f824cf82396d154bf54a55ecffe70a753ec9e6f70b9ca"
+    },
+    {
+      "file": "UPSTREAM-README.md",
+      "upstreamPath": "README.md",
+      "sha256": "0261ddc42087eb93af1c34fb1ba9acd829795bfe4524d7f820575bd157639786"
+    }
+  ]
+}

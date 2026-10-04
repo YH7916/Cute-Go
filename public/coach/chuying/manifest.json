@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "name": "褚嬴",
+  "frameWidth": 192,
+  "frameHeight": 208,
+  "source": "image_gen grounded in user reference + approved canonical base",
+  "scope": "CuteGo four game actions; not a Codex v2 pet",
+  "states": {
+    "idle": {
+      "file": "idle.png",
+      "webp": "idle.webp",
+      "frames": 6,
+      "columns": 6,
+      "rows": 1,
+      "durationMs": 1440,
+      "width": 1152,
+      "height": 208
+    },
+    "thinking": {
+      "file": "thinking.png",
+      "webp": "thinking.webp",
+      "frames": 6,
+      "columns": 6,
+      "rows": 1,
+      "durationMs": 1440,
+      "width": 1152,
+      "height": 208
+    },
+    "explaining": {
+      "file": "explaining.png",
+      "webp": "explaining.webp",
+      "frames": 6,
+      "columns": 6,
+      "rows": 1,
+      "durationMs": 1440,
+      "width": 1152,
+      "height": 208
+    },
+    "encouraging": {
+      "file": "encouraging.png",
+      "webp": "encouraging.webp",
+      "frames": 4,
+      "columns": 4,
+      "rows": 1,
+      "durationMs": 1280,
+      "width": 768,
+      "height": 208
+    }
+  }
+}

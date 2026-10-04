@@ -1,512 +1,200 @@
-import { useCallback, useRef, useState } from 'react';
-import type { MutableRefObject } from 'react';
-import { BoardSize, GameMode, GameType, Player } from '../types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { SetStateAction } from 'react';
+import type { BoardSize, Player } from '../types';
 import { platform } from '../services/platform';
-import type { AppProfile, AppSession, PlatformLiveMatchSession, PlatformOpponentSummary } from '../services/platform';
-import { parseNativeMatchMessage } from '../services/platform/nativeMatchMessages';
+import type { PlatformOpponentSummary } from '../services/platform';
 import type { NativeMatchMessage } from '../services/platform/nativeMatchMessages';
+import { OnlineSessionLifecycle } from './online/sessionLifecycle';
+import { OnlineRoomMessages } from './online/roomMessages';
+import { formatOnlineError } from './online/types';
+import type { OnlineRequestKind, UseOnlineMatchOptions } from './online/types';
 
-const ONLINE_REQUEST_TIMEOUT_MS = 15000;
-
-const withTimeout = async <T,>(promise: Promise<T>, message: string): Promise<T> => {
-  let timer: number | null = null;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timer = window.setTimeout(() => reject(new Error(message)), ONLINE_REQUEST_TIMEOUT_MS);
-      }),
-    ]);
-  } finally {
-    if (timer !== null) window.clearTimeout(timer);
-  }
-};
-
-const formatOnlineError = (error: unknown): string => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  if (!error || typeof error !== 'object') return '未知错误';
-
-  const details = error as {
-    code?: string | number;
-    errno?: string | number;
-    errorCode?: string | number;
-    message?: string;
-    errMsg?: string;
-    errorMessage?: string;
-  };
-  const code = details.errno ?? details.errorCode ?? details.code;
-  const message = details.errMsg ?? details.errorMessage ?? details.message;
-  if (code !== undefined && message) return `${message}（错误码 ${code}）`;
-  if (message) return message;
-  if (code !== undefined) return `错误码 ${code}`;
-  return '未知错误';
-};
-
-interface OnlineSettings {
-  boardSize: BoardSize;
-  gameType: GameType;
-  setBoardSize: (size: BoardSize) => void;
-  setGameType: (gameType: GameType) => void;
-  setGameMode: (gameMode: GameMode) => void;
+interface OnlineUiState {
+  showOnlineMenu: boolean;
+  isMatching: boolean;
+  matchTime: number;
+  matchBoardSize: BoardSize;
+  onlineStatus: 'disconnected' | 'connecting' | 'connected';
+  myColor: Player | null;
+  opponentProfile: PlatformOpponentSummary | null;
+  roomId: string | null;
+  isCreatingRoom: boolean;
+  isJoiningRoom: boolean;
 }
+const requestLabels = { match: 'TapTap 匹配', create: '创建房间', join: '加入房间' };
 
-interface UseOnlineMatchOptions {
-  settings: OnlineSettings;
-  session: AppSession | null;
-  userProfile: AppProfile | null;
-  boardSizeRef: MutableRefObject<BoardSize>;
-  gameTypeRef: MutableRefObject<GameType>;
-  currentPlayerRef: MutableRefObject<Player>;
-  myColorRef: MutableRefObject<Player | null>;
-  resetGameRef: MutableRefObject<(keepOnline?: boolean, explicitSize?: number, shouldBroadcast?: boolean) => void>;
-  executeMoveRef: MutableRefObject<(x: number, y: number, isRemote: boolean) => void>;
-  handlePassRef: MutableRefObject<(isRemote?: boolean) => void>;
-  setShowLoginModal: (show: boolean) => void;
-  setShowMenu: (show: boolean) => void;
-  setShowStartScreen: (show: boolean) => void;
-  setToastMsg: (message: string | null) => void;
-  vibrate: (pattern: number | number[]) => void;
-}
+export const useOnlineMatch = (options: UseOnlineMatchOptions) => {
+  const [state, setState] = useState<OnlineUiState>(() => ({
+    showOnlineMenu: false, isMatching: false, matchTime: 0,
+    matchBoardSize: [9, 13, 19].includes(options.settings.boardSize) ? options.settings.boardSize : 9,
+    onlineStatus: 'disconnected', myColor: null, opponentProfile: null, roomId: null,
+    isCreatingRoom: false, isJoiningRoom: false,
+  }));
+  // This ref is the synchronous snapshot of the single UI state owner. Native
+  // events can arrive before React renders, so request guards must not use closures.
+  const ui = useRef(state);
+  const latest = useRef(options);
+  latest.current = options;
+  const lifecycle = useRef(new OnlineSessionLifecycle()).current;
+  const messages = useRef<OnlineRoomMessages | null>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mounted = useRef(true);
+  const account = useRef(options.session?.user.id);
 
-export const useOnlineMatch = ({
-  settings,
-  session,
-  userProfile,
-  boardSizeRef,
-  gameTypeRef,
-  currentPlayerRef,
-  myColorRef,
-  resetGameRef,
-  executeMoveRef,
-  handlePassRef,
-  setShowLoginModal,
-  setShowMenu,
-  setShowStartScreen,
-  setToastMsg,
-  vibrate,
-}: UseOnlineMatchOptions) => {
-  const [showOnlineMenu, setShowOnlineMenu] = useState(false);
-  const [isMatching, setIsMatching] = useState(false);
-  const [matchTime, setMatchTime] = useState(0);
-  const [matchBoardSize, setMatchBoardSize] = useState<BoardSize>(() => ([9, 13, 19].includes(settings.boardSize) ? settings.boardSize : 9));
-  const [onlineStatus, setOnlineStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
-  const [myColor, setMyColor] = useState<Player | null>(null);
-  const [opponentProfile, setOpponentProfile] = useState<PlatformOpponentSummary | null>(null);
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
-  const [isJoiningRoom, setIsJoiningRoom] = useState(false);
+  const update = useCallback((patch: Partial<OnlineUiState>) => {
+    if (!mounted.current) return;
+    ui.current = { ...ui.current, ...patch };
+    setState(ui.current);
+  }, []);
+  const stopTimer = useCallback(() => {
+    if (timer.current !== null) clearInterval(timer.current);
+    timer.current = null;
+  }, []);
+  const resetUi = useCallback(() => {
+    stopTimer();
+    messages.current = null;
+    latest.current.myColorRef.current = null;
+    update({ onlineStatus: 'disconnected', opponentProfile: null, myColor: null, roomId: null,
+      isCreatingRoom: false, isJoiningRoom: false, isMatching: false, matchTime: 0 });
+  }, [stopTimer, update]);
+  const cleanupOnline = useCallback(async (_isManual = false) => {
+    const cleanup = lifecycle.cancel();
+    resetUi();
+    await cleanup;
+  }, [lifecycle, resetUi]);
 
-  const matchTimerRef = useRef<number | null>(null);
-  const liveMatchRef = useRef<PlatformLiveMatchSession | null>(null);
-  const isManualDisconnect = useRef(false);
-  const matchmakingRequestIdRef = useRef(0);
-  const activeRoomConfigRef = useRef<{ boardSize: BoardSize; gameType: GameType } | null>(null);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      stopTimer();
+      messages.current = null;
+      latest.current.myColorRef.current = null;
+      void lifecycle.cancel();
+    };
+  }, [lifecycle, stopTimer]);
+  useEffect(() => {
+    if (account.current !== options.session?.user.id) void cleanupOnline(true);
+    account.current = options.session?.user.id;
+  }, [cleanupOnline, options.session?.user.id]);
 
-  const stopMatchTimer = useCallback(() => {
-    if (matchTimerRef.current) {
-      clearInterval(matchTimerRef.current);
-      matchTimerRef.current = null;
-    }
+  const connected = useCallback(() => {
+    stopTimer();
+    update({ onlineStatus: 'connected', isMatching: false, showOnlineMenu: false });
+    latest.current.settings.setGameMode('PvP');
+    latest.current.setShowMenu(false);
+    latest.current.setShowStartScreen(false);
+  }, [stopTimer, update]);
+  const authenticated = useCallback(() => {
+    if (latest.current.session && latest.current.userProfile) return true;
+    latest.current.setShowLoginModal(true);
+    return false;
   }, []);
 
-  const sendData = useCallback(async (msg: NativeMatchMessage): Promise<boolean> => {
-    const liveMatch = liveMatchRef.current;
-    if (!liveMatch) {
-      setToastMsg('联机尚未建立，消息未发送');
-      return false;
-    }
-
-    try {
-      const sent = await liveMatch.send(msg);
-      if (!sent) setToastMsg('联机消息发送失败，请检查网络');
-      return sent;
-    } catch (error) {
-      console.warn('[Online] Failed to send room message:', error);
-      setToastMsg('联机消息发送失败，请检查网络');
-      return false;
-    }
-  }, [setToastMsg]);
-
-  const cleanupOnline = useCallback(async (isManual = false) => {
-    if (isManual) {
-      isManualDisconnect.current = true;
-    } else {
-      isManualDisconnect.current = false;
-    }
-    const previousMatch = liveMatchRef.current;
-    liveMatchRef.current = null;
-    setOnlineStatus('disconnected');
-    setOpponentProfile(null);
-    setMyColor(null);
-    myColorRef.current = null;
-    setRoomId(null);
-    setIsCreatingRoom(false);
-    setIsJoiningRoom(false);
-    activeRoomConfigRef.current = null;
-    if (previousMatch) await previousMatch.leave();
-  }, [myColorRef]);
-
-  const handleNativeRoomMessage = useCallback((payload: unknown) => {
-    const msg = parseNativeMatchMessage(payload, boardSizeRef.current);
-    if (!msg) {
-      console.warn('[Online] Ignored invalid TapTap room message:', payload);
-      return;
-    }
-
-    if (msg.type === 'MOVE' || msg.type === 'PASS') {
-      if (myColorRef.current === null || currentPlayerRef.current === myColorRef.current) {
-        console.warn('[Online] Ignored out-of-turn TapTap room message:', msg.type);
-        return;
-      }
-      if (msg.type === 'MOVE') executeMoveRef.current(msg.x, msg.y, true);
-      else void handlePassRef.current(true);
-    }
-    else if (msg.type === 'SYNC') {
-      if (liveMatchRef.current?.isHost) return;
-      settings.setBoardSize(msg.boardSize);
-      boardSizeRef.current = msg.boardSize;
-      settings.setGameType(msg.gameType);
-      gameTypeRef.current = msg.gameType;
-      setMyColor(msg.startColor);
-      myColorRef.current = msg.startColor;
-      if (msg.opponentInfo) {
-        setOpponentProfile(msg.opponentInfo);
-        if (session) {
-          void sendData({
-            type: 'SYNC_REPLY',
-            opponentInfo: { id: session.user.id },
-          });
-        }
-      }
-      resetGameRef.current(true, msg.boardSize, false);
-      vibrate(20);
-    }
-    else if (msg.type === 'SYNC_REPLY') {
-      if (!liveMatchRef.current?.isHost) return;
-      if (msg.opponentInfo) setOpponentProfile(msg.opponentInfo);
-    }
-    else if (msg.type === 'RESTART') {
-      resetGameRef.current(true, undefined, false);
-    }
-  }, [boardSizeRef, currentPlayerRef, executeMoveRef, gameTypeRef, handlePassRef, myColorRef, resetGameRef, sendData, session, settings, vibrate]);
-
-  const startNativeHostGame = useCallback(async (boardSize = boardSizeRef.current, gameType = gameTypeRef.current) => {
-    if (!liveMatchRef.current || !session) return;
-    settings.setBoardSize(boardSize);
-    boardSizeRef.current = boardSize;
-    settings.setGameType(gameType);
-    gameTypeRef.current = gameType;
-    settings.setGameMode('PvP');
-    setMyColor('white');
-    myColorRef.current = 'white';
-    resetGameRef.current(true, boardSize, false);
-    const sent = await sendData({
-      type: 'SYNC',
-      boardSize,
-      gameType,
-      startColor: 'black',
-      opponentInfo: { id: session.user.id },
+  const openRoom = useCallback(async (kind: OnlineRequestKind, boardSize: BoardSize, roomId?: string) => {
+    const config = { boardSize, gameType: latest.current.settings.gameType };
+    const request = lifecycle.begin(kind, config);
+    resetUi();
+    update({ matchBoardSize: boardSize, isMatching: kind === 'match',
+      isCreatingRoom: kind === 'create', isJoiningRoom: kind === 'join' });
+    if (kind === 'match') timer.current = setInterval(() => update({ matchTime: ui.current.matchTime + 1 }), 1000);
+    const protocol = new OnlineRoomMessages(request, {
+      options: () => latest.current, isCurrent: () => lifecycle.isCurrent(request),
+      color: myColor => update({ myColor }), opponent: opponentProfile => update({ opponentProfile }),
+      connected,
+      failed: () => { void cleanupOnline(); update({ showOnlineMenu: true }); },
     });
-    if (!sent) {
-      await cleanupOnline();
-      setShowOnlineMenu(true);
-      return;
-    }
-
-    setOnlineStatus('connected');
-    setIsMatching(false);
-    stopMatchTimer();
-    setShowOnlineMenu(false);
-    setShowMenu(false);
-    setShowStartScreen(false);
-  }, [boardSizeRef, cleanupOnline, gameTypeRef, myColorRef, resetGameRef, sendData, session, setShowMenu, setShowStartScreen, settings, stopMatchTimer]);
-
-  const buildNativeRoomHandlers = useCallback(() => ({
-    onMessage: (payload: unknown) => {
-      handleNativeRoomMessage(payload);
-    },
-    onPeerJoin: (peer: PlatformOpponentSummary) => {
-      if (peer.id === liveMatchRef.current?.playerId) {
-        setToastMsg('检测到同一 TapTap 玩家进入房间，请换一个账号测试联机。');
+    messages.current = protocol;
+    const disconnected = (message: string) => {
+      void cleanupOnline();
+      alert(message);
+    };
+    const peerDeparted = (message: string) => {
+      if (!protocol.peerDeparted()) return;
+      update({ onlineStatus: 'disconnected' });
+      alert(message);
+    };
+    const handlers = lifecycle.handlers(request, {
+      onMessage: payload => protocol.receive(payload), onPeerJoin: peer => protocol.peerJoined(peer),
+      onPeerLeave: () => peerDeparted('对方已离开房间'),
+      onPeerOffline: () => peerDeparted('对方已离线'),
+      onDisconnect: () => disconnected('联机已断开'),
+      onError: error => latest.current.setToastMsg(`TapTap 联机错误：${formatOnlineError(error)}`),
+    });
+    const playerProfile = { nickname: latest.current.userProfile?.nickname, gameType: config.gameType, boardSize };
+    const roomType = `${config.gameType.toLowerCase()}_${boardSize}`;
+    try {
+      const room = await lifecycle.open(request, () => {
+        const api = platform.multiplayer;
+        if (kind === 'join') return api.joinNativeRoom?.({ roomId: roomId!, playerProfile, handlers }) ?? Promise.resolve(null);
+        const input = { roomType, playerProfile, handlers };
+        return (kind === 'create' ? api.createNativeRoom?.(input) : api.startNativeMatch?.(input)) ?? Promise.resolve(null);
+      }, `${kind === 'match' ? 'TapTap 匹配' : `TapTap ${requestLabels[kind]}`}超时`);
+      if (lifecycle.current !== request) return;
+      if (!room) {
+        void cleanupOnline();
+        latest.current.setToastMsg(`${requestLabels[kind]}失败`);
         return;
       }
-      setOpponentProfile(peer);
-      if (liveMatchRef.current?.isHost) {
-        const roomConfig = activeRoomConfigRef.current;
-        void startNativeHostGame(roomConfig?.boardSize, roomConfig?.gameType);
-      }
-    },
-    onPeerLeave: () => {
-      setOnlineStatus('disconnected');
-      if (!isManualDisconnect.current) alert("对方已离开房间");
-    },
-    onPeerOffline: () => {
-      setOnlineStatus('disconnected');
-      if (!isManualDisconnect.current) alert("对方已离线");
-    },
-    onDisconnect: () => {
-      setOnlineStatus('disconnected');
-      if (!isManualDisconnect.current) alert("联机已断开");
-    },
-    onError: (error: unknown) => {
-      setToastMsg(`TapTap 联机错误：${formatOnlineError(error)}`);
-    },
-  }), [handleNativeRoomMessage, setToastMsg, startNativeHostGame]);
-
-  const buildPlayerProfile = useCallback((sizeToUse: BoardSize) => ({
-    nickname: userProfile?.nickname,
-    gameType: settings.gameType,
-    boardSize: sizeToUse,
-  }), [settings.gameType, userProfile?.nickname]);
-
-  const startNativeMatchmaking = useCallback(async (sizeToMatch: BoardSize) => {
-    if (!session || !userProfile) {
-      setShowLoginModal(true);
-      return;
-    }
-
-    const requestId = matchmakingRequestIdRef.current + 1;
-    matchmakingRequestIdRef.current = requestId;
-    const gameTypeToMatch = settings.gameType;
-
-    await cleanupOnline();
-    activeRoomConfigRef.current = { boardSize: sizeToMatch, gameType: gameTypeToMatch };
-    setMatchBoardSize(sizeToMatch);
-    setIsMatching(true);
-    setMatchTime(0);
-
-    matchTimerRef.current = window.setInterval(() => setMatchTime(prev => prev + 1), 1000);
-
-    const roomType = `${gameTypeToMatch.toLowerCase()}_${sizeToMatch}`;
-    let matchResult: PlatformLiveMatchSession | null = null;
-    try {
-      matchResult = platform.multiplayer.startNativeMatch
-        ? await withTimeout(platform.multiplayer.startNativeMatch({
-          roomType,
-          playerProfile: buildPlayerProfile(sizeToMatch),
-          handlers: buildNativeRoomHandlers(),
-        }), 'TapTap 匹配超时')
-        : null;
+      update({ isCreatingRoom: false, isJoiningRoom: false,
+        roomId: kind === 'match' ? null : room.roomId, onlineStatus: 'connecting' });
+      if (room.peers[0]) update({ opponentProfile: room.peers[0] });
+      if (kind === 'join' || (kind === 'match' && room.peers.length > 0 && !room.isHost)) connected();
+      lifecycle.flush(request);
+      if (room.isHost && room.peers.length > 0) await protocol.startHost();
     } catch (error) {
-      if (requestId !== matchmakingRequestIdRef.current) return;
-      console.warn('[Online] matchmaking failed:', error);
-      setIsMatching(false);
-      stopMatchTimer();
-      activeRoomConfigRef.current = null;
-      setToastMsg(`TapTap 匹配失败：${formatOnlineError(error)}`);
-      return;
+      if (lifecycle.current !== request) return;
+      void cleanupOnline();
+      latest.current.setToastMsg(`${requestLabels[kind]}失败：${formatOnlineError(error)}`);
     }
-
-    if (requestId !== matchmakingRequestIdRef.current) {
-      void matchResult?.leave();
-      return;
-    }
-
-    if (!matchResult) {
-      setIsMatching(false);
-      stopMatchTimer();
-      activeRoomConfigRef.current = null;
-      setToastMsg('TapTap 匹配失败');
-      return;
-    }
-
-    liveMatchRef.current = matchResult;
-
-    if (matchResult.peers.length > 0) {
-      setOpponentProfile(matchResult.peers[0]);
-      setOnlineStatus('connected');
-      setIsMatching(false);
-      stopMatchTimer();
-      setShowOnlineMenu(false);
-      setShowMenu(false);
-      setShowStartScreen(false);
-      settings.setGameMode('PvP');
-
-      if (matchResult.isHost) {
-        await startNativeHostGame(sizeToMatch, gameTypeToMatch);
-      }
-    } else {
-      setOnlineStatus('connecting');
-    }
-  }, [
-    boardSizeRef,
-    buildNativeRoomHandlers,
-    buildPlayerProfile,
-    cleanupOnline,
-    session,
-    setShowLoginModal,
-    setShowMenu,
-    setShowStartScreen,
-    setToastMsg,
-    settings,
-    stopMatchTimer,
-    userProfile,
-  ]);
-
-  const createRoom = useCallback(async () => {
-    if (!session || !userProfile) {
-      setShowLoginModal(true);
-      return;
-    }
-    if (!platform.isNative || !platform.multiplayer.createNativeRoom) {
-      setToastMsg('当前 TapTap 环境不支持创建房间');
-      return;
-    }
-
-    const sizeToUse = boardSizeRef.current;
-    setMatchBoardSize(sizeToUse);
-    await cleanupOnline();
-    setIsCreatingRoom(true);
-    activeRoomConfigRef.current = { boardSize: sizeToUse, gameType: settings.gameType };
-
-    const roomType = `${settings.gameType.toLowerCase()}_${sizeToUse}`;
-    let room: PlatformLiveMatchSession | null = null;
-    try {
-      room = await withTimeout(platform.multiplayer.createNativeRoom({
-        roomType,
-        playerProfile: buildPlayerProfile(sizeToUse),
-        handlers: buildNativeRoomHandlers(),
-      }), 'TapTap 创建房间超时');
-    } catch (error) {
-      console.warn('[Online] createRoom failed:', error);
-      setIsCreatingRoom(false);
-      activeRoomConfigRef.current = null;
-      setToastMsg(`创建房间失败：${formatOnlineError(error)}`);
-      return;
-    }
-
-    setIsCreatingRoom(false);
-
-    if (!room) {
-      activeRoomConfigRef.current = null;
-      setToastMsg('创建房间失败');
-      return;
-    }
-
-    liveMatchRef.current = room;
-    setRoomId(room.roomId);
-    setOnlineStatus('connecting');
-  }, [
-    boardSizeRef,
-    buildNativeRoomHandlers,
-    buildPlayerProfile,
-    cleanupOnline,
-    session,
-    setShowLoginModal,
-    setToastMsg,
-    settings,
-    userProfile,
-  ]);
-
-  const joinRoom = useCallback(async (roomIdToJoin: string) => {
-    const trimmedRoomId = roomIdToJoin.trim();
-    if (!trimmedRoomId) {
-      setToastMsg('请输入房间号');
-      return;
-    }
-    if (!session || !userProfile) {
-      setShowLoginModal(true);
-      return;
-    }
-    if (!platform.isNative || !platform.multiplayer.joinNativeRoom) {
-      setToastMsg('当前 TapTap 环境不支持加入房间');
-      return;
-    }
-
-    await cleanupOnline();
-    setIsJoiningRoom(true);
-
-    let room: PlatformLiveMatchSession | null = null;
-    try {
-      room = await withTimeout(platform.multiplayer.joinNativeRoom({
-        roomId: trimmedRoomId,
-        playerProfile: buildPlayerProfile(matchBoardSize),
-        handlers: buildNativeRoomHandlers(),
-      }), 'TapTap 加入房间超时');
-    } catch (error) {
-      console.warn('[Online] joinRoom failed:', error);
-      setIsJoiningRoom(false);
-      setToastMsg(`加入房间失败：${formatOnlineError(error)}`);
-      return;
-    }
-
-    setIsJoiningRoom(false);
-
-    if (!room) {
-      setToastMsg('加入房间失败');
-      return;
-    }
-
-    liveMatchRef.current = room;
-    setRoomId(room.roomId);
-    setOnlineStatus('connected');
-    setShowOnlineMenu(false);
-    setShowMenu(false);
-    setShowStartScreen(false);
-    settings.setGameMode('PvP');
-    if (room.peers.length > 0) setOpponentProfile(room.peers[0]);
-  }, [
-    buildNativeRoomHandlers,
-    buildPlayerProfile,
-    cleanupOnline,
-    matchBoardSize,
-    session,
-    setShowLoginModal,
-    setShowMenu,
-    setShowStartScreen,
-    setToastMsg,
-    settings,
-    userProfile,
-  ]);
-
-  const cancelMatchmaking = useCallback(async () => {
-    matchmakingRequestIdRef.current += 1;
-    stopMatchTimer();
-    setIsMatching(false);
-    setMatchTime(0);
-    activeRoomConfigRef.current = null;
-    await cleanupOnline(true);
-  }, [cleanupOnline, stopMatchTimer]);
+  }, [cleanupOnline, connected, lifecycle, resetUi, update]);
 
   const startMatchmaking = useCallback(async (sizeOverride?: BoardSize) => {
-    if (!session || !userProfile) {
-      setShowLoginModal(true);
-      return;
-    }
-    const sizeToMatch = sizeOverride ?? matchBoardSize;
-    if (onlineStatus === 'connected') return;
-    if (isMatching) {
-      if (sizeToMatch === matchBoardSize) return;
-      await cancelMatchmaking();
-    }
-
+    if (!authenticated() || ui.current.onlineStatus === 'connected') return;
+    const size = sizeOverride ?? ui.current.matchBoardSize;
+    const current = lifecycle.current;
+    if (current?.kind === 'match' && lifecycle.isCurrent(current) && current.config.boardSize === size) return;
     if (!platform.isNative || !platform.multiplayer.usesNativeMatchmaking || !platform.multiplayer.startNativeMatch) {
-      setToastMsg('联机仅支持 TapTap 小游戏环境');
+      latest.current.setToastMsg('联机仅支持 TapTap 小游戏环境');
       return;
     }
+    await openRoom('match', size);
+  }, [authenticated, lifecycle, openRoom]);
+  const createRoom = useCallback(async () => {
+    if (!authenticated()) return;
+    if (!platform.isNative || !platform.multiplayer.createNativeRoom) {
+      latest.current.setToastMsg('当前 TapTap 环境不支持创建房间');
+      return;
+    }
+    await openRoom('create', latest.current.boardSizeRef.current);
+  }, [authenticated, openRoom]);
+  const joinRoom = useCallback(async (roomId: string) => {
+    const trimmed = roomId.trim();
+    if (!trimmed) { latest.current.setToastMsg('请输入房间号'); return; }
+    if (!authenticated()) return;
+    if (!platform.isNative || !platform.multiplayer.joinNativeRoom) {
+      latest.current.setToastMsg('当前 TapTap 环境不支持加入房间');
+      return;
+    }
+    await openRoom('join', ui.current.matchBoardSize, trimmed);
+  }, [authenticated, openRoom]);
+  const sendData = useCallback(async (message: NativeMatchMessage): Promise<boolean> => {
+    if (!messages.current || !lifecycle.current?.room) {
+      latest.current.setToastMsg('联机尚未建立，消息未发送');
+      return false;
+    }
+    return messages.current.send(message);
+  }, [lifecycle]);
+  const setShowOnlineMenu = useCallback((value: SetStateAction<boolean>) => {
+    update({ showOnlineMenu: typeof value === 'function' ? value(ui.current.showOnlineMenu) : value });
+  }, [update]);
+  const setMyColor = useCallback((value: SetStateAction<Player | null>) => {
+    const myColor = typeof value === 'function' ? value(ui.current.myColor) : value;
+    latest.current.myColorRef.current = myColor;
+    update({ myColor });
+  }, [update]);
+  const cancelMatchmaking = useCallback(() => cleanupOnline(true), [cleanupOnline]);
 
-    await startNativeMatchmaking(sizeToMatch);
-  }, [cancelMatchmaking, isMatching, matchBoardSize, onlineStatus, session, setShowLoginModal, setToastMsg, startNativeMatchmaking, userProfile]);
-
-  return {
-    showOnlineMenu,
-    setShowOnlineMenu,
-    isMatching,
-    matchTime,
-    matchBoardSize,
-    onlineStatus,
-    roomId,
-    isCreatingRoom,
-    isJoiningRoom,
-    myColor,
-    setMyColor,
-    opponentProfile,
-    sendData,
-    cleanupOnline,
-    startMatchmaking,
-    createRoom,
-    joinRoom,
-    cancelMatchmaking,
-  };
+  return { ...state, setShowOnlineMenu, setMyColor, sendData, cleanupOnline,
+    startMatchmaking, createRoom, joinRoom, cancelMatchmaking };
 };

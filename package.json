@@ -1,22 +1,27 @@
 {
   "name": "cute-go",
   "private": true,
-  "version": "3.0.0",
+  "version": "4.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node harness/run.mjs build",
     "preview": "vite preview",
-    "test": "node scripts/run-tests.mjs",
-    "lint": "eslint \"**/*.{ts,tsx}\" --ignore-pattern \"node_modules/**\" --ignore-pattern \"dist/**\" --ignore-pattern \"android/**\"",
-    "lint:fix": "eslint \"**/*.{ts,tsx}\" --ignore-pattern \"node_modules/**\" --ignore-pattern \"dist/**\" --ignore-pattern \"android/**\" --fix",
+    "test": "node harness/run.mjs test",
+    "test:flows": "node harness/run.mjs test:flows",
+    "lint": "node harness/run.mjs lint",
+    "lint:fix": "npm run lint -- --fix",
+    "lint:prune": "npm run lint -- --prune-suppressions",
+    "check": "node harness/run.mjs check",
     "format": "prettier --write \"**/*.{ts,tsx,css}\" --ignore-path .gitignore",
-    "typecheck": "tsc --noEmit",
-    "//--- 下面是新增的一键自动化脚本 ---": "",
+    "typecheck": "node harness/run.mjs typecheck",
     "version:sync": "node update-version.js",
     "icon:gen": "capacitor-assets generate --android",
-    "//--- 终极懒人命令：版本同步 + 编译React + 生成图标 + 同步到安卓 ---": "",
-    "make-android": "npm run version:sync && npm run build && npm run icon:gen && npx cap sync android"
+    "make-android": "npm run version:sync && npm run build && npm run icon:gen && npx cap sync android",
+    "harness:sync": "node harness/contracts.mjs --write"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.1",

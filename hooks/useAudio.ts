@@ -1,11 +1,25 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { tryTapVibration } from '../services/platform/haptics';
+
+interface AudioRuntime {
+  AudioContext?: typeof AudioContext;
+  webkitAudioContext?: typeof AudioContext;
+  Capacitor?: { isNativePlatform?: () => boolean };
+}
 
 export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const bgmSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const bgmGainNodeRef = useRef<GainNode | null>(null);
+  const hapticStateRef = useRef({ enabled: hapticEnabled, mounted: true, generation: 0 });
+  const webVibrationActiveRef = useRef(false);
+  // Retained callbacks read the current preference. Changing it also invalidates
+  // work already waiting for the native plugin, including disable/enable cycles.
+  if (hapticStateRef.current.enabled !== hapticEnabled) {
+    hapticStateRef.current.enabled = hapticEnabled;
+    hapticStateRef.current.generation++;
+  }
   
   // Buffers
   const buffers = useRef<{ [key: string]: AudioBuffer | null }>({
@@ -24,7 +38,8 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
   useEffect(() => {
     const initAudio = async () => {
       // Create Context
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const runtime = window as AudioRuntime;
+      const AudioContextClass = runtime.AudioContext || runtime.webkitAudioContext;
       if (!AudioContextClass) return;
       
       const ctx = new AudioContextClass();
@@ -185,46 +200,62 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
       };
   }, [isAudioUnlocked]);
 
+  const stopWebVibration = useCallback(() => {
+    if (!webVibrationActiveRef.current) return;
+    webVibrationActiveRef.current = false;
+    try { navigator.vibrate?.(0); } catch { /* Optional browser capability. */ }
+  }, []);
+
+  useEffect(() => {
+    if (!hapticEnabled) stopWebVibration();
+  }, [hapticEnabled, stopWebVibration]);
+
+  useEffect(() => {
+    hapticStateRef.current.mounted = true;
+    return () => {
+      hapticStateRef.current.mounted = false;
+      hapticStateRef.current.generation++;
+      stopWebVibration();
+    };
+  }, [stopWebVibration]);
+
   // Vibrate with Multi-Platform Support
   const vibrate = useCallback((pattern: number | number[]) => {
-      if (!hapticEnabled) return;
+      const { enabled, mounted, generation } = hapticStateRef.current;
+      if (!enabled || !mounted) return;
+      const isCurrent = () => hapticStateRef.current.enabled && hapticStateRef.current.mounted &&
+        hapticStateRef.current.generation === generation;
+      const tryWebVibration = () => {
+          if (!isCurrent()) return;
+          try {
+              if (navigator.vibrate) {
+                  console.log('[Vibrate] Using Web Vibration API');
+                  const success = navigator.vibrate(pattern);
+                  webVibrationActiveRef.current = success;
+                  console.log('[Vibrate] Web vibration result:', success);
+              } else {
+                  console.warn('[Vibrate] No vibration API available');
+              }
+          } catch (e) {
+              console.warn('[Vibrate] Web vibration error:', e);
+          }
+      };
       
       console.log('[Vibrate] Attempting vibration with pattern:', pattern);
       
       // 1. Try TapTap Minigame API (小游戏环境)
-      if (typeof window !== 'undefined' && (window as any).tap) {
-          const tap = (window as any).tap;
-          try {
-              // TapTap 小游戏振动 API
-              if (tap.vibrateShort) {
-                  console.log('[Vibrate] Using TapTap vibrateShort API');
-                  tap.vibrateShort({
-                      type: 'medium', // 'heavy' | 'medium' | 'light'
-                      success: () => console.log('[Vibrate] TapTap vibration success'),
-                      fail: (err: any) => console.warn('[Vibrate] TapTap vibration failed:', err)
-                  });
-                  return;
-              } else if (tap.vibrateLong) {
-                  console.log('[Vibrate] Using TapTap vibrateLong API');
-                  tap.vibrateLong({
-                      success: () => console.log('[Vibrate] TapTap vibration success'),
-                      fail: (err: any) => console.warn('[Vibrate] TapTap vibration failed:', err)
-                  });
-                  return;
-              }
-          } catch (e) {
-              console.warn('[Vibrate] TapTap vibration error:', e);
-          }
-      }
+      const runtime: AudioRuntime | undefined = typeof window !== 'undefined' ? window as AudioRuntime : undefined;
+      if (tryTapVibration()) return;
       
       // 2. Try Capacitor Haptics (原生应用)
-      if (typeof window !== 'undefined' && (window as any).Capacitor) {
+      if (runtime?.Capacitor) {
           try {
-              const { Capacitor } = window as any;
+              const { Capacitor } = runtime;
               // Check if running on native platform
               if (Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
                   // Dynamically import Haptics plugin
                   import('@capacitor/haptics').then(({ Haptics, ImpactStyle }) => {
+                      if (!isCurrent()) return;
                       console.log('[Vibrate] Using Capacitor Haptics API');
                       // Convert pattern to impact
                       const duration = Array.isArray(pattern) ? pattern[0] : pattern;
@@ -235,9 +266,10 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
                           .then(() => console.log('[Vibrate] Capacitor vibration success'))
                           .catch((err) => console.warn('[Vibrate] Capacitor vibration failed:', err));
                   }).catch((err) => {
+                      if (!isCurrent()) return;
                       console.warn('[Vibrate] Capacitor Haptics import failed:', err);
                       // Fallback to Web API
-                      tryWebVibration(pattern);
+                      tryWebVibration();
                   });
                   return;
               }
@@ -247,23 +279,8 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
       }
       
       // 3. Fallback to Web Vibration API (标准浏览器)
-      tryWebVibration(pattern);
-  }, [hapticEnabled]);
-
-  // Helper function for Web Vibration API
-  const tryWebVibration = (pattern: number | number[]) => {
-      try {
-          if (navigator.vibrate) {
-              console.log('[Vibrate] Using Web Vibration API');
-              const success = navigator.vibrate(pattern);
-              console.log('[Vibrate] Web vibration result:', success);
-          } else {
-              console.warn('[Vibrate] No vibration API available');
-          }
-      } catch (e) {
-          console.warn('[Vibrate] Web vibration error:', e);
-      }
-  };
+      tryWebVibration();
+  }, []);
 
   return { playSfx, vibrate };
 };

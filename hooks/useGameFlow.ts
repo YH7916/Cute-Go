@@ -164,7 +164,7 @@ export const useGameFlow = ({
 
     if (gameState.currentPlayer === aiColor) {
       if (aiTurnLock.current) {
-        if (!isWorkerReady && !isWebInitializing && !isWebThinking) {
+        if (aiTimerRef.current === null && !isWorkerReady && !isWebInitializing && !isWebThinking) {
           console.warn("[App] AI turn lock was stale. Resetting and retrying local AI request.");
           aiTurnLock.current = false;
         } else {
@@ -197,6 +197,7 @@ export const useGameFlow = ({
       aiTurnLock.current = false;
     }
   }, [
+    aiTimerRef,
     aiTurnLock,
     gameState.appMode,
     gameState.board,

@@ -67,9 +67,9 @@ export const useAppAuthProfile = ({ setToastMsg }: UseAppAuthProfileOptions) => 
     if (isSigningOutRef.current) return;
     isSigningOutRef.current = true;
     try {
+      // The provider publishes valid session changes. A completed old logout
+      // must not clear a newer login that was already published.
       await platform.auth.signOut();
-      setSession(null);
-      setUserProfile(null);
     } finally {
       isSigningOutRef.current = false;
     }

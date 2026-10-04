@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { SettingsModal } from '../SettingsModal';
+import { CoachSettings } from '../CoachSettings';
 import { UserPage } from '../UserPage';
 import { OnlineMenu } from '../OnlineMenu';
 import { ImportExportModal } from '../ImportExportModal';
@@ -8,12 +9,7 @@ import { TutorialModal } from '../TutorialModal';
 import { OfflineLoadingModal } from '../OfflineLoadingModal';
 import { LoginModal } from '../LoginModal';
 import { AboutModal } from '../AboutModal';
-import { TsumegoListModal } from '../TsumegoListModal';
-import TsumegoResultModal from '../TsumegoResultModal';
-import { TsumegoHub } from '../Tsumego/TsumegoHub';
 import { SkinShopModal } from '../SkinShopModal';
-import { parseSGFToTree } from '../../utils/sgfParser';
-import { fetchProblemSGF } from '../../utils/tsumegoData';
 import { platform } from '../../services/platform';
 import type { AppViewModel } from './AppViewModel';
 
@@ -25,23 +21,18 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
   const {
     achievementsList,
     cancelMatchmaking,
-    completedLevelIds,
     createRoom,
     eloDiffStyle,
     eloDiffText,
-    exitTsumegoMode,
     gameCopied,
     gameState,
     handleApplySettings,
     handleCopy,
     handleExportSGF,
     handleImport,
-    handleNextTsumego,
-    handleRetryTsumego,
     handleSignOut,
     handleTapTapLogin,
     handleUpdateNickname,
-    hasNextProblem,
     hideOfflineLoading,
     importKey,
     isCreatingRoom,
@@ -56,7 +47,6 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
     roomId,
     resetGame,
     session,
-    setCurrentTsumegoLevel,
     setHideOfflineLoading,
     setImportKey,
     setShowAboutModal,
@@ -65,14 +55,8 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
     setShowMenu,
     setShowOnlineMenu,
     setShowSkinShop,
-    setShowStartScreen,
-    setShowTsumegoLevelSelector,
-    setShowTsumegoList,
-    setShowTsumegoResult,
     setShowTutorial,
     setShowUserPage,
-    setToastMsg,
-    setTsumegoCollection,
     settings,
     showAboutModal,
     showImportModal,
@@ -80,17 +64,9 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
     showMenu,
     showOnlineMenu,
     showSkinShop,
-    showTsumegoLevelSelector,
-    showTsumegoList,
-    showTsumegoResult,
     showTutorial,
     showUserPage,
     startMatchmaking,
-    startTsumego,
-    tsumegoCollection,
-    tsumegoIsCorrect,
-    tsumegoResultMsg,
-    tsumegoSetTitle,
     userAchievements,
     userProfile,
     vibrate,
@@ -106,15 +82,19 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
 
   return (
     <>
-      <TutorialModal
-        isOpen={showTutorial}
-        onClose={() => {
-          setShowTutorial(false);
-          localStorage.setItem('cute_go_tutorial_seen', 'true');
-        }}
-      />
-
+      <TutorialModal tutorialContent={vm.teaching?.tutorialContent} isOpen={showTutorial} onClose={() => {
+        setShowTutorial(false); localStorage.setItem('cute_go_tutorial_seen', 'true');
+      }} onExplore={destination => {
+        if (destination === 'learning') vm.handleOpenLearning();
+        else if (destination === 'coach') vm.handleStartCoach();
+        else if (destination === 'local') vm.handleStartGame('PvP', undefined, 'Go');
+        else if (destination === 'ai') vm.handleStartGame('PvAI', 'local', 'Go');
+        else setShowOnlineMenu(true);
+      }} stoneAnimationEnabled={settings.stoneAnimationEnabled} vibrate={vibrate} />
       <SettingsModal
+        coachMode={settings.coachMode}
+        coachSettings={<CoachSettings value={vm.coachSettings.config} rememberKey={vm.coachSettings.rememberKey}
+          onSave={vm.coachSettings.saveConfig} onClearKey={vm.coachSettings.clearKey} storageError={vm.coachSettings.storageError} />}
         isOpen={showMenu}
         onClose={() => setShowMenu(false)}
         currentGameSettings={currentGameSettings}
@@ -122,16 +102,16 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
         showQi={settings.showQi} setShowQi={settings.setShowQi}
         showWinRate={settings.showWinRate} setShowWinRate={settings.setShowWinRate}
         showCoordinates={settings.showCoordinates} setShowCoordinates={settings.setShowCoordinates}
+        stoneAnimationEnabled={settings.stoneAnimationEnabled} setStoneAnimationEnabled={settings.setStoneAnimationEnabled}
         musicVolume={settings.musicVolume} setMusicVolume={settings.setMusicVolume}
         hapticEnabled={settings.hapticEnabled} setHapticEnabled={settings.setHapticEnabled}
         vibrate={vibrate}
         skipStartScreen={settings.skipStartScreen} setSkipStartScreen={settings.setSkipStartScreen}
-        onStartSetup={() => { exitTsumegoMode('PvP'); resetGame(false); gameState.setAppMode('setup'); setShowMenu(false); }}
+        onStartSetup={() => { settings.setCoachMode(false); settings.setGameMode('PvP'); resetGame(false); gameState.setAppMode('setup'); setShowMenu(false); }}
         onOpenImport={() => { setShowImportModal(true); setShowMenu(false); }}
+        onOpenTutorial={() => { setShowTutorial(true); setShowMenu(false); }}
         onOpenOnline={() => setShowOnlineMenu(true)}
         onOpenAbout={() => { setShowAboutModal(true); setShowMenu(false); }}
-        onOpenTutorial={() => { setShowTutorial(true); setShowMenu(false); }}
-        onOpenTsumego={() => setShowTsumegoLevelSelector(true)}
         onOpenSkinShop={() => setShowSkinShop(true)}
         separatePieces={settings.separatePieces}
         setSeparatePieces={settings.setSeparatePieces}
@@ -142,23 +122,11 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
         onClose={() => setShowSkinShop(false)}
         currentBoardSkin={settings.boardSkin}
         currentStoneSkin={settings.stoneSkin}
+        currentCoachSkin={settings.coachSkin}
         onSetBoardSkin={settings.setBoardSkin}
         onSetStoneSkin={settings.setStoneSkin}
+        onSetCoachSkin={settings.setCoachSkin}
       />
-
-      {showTsumegoList && (
-        <TsumegoListModal
-          onClose={() => setShowTsumegoList(false)}
-          onSelectSet={vm.handleSelectTsumegoSet}
-          collection={tsumegoCollection}
-          currentSetTitle={tsumegoSetTitle}
-          onBackToSets={() => setTsumegoCollection(null)}
-          onSelectProblem={(node) => {
-            startTsumego(node);
-            setShowTsumegoList(false);
-          }}
-        />
-      )}
 
       <UserPage
         isOpen={showUserPage}
@@ -203,14 +171,14 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
       />
 
       <EndGameModal
-        isOpen={gameState.gameOver && !showMenu}
+        isOpen={gameState.gameOver && gameState.appMode === 'playing' && !showMenu}
         winner={gameState.winner}
         winReason={gameState.winReason}
         eloDiffText={eloDiffText}
         eloDiffStyle={eloDiffStyle}
         finalScore={gameState.finalScore}
         onRestart={() => resetGame(true)}
-        onReview={() => { gameState.setAppMode('review'); gameState.setReviewIndex(gameState.history.length); gameState.setGameOver(false); }}
+        onReview={vm.handleEnterReview}
       />
 
       <OfflineLoadingModal
@@ -231,44 +199,6 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
         vibrate={vibrate}
       />
 
-      <TsumegoResultModal
-        isOpen={showTsumegoResult}
-        isCorrect={tsumegoIsCorrect}
-        message={tsumegoResultMsg}
-        onNext={handleNextTsumego}
-        onRetry={handleRetryTsumego}
-        onClose={() => setShowTsumegoResult(false)}
-        hasNext={hasNextProblem}
-      />
-
-      {showTsumegoLevelSelector && (
-        <TsumegoHub
-          onClose={() => setShowTsumegoLevelSelector(false)}
-          completedLevelIds={completedLevelIds}
-          onSelectLevel={async (level) => {
-            try {
-              setToastMsg("正在加载...");
-              const sgf = await fetchProblemSGF(level.filename);
-
-              setCurrentTsumegoLevel(level);
-              setShowTsumegoLevelSelector(false);
-              setShowStartScreen(false);
-              settings.setGameMode('Tsumego');
-
-              const nodes = parseSGFToTree(sgf);
-              if (!nodes || nodes.length === 0) throw new Error("Invalid SGF");
-              startTsumego(nodes[0]);
-
-              vibrate(20);
-              setToastMsg(null);
-            } catch (error) {
-              console.error(error);
-              setToastMsg("加载失败");
-              setTimeout(() => setToastMsg(null), 2000);
-            }
-          }}
-        />
-      )}
     </>
   );
 };

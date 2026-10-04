@@ -1,23 +1,17 @@
 import { extractPolicyMoves } from './policy';
+import { createEngineSession, releaseSession, isMobileDevice, checkModelLoadActive, type OnnxEngineConfig } from './session';
+import { readModelOutputs, processWinrate, normalizeOwnership } from './outputs';
 import { getDefaultKomi } from '../../core/go/config';
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as ort from 'onnxruntime-web';
 import { MicroBoard, type Sign } from '../../utils/micro-board';
 
-export interface OnnxEngineConfig {
-    modelPath: string;
-    modelParts?: string[]; // [New] Optional split parts for large models
-    wasmPath?: string; // [New] Path to directory containing WASM files
-    numThreads?: number;
-    debug?: boolean;
-    gpuBackend?: 'webgpu' | 'wasm'; // [New] Force backend
-}
+export type { OnnxEngineConfig } from './session';
 
 export interface EngineAnalysisOptions {
     komi?: number;
     history?: { color: Sign; x: number; y: number }[];
-    parent?: { color: Sign; x: number; y: number }[]; 
+    parent?: { color: Sign; x: number; y: number }[];
     difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard'; // kept for logging
     temperature?: number; // [New] Softmax scaling
 }
@@ -45,191 +39,58 @@ export interface AnalysisResult {
 export class OnnxEngine {
     private session: ort.InferenceSession | null = null;
     private config: OnnxEngineConfig;
-    private boardSize: number = 19;
+    private initialization: Promise<void> | null = null;
+    private initializationAbort: AbortController | null = null;
+    private disposal: Promise<void> = Promise.resolve();
+    private generation = 0;
+    private activeRuns = new Set<Promise<AnalysisResult>>();
 
     constructor(config: OnnxEngineConfig) {
         this.config = config;
     }
 
-    async initialize(onProgress?: (msg: string) => void) {
-        if (this.session) return;
-
-        try {
-            // Configure WASM paths if provided
-            if (this.config.wasmPath) {
-                console.log(`[OnnxEngine] Setting WASM path to: ${this.config.wasmPath}`);
-                ort.env.wasm.wasmPaths = this.config.wasmPath;
+    initialize(onProgress?: (msg: string) => void): Promise<void> {
+        if (this.session) return Promise.resolve();
+        if (this.initialization) return this.initialization;
+        const generation = this.generation;
+        const controller = new AbortController();
+        this.initializationAbort = controller;
+        const pending = (async () => {
+            await this.disposal;
+            checkModelLoadActive(controller.signal);
+            const session = await createEngineSession(this.config, controller.signal, onProgress);
+            if (generation !== this.generation) {
+                await releaseSession(session);
+                throw new Error('Engine initialization cancelled by dispose');
             }
-
-            // Configure simple session options
-            // Note: WASM files must be served correctly.
-            // Detect Mobile to avoid WebGPU crashes if not explicitly requested
-            const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-
-            // [CRITICAL CHECK] Detect if SharedArrayBuffer is available
-            const isIsolated = typeof self !== 'undefined' && (self as any).crossOriginIsolated;
-            
-            // [Fix] If running in non-isolated environment (standard H5 without headers),
-            // the local 'ort-wasm-simd-threaded.wasm' WILL FAIL to load.
-            // We successfully downloaded 'ort-wasm.wasm' (Vanilla) to 'public/wasm/'.
-            // So we just disable SIMD/Threading and let it load the local Vanilla file.
-            if (!isIsolated && !isMobile) {
-                 console.warn("[OnnxEngine] ⚠️ No crossOriginIsolated detected! Multithreading disabled.");
-                 console.warn("[OnnxEngine] Using local vanilla WASM (ort-wasm.wasm) for compatibility.");
-                 
-                 ort.env.wasm.simd = false;
-                 ort.env.wasm.proxy = false;
-                 ort.env.wasm.numThreads = 1;
-                 // ort.env.wasm.wasmPaths = ... (Default to local)
+            this.session = session;
+        })();
+        const initialization = pending.finally(() => {
+            // Also cancel unfinished sibling downloads when a model part fails.
+            controller.abort();
+            if (this.initialization === initialization) {
+                this.initialization = null;
+                this.initializationAbort = null;
             }
-
-            // [Memory Fix] Low-End Device Protection (All Mobile)
-            // Jetsam (iOS) and Low-Memory Killers (Android Wechat/H5) are strict.
-            // Disabling SIMD/Proxy reduces memory footprint significantly at cost of speed.
-            if (isMobile) {
-                console.log("[OnnxEngine] Mobile detected: Disabling SIMD and Proxy for max stability.");
-                ort.env.wasm.simd = false;
-                ort.env.wasm.proxy = false; 
-                ort.env.wasm.numThreads = 1; // Force 1 thread here too
-                
-                // [CRITICAL FIX] Use Local Vanilla WASM
-                // We downloaded ort-wasm.wasm to public/wasm, so no need for CDN.
-                console.log("[OnnxEngine] Mobile: Using local vanilla WASM...");
-                // ort.env.wasm.wasmPaths = ... (Default to local)
-            }
-
-            const preferredBackend = this.config.gpuBackend || (isMobile ? 'wasm' : 'webgpu');
-
-            // [Memory Fix] Graph Optimization consumes huge RAM during compile time.
-            // On low-end mobile, we MUST disable it to prevent OOM.
-            // 'disabled' = fastest startup, lowest memory, slightly slower inference.
-            // [Update] 60s timeout allows us to use 'basic' again for better inference speed.
-            const graphOptLevel = isMobile ? 'basic' : 'all';
-
-            const options: ort.InferenceSession.SessionOptions = {
-                executionProviders: [preferredBackend, 'wasm'], 
-                graphOptimizationLevel: graphOptLevel,
-                enableCpuMemArena: true, 
-                enableMemPattern: true,
-                executionMode: 'sequential', // Force sequential
-            };
-            
-            if (this.config.numThreads) {
-                options.intraOpNumThreads = this.config.numThreads;
-                options.interOpNumThreads = this.config.numThreads;
-            }
-
-            console.log(`[OnnxEngine] Loading model...`);
-            
-            let modelData: string | Uint8Array = this.config.modelPath;
-
-            // Handle Split Models (Cloudflare Pages 25MB limit workaround)
-            if (this.config.modelParts && this.config.modelParts.length > 0) {
-                 // ... (Splitting logic remains same, just logging)
-                 // Keeping existing split logic but ensuring we log clearly
-                console.log(`[OnnxEngine] Loading model from ${this.config.modelParts.length} parts...`);
-                
-                try {
-                    let completed = 0;
-                    const total = this.config.modelParts.length;
-                    onProgress?.(`正在下载模型 (${completed}/${total})...`);
-
-                    const buffers = await Promise.all(this.config.modelParts.map(async (partUrl) => {
-                        const res = await fetch(partUrl);
-                        if (!res.ok) throw new Error(`Failed to fetch part: ${partUrl}`);
-                        const buf = await res.arrayBuffer();
-                        completed++;
-                        onProgress?.(`正在下载模型 (${completed}/${total})...`);
-                        return buf;
-                    }));
-                    
-                    onProgress?.(`正在合并模型数据...`);
-                    const totalLength = buffers.reduce((acc, buf) => acc + buf.byteLength, 0);
-                    const merged = new Uint8Array(totalLength);
-                    let offset = 0;
-                    
-                    // Copy and immediately try to dereference (fake) by looping
-                    for (let i = 0; i < buffers.length; i++) {
-                        merged.set(new Uint8Array(buffers[i]), offset);
-                        offset += buffers[i].byteLength;
-                        // @ts-ignore
-                        buffers[i] = null; // Help GC
-                    }
-
-                    console.log(`[OnnxEngine] Merged model parts. Total size: ${(totalLength / 1024 / 1024).toFixed(2)} MB`);
-                    modelData = merged;
-                    onProgress?.(`正在启动 AI 引擎 (首次需编译，请稍候)...`); 
-                } catch (e) {
-                    console.error('[OnnxEngine] Failed to load model parts:', e);
-                    throw e;
-                }
-            } else {
-                 console.log(`[OnnxEngine] Loading model from ${this.config.modelPath}...`);
-            }
-
-            try {
-                console.log(`[OnnxEngine] Creating InferenceSession with provider: ${preferredBackend}`);
-                console.log(`[OnnxEngine] Env State:`, JSON.stringify(ort.env.wasm));
-                
-                // @ts-ignore
-                this.session = await ort.InferenceSession.create(modelData, options);
-
-                // [Memory Fix] IMMEDIATELY release the JS copy of the model
-                // The WASM runtime now has its own copy. We don't need this duplicate 20MB in JS heap.
-                (modelData as any) = null; 
-
-                console.log(`[OnnxEngine] Model loaded successfully (${preferredBackend})`);
-                console.log(`[OnnxEngine] Inputs: ${this.session.inputNames.join(', ')}`);
-                console.log(`[OnnxEngine] Outputs: ${this.session.outputNames.join(', ')}`);
-            } catch (e) {
-                console.warn(`[OnnxEngine] ${preferredBackend} failed, falling back to WASM... Error: ${(e as Error).message}`);
-                
-                // Fallback to WASM only (Safest)
-                const wasmOptions: ort.InferenceSession.SessionOptions = {
-                    executionProviders: ['wasm'],
-                    graphOptimizationLevel: 'disabled', // Strongest fallback
-                    enableCpuMemArena: false,
-                    enableMemPattern: false,
-                    executionMode: 'sequential'
-                };
-                
-                // Disable SIMD/Threads for fallback purely
-                ort.env.wasm.simd = false;
-                ort.env.wasm.proxy = false;
-                ort.env.wasm.numThreads = 1;
-
-                console.log("[OnnxEngine] Retrying with basic WASM (No SIMD/Threads)...");
-                this.session = await ort.InferenceSession.create(this.config.modelPath, wasmOptions); // Fallback usually expects path? or can take buffer too
-                // Actually where modelData was used, we might need to recreate it if it was nulled?
-                // Wait, if create failed, modelData SHOULD be intact.. but wait.
-                // The previous logic didn't null model data until success.
-                // But my fix above does.
-                // If create throws, we are in catch block. modelData is still valid (unless I nulled it in try? No, I nulled it AFTER await).
-                // So modelData is safe to use here.
-
-                if (typeof modelData !== 'string' && modelData) {
-                     this.session = await ort.InferenceSession.create(modelData, wasmOptions);
-                } else {
-                     this.session = await ort.InferenceSession.create(this.config.modelPath, wasmOptions);
-                }
-                
-                console.log('[OnnxEngine] Model loaded successfully (WASM Fallback)');
-            }
-        } catch (e) {
-            console.error('[OnnxEngine] Failed to initialize:', e);
-            throw e;
-        }
+        });
+        this.initialization = initialization;
+        return initialization;
     }
 
-    async analyze(board: MicroBoard, color: Sign, options: EngineAnalysisOptions = {}): Promise<AnalysisResult> {
-        if (!this.session) throw new Error('Engine not initialized');
-
+    analyze(board: MicroBoard, color: Sign, options: EngineAnalysisOptions = {}): Promise<AnalysisResult> {
+        const session = this.session;
+        if (!session) return Promise.reject(new Error('Engine not initialized'));
+        const run = this.analyzeSession(session, board, color, options);
+        this.activeRuns.add(run);
+        return run.finally(() => { this.activeRuns.delete(run); });
+    }
+    private async analyzeSession(session: ort.InferenceSession, board: MicroBoard, color: Sign, options: EngineAnalysisOptions): Promise<AnalysisResult> {
         const size = board.size;
-        this.boardSize = size;
+
         const komi = options.komi ?? getDefaultKomi(board.size);
         const history = options.history || [];
 
-        const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+        const isMobile = isMobileDevice();
 
         if (!isMobile) console.time('[OnnxEngine] Inference');
         // console.log(`[OnnxEngine] Starting analysis (Size: ${size}x${size})...`);
@@ -241,7 +102,7 @@ export class OnnxEngine {
         const globalInputData = new Float32Array(19);
 
         // 填充数据 (不再需要传递 modelBoardSize，因为 modelSize 就是 actualSize)
-        this.fillBinInput(board, color, komi, history, binInputData, size);
+        this.fillBinInput(board, color, history, binInputData, size);
         this.fillGlobalInput(history, komi, color, globalInputData);
 
         const tensorsToDispose: ort.Tensor[] = [];
@@ -250,9 +111,8 @@ export class OnnxEngine {
         try {
             // 创建 Tensor: [1, 22, size, size]
             const binInputTensor = new ort.Tensor('float32', binInputData, [1, inputChannels, size, size]);
-            const globalInputTensor = new ort.Tensor('float32', globalInputData, [1, 19]);
-            
             tensorsToDispose.push(binInputTensor);
+            const globalInputTensor = new ort.Tensor('float32', globalInputData, [1, 19]);
             tensorsToDispose.push(globalInputTensor);
 
             // 2. 运行推理
@@ -260,53 +120,25 @@ export class OnnxEngine {
             feeds['input_binary'] = binInputTensor;
             feeds['input_global'] = globalInputTensor;
 
-            results = await this.session.run(feeds);
-            if (!isMobile) console.timeEnd('[OnnxEngine] Inference');
+            results = await session.run(feeds);
 
             // 3. 处理结果
-            const policyTensor = results['output_policy'];
-            const valueTensor = results['output_value'];
-            const miscTensor = results['output_miscvalue'];
-            const ownershipTensor = results['output_ownership'];
+            const { policy: policyData, value, misc, ownership: ownershipRaw } = readModelOutputs(results, size);
 
-            if (!policyTensor || !valueTensor || !miscTensor) {
-                throw new Error('Model output missing required tensors');
-            }
-
-            const policyData = policyTensor.data as Float32Array; // 长度应该正好是 size*size + 1
-            const value = valueTensor.data as Float32Array;
-            const misc = miscTensor.data as Float32Array;
-            const ownershipRaw = ownershipTensor ? ownershipTensor.data as Float32Array : null;
-
-            // [Simplify] 因为模型是动态的，输出直接对应当前棋盘，不需要重映射！
-            // policyData 的最后一个值是 Pass
-            
-            // 4. 处理 Ownership (如果存在)
-            // 动态模型输出已经直接对齐当前棋盘坐标。
-            // 这里仍然统一转换成绝对视角：黑为正，白为负。
-            let finalOwnership: Float32Array | null = null;
-            if (ownershipRaw) {
-                 finalOwnership = new Float32Array(size * size);
-                 for (let i = 0; i < size * size; i++) {
-                     // This older model's ownership head is relative to the side to play.
-                     // Normalize it back to absolute ownership for downstream code.
-                     const rawVal = ownershipRaw[i];
-                     finalOwnership[i] = (color === 1) ? rawVal : -rawVal;
-                 }
-            }
+            const finalOwnership = normalizeOwnership(ownershipRaw, color === 1 ? 1 : -1);
 
             // KataGo's misc head is a 4-float vector.
             // The official PyTorch export order is:
             // [scoreMeanRaw, scoreStdevRaw, leadRaw, varianceTimeRaw]
             // We only consume lead/stdev here, and they are still uncalibrated raw values.
-            const winrate = this.processWinrate(value);
+            const winrate = processWinrate(value);
             const lead = misc[2] ?? 0;
             const scoreStdev = misc[1] ?? 0;
 
             // 提取最佳着手
             // 直接传入 policyData，它已经是正确的大小了
             const moveInfos = extractPolicyMoves(policyData, size, board, color, options.temperature ?? 0);
-            
+
             const resultMoves = moveInfos;
 
             // Log detailed results (Desktop Only)
@@ -336,12 +168,13 @@ export class OnnxEngine {
             console.error('[OnnxEngine] Inference Failed:', e);
             throw e;
         } finally {
+            if (!isMobile) console.timeEnd('[OnnxEngine] Inference');
             // 清理 Tensor
             for (const t of tensorsToDispose) t.dispose();
             if (results) {
                 for (const key in results) {
                     const val = results[key];
-                    if (val && typeof (val as any).dispose === 'function') (val as any).dispose();
+                    val.dispose();
                 }
             }
         }
@@ -350,13 +183,12 @@ export class OnnxEngine {
     private fillBinInput(
         board: MicroBoard,
         pla: Sign,
-        komi: number,
         history: { color: Sign; x: number; y: number }[],
         data: Float32Array,
         size: number // 只需要 actualSize
     ) {
         const opp: Sign = pla === 1 ? -1 : 1;
-        
+
         // Helper: 设置 NCHW (Channel, Y, X)
         // 因为 tensor 大小就是 size*size，所以直接计算 offset
         const set = (c: number, y: number, x: number, val: number) => {
@@ -366,7 +198,7 @@ export class OnnxEngine {
         // 1. Feature 0: Ones (整个棋盘都是 1，不再需要边缘 Moat)
         // 我们可以用 fill 快速填充第一个 Channel
         const planeSize = size * size;
-        data.fill(1.0, 0, planeSize); 
+        data.fill(1.0, 0, planeSize);
 
         // 2. 遍历棋盘设置石子特征
         for (let y = 0; y < size; y++) {
@@ -435,85 +267,31 @@ export class OnnxEngine {
         if (len >= 4 && history[len - 4].x < 0) setGlobal(3, 1.0);
         if (len >= 5 && history[len - 5].x < 0) setGlobal(4, 1.0);
 
-        if (len >= 5 && history[len - 5].x < 0) setGlobal(4, 1.0);
-
         // Komi Direction:
         // KataGo expects Komi relative to the *current player*.
         // If White (Color -1) is playing: Komi is 7.5 -> Input 7.5
         // If Black (Color 1) is playing: Komi is 7.5 (favors White) -> Input -7.5
         // So: if pla === -1 (White), use komi. If pla === 1 (Black), use -komi.
-        
+
         const relativeKomi = (pla === -1) ? komi : -komi;
         setGlobal(5, relativeKomi / 20.0);
         setGlobal(9, 1.0); // Territory scoring, no tax (KataGo input v7).
     }
 
-    private processWinrate(valueData: Float32Array): number {
-        // valueData typically has 3 values: [win, loss, noresult] (or specialized)
-        // Reference:
-        // expValue = [exp(v[0]), exp(v[1]), exp(v[2])]
-        // winrate = expValue[0] / sum
-        
-        // We'll follow the reference implementation
-        const v0 = valueData[0];
-        const v1 = valueData[1];
-        const v2 = valueData[2] || 0; // fallback if only 2
-
-        const e0 = Math.exp(v0);
-        const e1 = Math.exp(v1);
-        const e2 = Math.exp(v2);
-        const sum = e0 + e1 + e2;
-        
-        return (e0 / sum) * 100; // Return percentage
-    }
-
-    private calculateTerritoryScore(ownership: Float32Array, komi: number, size: number, playerColor: Sign): number {
-        // Ownership Logic: Normalized to ABSOLUTE (+1=Black, -1=White)
-        
-        let blackPoints = 0;
-        let whitePoints = 0;
-
-        // Use constant for threshold (defined at top of file, or here for now)
-        const TERRITORY_THRESHOLD = 0.3; 
-
-        for (let i = 0; i < ownership.length; i++) {
-            const val = ownership[i];
-            if (val > TERRITORY_THRESHOLD) blackPoints += 1;
-            else if (val < -TERRITORY_THRESHOLD) whitePoints += 1;
-        }
-        
-        // Absolute Score: (Black - White) - Komi
-        const absoluteScore = (blackPoints - whitePoints) - komi;
-        
-        // Return Lead relative to CURRENT PLAYER
-        // If Black (1): return Abs; If White (-1): return -Abs.
-        return playerColor === 1 ? absoluteScore : -absoluteScore;
-    }
-
-    private deriveWinRateFromScore(scoreLead: number): number {
-        // Logistic Function.
-        // Hard Scoring reduces the magnitude of the lead compared to Soft Scoring (which includes 0.4s).
-        // A "Current Form" lead of 10 points is significant.
-        // T=8: 10pts -> ~78% (Conservative)
-        // T=5: 10pts -> ~88% (Reasonable)
-        const T = 5.0; 
-        const winProbability = 1 / (1 + Math.exp(-scoreLead / T));
-        return winProbability * 100;
-    }
-
-    dispose() {
-        if (this.session) {
-            try {
-                // @ts-ignore - 'release' is available in recent ort-web but might be missing in types
-                if (typeof this.session.release === 'function') {
-                    // @ts-ignore
-                    this.session.release();
-                    console.log("[OnnxEngine] Session released.");
-                }
-            } catch (e) {
-                console.warn("[OnnxEngine] Failed to release session:", e);
-            }
-            this.session = null;
-        }
+    dispose(): Promise<void> {
+        this.generation++;
+        this.initializationAbort?.abort();
+        const initialization = this.initialization;
+        this.initialization = null;
+        this.initializationAbort = null;
+        const session = this.session;
+        this.session = null;
+        const previousDisposal = this.disposal;
+        const activeRuns = [...this.activeRuns];
+        this.disposal = (async () => {
+            await Promise.allSettled([previousDisposal, initialization, ...activeRuns]);
+            if (session) await releaseSession(session);
+        })();
+        return this.disposal;
     }
 }

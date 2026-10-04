@@ -22,19 +22,6 @@ const PreviewStone: React.FC<{
     const isBlack = color === 'black';
     const mainColor = isBlack ? theme.blackColor : theme.whiteColor;
 
-    if (theme.id === 'minimal') {
-        const bodyShadowColor = isBlack ? '#000000' : '#999999';
-        const dropShadowColor = '#000000';
-        const mainStroke = 'none';
-        return (
-            <g>
-                <circle cx={cx + 1.5} cy={cy + 1.5} r={STONE_RADIUS} fill={dropShadowColor} opacity={0.2} />
-                <circle cx={cx + 0.8} cy={cy + 0.8} r={STONE_RADIUS} fill={bodyShadowColor} opacity={0.5} />
-                <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={mainColor} stroke={mainStroke} />
-            </g>
-        );
-    }
-
     if (theme.id === 'skeuomorphic') {
         const shadowStyle = isBlack
             ? { filter: 'drop-shadow(1.5px 1.5px 1px rgba(0,0,0,0.4)) drop-shadow(2.5px 2.5px 2px rgba(0,0,0,0.2))' }

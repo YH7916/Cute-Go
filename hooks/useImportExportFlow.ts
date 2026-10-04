@@ -1,7 +1,8 @@
 import { getDefaultKomi } from '../core/go/config';
 import { useCallback, useState } from 'react';
-import { BoardSize, GameType, HistoryItem, Player } from '../types';
-import { deserializeGame, generateSGF, parseSGF } from '../utils/goLogic';
+import { BoardSize, GameType, Player } from '../types';
+import { deserializeGame, generateSGF, parseSGF } from '../core/go/sgf';
+import type { PositionAccess } from '../domains/game/positionState';
 
 interface ImportExportSettings {
   boardSize: BoardSize;
@@ -9,30 +10,16 @@ interface ImportExportSettings {
   setGameType: (gameType: GameType) => void;
 }
 
-interface ImportExportGameState {
-  board: HistoryItem['board'];
-  currentPlayer: Player;
-  blackCaptures: number;
-  whiteCaptures: number;
-  lastMove: { x: number; y: number } | null;
-  consecutivePasses: number;
-  history: HistoryItem[];
-  setBoard: (board: HistoryItem['board']) => void;
-  setCurrentPlayer: (player: Player) => void;
-  setBlackCaptures: (captures: number) => void;
-  setWhiteCaptures: (captures: number) => void;
-  setLastMove: (move: { x: number; y: number } | null) => void;
-  setHistory: (history: HistoryItem[]) => void;
+interface ImportExportGameState extends PositionAccess {
   setGameOver: (gameOver: boolean) => void;
   setWinner: (winner: Player | null) => void;
-  setConsecutivePasses: (passes: number) => void;
   setAppMode: (mode: 'playing' | 'review' | 'setup') => void;
 }
 
 interface UseImportExportFlowOptions {
   settings: ImportExportSettings;
   gameState: ImportExportGameState;
-  exitTsumegoMode: (nextGameMode?: 'PvP') => void;
+  onImported: () => void;
   playSfx: (type: 'move' | 'capture' | 'error' | 'win' | 'lose') => void;
   vibrate: (pattern: number | number[]) => void;
 }
@@ -40,7 +27,7 @@ interface UseImportExportFlowOptions {
 export const useImportExportFlow = ({
   settings,
   gameState,
-  exitTsumegoMode,
+  onImported,
   playSfx,
   vibrate,
 }: UseImportExportFlowOptions) => {
@@ -57,21 +44,19 @@ export const useImportExportFlow = ({
     if (importKey.trim().startsWith('(;')) {
       const sgfState = parseSGF(importKey);
       if (sgfState) {
-        exitTsumegoMode('PvP');
-        gameState.setBoard(sgfState.board);
-        gameState.setCurrentPlayer(sgfState.currentPlayer);
+        gameState.writePosition({
+          board: sgfState.board, currentPlayer: sgfState.currentPlayer,
+          blackCaptures: sgfState.blackCaptures, whiteCaptures: sgfState.whiteCaptures,
+          lastMove: sgfState.lastMove, history: sgfState.history, consecutivePasses: 0,
+        });
         settings.setGameType(sgfState.gameType);
         settings.setBoardSize(sgfState.boardSize);
-        gameState.setBlackCaptures(sgfState.blackCaptures);
-        gameState.setWhiteCaptures(sgfState.whiteCaptures);
-        gameState.setLastMove(sgfState.lastMove);
-        gameState.setHistory(sgfState.history);
         setInitialStones(sgfState.initialStones);
         gameState.setGameOver(false);
         gameState.setWinner(null);
-        gameState.setConsecutivePasses(0);
         gameState.setAppMode('playing');
         setShowImportModal(false);
+        onImported();
         playSfx('move');
         vibrate(20);
         return;
@@ -80,34 +65,30 @@ export const useImportExportFlow = ({
 
     const gs = deserializeGame(importKey);
     if (gs) {
-      exitTsumegoMode('PvP');
-      gameState.setBoard(gs.board);
-      gameState.setCurrentPlayer(gs.currentPlayer);
+      gameState.writePosition({
+        board: gs.board, currentPlayer: gs.currentPlayer,
+        blackCaptures: gs.blackCaptures, whiteCaptures: gs.whiteCaptures,
+        lastMove: null, history: [], consecutivePasses: 0,
+      });
       settings.setGameType(gs.gameType);
       settings.setBoardSize(gs.boardSize);
-      gameState.setBlackCaptures(gs.blackCaptures);
-      gameState.setWhiteCaptures(gs.whiteCaptures);
-      gameState.setLastMove(null);
-      gameState.setHistory([]);
       gameState.setGameOver(false);
       gameState.setWinner(null);
       setInitialStones([]);
-      gameState.setConsecutivePasses(0);
       gameState.setAppMode('playing');
       setShowImportModal(false);
+      onImported();
       playSfx('move');
       vibrate(20);
     } else {
       alert('无效的棋谱格式 (支持 SGF 或 CuteGo 代码)');
     }
-  }, [exitTsumegoMode, gameState, importKey, playSfx, settings, vibrate]);
-
-  const getFullHistory = useCallback(() => {
-    return gameState.history;
-  }, [gameState.history]);
+  }, [gameState, importKey, onImported, playSfx, settings, vibrate]);
 
   const handleCopy = useCallback(() => {
-    const sgf = generateSGF(getFullHistory(), settings.boardSize, getDefaultKomi(settings.boardSize), initialStones);
+    const position = gameState.readPosition();
+    const size = position.board.length;
+    const sgf = generateSGF(position.history, size, getDefaultKomi(size), initialStones);
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(sgf).then(() => {
@@ -121,10 +102,12 @@ export const useImportExportFlow = ({
     } else {
       alert("浏览器限制，请使用下方‘导出 SGF’按钮");
     }
-  }, [getFullHistory, initialStones, settings.boardSize, vibrate]);
+  }, [gameState, initialStones, vibrate]);
 
   const handleExportSGF = useCallback(() => {
-    const sgf = generateSGF(getFullHistory(), settings.boardSize, getDefaultKomi(settings.boardSize), initialStones);
+    const position = gameState.readPosition();
+    const size = position.board.length;
+    const sgf = generateSGF(position.history, size, getDefaultKomi(size), initialStones);
 
     const blob = new Blob([sgf], { type: 'application/x-go-sgf' });
     const url = URL.createObjectURL(blob);
@@ -136,7 +119,7 @@ export const useImportExportFlow = ({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     vibrate(10);
-  }, [getFullHistory, initialStones, settings.boardSize, vibrate]);
+  }, [gameState, initialStones, vibrate]);
 
   return {
     clearInitialStones,

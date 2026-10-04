@@ -1,0 +1,429 @@
+{
+  "ogs-stage-1.title": "基础规则",
+  "ogs-rules-intro.title": "认识围棋",
+  "ogs-rules-intro.subtext": "一手一手围出地盘",
+  "ogs-rules-intro-page1.text": [
+    "棋局从空棋盘开始。双方轮流落下黑子和白子，黑棋先下。棋子可以落在任何空的交叉点上，包括棋盘最外侧。现在落一手，继续学习。"
+  ],
+  "ogs-rules-intro-page2.text": [
+    "黑棋已经下了第一手，现在轮到白棋。请落一手。"
+  ],
+  "ogs-rules-intro-page3.text": [
+    "与棋子紧邻的空点叫作“气”。请占住这颗黑子的一口气。"
+  ],
+  "ogs-rules-intro-page4.text": [
+    "一颗棋子的气全部被对方占住时，就会被提走。请占住这颗黑子的最后一口气，把它提掉。"
+  ],
+  "ogs-rules-intro-page5.text": [
+    "相邻并直接连接的同色棋子组成一块棋。请占住这块黑棋的一口气。"
+  ],
+  "ogs-rules-intro-page6.text": [
+    "这块黑棋只剩一口气，这种状态叫“被打吃”。请提掉这块被打吃的黑棋。"
+  ],
+  "ogs-self-capture.title": "禁入点与提子",
+  "ogs-self-capture.subtext": "不能让自己的棋无气被提",
+  "ogs-self-capture-page01.text": [
+    "白先。在 A 或 B 落子会让白棋没有气，属于禁止的自杀着。但 C 点可以下，因为它能提掉标记的黑棋，让白棋重新有气。请提掉标记的黑棋。"
+  ],
+  "ogs-self-capture-page02.text": [
+    "白先。双方都有棋被打吃。落子后没有气是不允许的，但能够提掉对方棋子时例外。请提掉一颗或更多黑子。"
+  ],
+  "ogs-self-capture-page03.text": [
+    "白先。双方都有棋被打吃。落子后没有气是不允许的，但能够提掉对方棋子时例外。请提掉一颗或更多黑子。"
+  ],
+  "ogs-eyes.title": "认识眼",
+  "ogs-eyes.subtext": "一眼与两眼",
+  "ogs-eyes-page01.text": [
+    "A 点被白棋围住，叫作“眼”。黑棋不能下在 A 点，否则会自杀。B 点也是眼，但黑棋可以在这里落子提棋。请提掉白棋。"
+  ],
+  "ogs-eyes-page02.text": [
+    "白棋有一个包含两个空点的大眼，但这块棋还不安全。黑先。请逐点填入这个眼，提掉白棋。"
+  ],
+  "ogs-eyes-page03.text": [
+    "白棋有两块棋，一块有两只眼，另一块只有一个大眼。有两只眼的那块棋是安全的，不会被提掉。黑先。请提掉其中一块白棋。"
+  ],
+  "ogs-eyes-page04.text": [
+    "一块白棋有两只真眼。另一块在 A 点有真眼，在 B 点是假眼。假眼不安全，可以受到攻击。黑先。请从假眼入手，提掉这块白棋。"
+  ],
+  "ogs-ko.title": "劫",
+  "ogs-ko.subtext": "不能立即回提",
+  "ogs-ko-page01.text": [
+    "为了防止双方在同一处无休止地反复提子，“劫”的规则禁止立即回提、恢复到刚才的局面。黑棋可以提掉标记的白子，但白棋不能马上提回这颗黑子，必须先在别处下一手。请提掉标记的白子。"
+  ],
+  "ogs-ko-page02.text": [
+    "请利用劫的规则，提掉这块白棋。"
+  ],
+  "ogs-ko-page03.text": [
+    "请把黑棋连接起来。"
+  ],
+  "ogs-ko-page04.text": [
+    "请利用劫的规则，提掉两颗白子。"
+  ],
+  "ogs-ko-page05.text": [
+    "白棋刚在标记为 1 的位置落子，提掉了一颗黑子。黑棋需要先找一处让白棋必须应对提子的地方，这叫“劫材”。之后，黑棋就能回到这里，提掉标记的白棋。"
+  ],
+  "ogs-territory.title": "地盘",
+  "ogs-territory.subtext": "数一数地盘",
+  "ogs-territory-page01.text": [
+    "被己方棋子围住的区域叫“地盘”，里面每个空点算一目。地盘和提子都能得分，终局时得分多的一方获胜。角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page01.option.3": "3",
+  "ogs-territory-page01.option.4": "4",
+  "ogs-territory-page01.option.5": "5",
+  "ogs-territory-page02.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page02.option.6": "6",
+  "ogs-territory-page02.option.7": "7",
+  "ogs-territory-page02.option.8": "8",
+  "ogs-territory-page03.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page03.option.5": "5",
+  "ogs-territory-page03.option.6": "6",
+  "ogs-territory-page03.option.7": "7",
+  "ogs-territory-page04.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page04.option.7": "7",
+  "ogs-territory-page04.option.8": "8",
+  "ogs-territory-page04.option.9": "9",
+  "ogs-territory-page05.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page05.option.7": "7",
+  "ogs-territory-page05.option.8": "8",
+  "ogs-territory-page05.option.9": "9",
+  "ogs-territory-page06.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page06.option.6": "6",
+  "ogs-territory-page06.option.7": "7",
+  "ogs-territory-page06.option.8": "8",
+  "ogs-territory-page07.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page07.option.8": "8",
+  "ogs-territory-page07.option.9": "9",
+  "ogs-territory-page07.option.10": "10",
+  "ogs-territory-page08.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page08.option.7": "7",
+  "ogs-territory-page08.option.8": "8",
+  "ogs-territory-page08.option.9": "9",
+  "ogs-territory-page09.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page09.option.12": "12",
+  "ogs-territory-page09.option.14": "14",
+  "ogs-territory-page09.option.15": "15",
+  "ogs-territory-page10.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page10.option.8": "8",
+  "ogs-territory-page10.option.10": "10",
+  "ogs-territory-page10.option.12": "12",
+  "ogs-territory-page11.text": [
+    "对方留在己方地盘中、无法做出两眼而不能存活的棋，叫作“死子”。终局时，死子被提走算作俘子，原来的位置又空出一个地盘点。因此，一颗死子合计两目：一目俘子加一目地盘。角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page11.option.6": "6",
+  "ogs-territory-page11.option.7": "7",
+  "ogs-territory-page11.option.8": "8",
+  "ogs-territory-page12.text": [
+    "角上的这块地盘有多少目？"
+  ],
+  "ogs-territory-page12.option.7": "7",
+  "ogs-territory-page12.option.9": "9",
+  "ogs-territory-page12.option.11": "11",
+  "ogs-ending-the-game.title": "结束一局棋",
+  "ogs-ending-the-game.subtext": "双方停着",
+  "ogs-ending-the-game-page01.text": [
+    "轮到你时，不一定非要落子，也可以选择“停着”。当双方都认为没有值得下的地方时，会先后停着，结束对局。这盘棋已经下完了，请点击“停一手”。"
+  ],
+  "ogs-ending-the-game-page01.action": "停一手",
+  "ogs-ending-the-game-page02.text": [
+    "双方停着后，进入清除死子的阶段，可以把明显无法存活的棋从棋盘上移走。请点击死掉的黑棋，把它们移除。"
+  ],
+  "ogs-ending-the-game-page03.text": [
+    "移除死子后，计算双方地盘。黑棋有 24 目；白棋地盘有 18 目，再加上提掉的 4 颗死子，共 22 目。因此黑棋获胜。请点击“结束对局”，结束这局棋。"
+  ],
+  "ogs-ending-the-game-page03.action": "结束对局",
+  "ogs-the-board.title": "认识棋盘",
+  "ogs-the-board.subtext": "角、边与中央",
+  "ogs-the-board-page1.text": [
+    "你可以在任何地方落子。通常先占角，再走边，最后考虑中央，是一个实用的方向。请在右上角落一颗子。"
+  ],
+  "ogs-the-board-page2.text": [
+    "围棋可以使用不同大小的棋盘，常见的是 9 路、13 路和最普遍的 19 路。初学时适合从 9 路棋盘开始。请在棋盘右边落子，不要下在角上。"
+  ],
+  "ogs-the-board-page3.text": [
+    "棋盘上的几个小圆点叫作“星位”。它们没有特别的落子规则，只是帮助你辨认棋盘方位。请在一个星位上落子。"
+  ],
+  "ogs-stage-2.title": "基本原理",
+  "ogs-count-liberties.title": "数气",
+  "ogs-count-liberties.subtext": "数一数棋块的气",
+  "ogs-count-liberties-page01.text": [
+    "请数一数这块黑棋有几口气。"
+  ],
+  "ogs-count-liberties-page01.option.3": "3",
+  "ogs-count-liberties-page01.option.4": "4",
+  "ogs-count-liberties-page01.option.6": "6",
+  "ogs-count-liberties-page05.text": [
+    "请数一数这块黑棋有几口气。"
+  ],
+  "ogs-count-liberties-page05.option.2": "2",
+  "ogs-count-liberties-page05.option.3": "3",
+  "ogs-count-liberties-page05.option.4": "4",
+  "ogs-count-liberties-page11.text": [
+    "请数一数这块黑棋有几口气。"
+  ],
+  "ogs-count-liberties-page11.option.6": "6",
+  "ogs-count-liberties-page11.option.7": "7",
+  "ogs-count-liberties-page11.option.8": "8",
+  "ogs-count_chains.title": "棋块",
+  "ogs-count_chains.subtext": "数一数棋块",
+  "ogs-count_chains-page01.text": [
+    "只有直接相连的棋子才属于同一块棋。请数一数白棋有几块。"
+  ],
+  "ogs-count_chains-page01.option.2": "2",
+  "ogs-count_chains-page01.option.4": "4",
+  "ogs-count_chains-page01.option.7": "7",
+  "ogs-count_chains-page03.text": [
+    "请数一数白棋有几块。"
+  ],
+  "ogs-count_chains-page03.option.3": "3",
+  "ogs-count_chains-page03.option.4": "4",
+  "ogs-count_chains-page03.option.5": "5",
+  "ogs-count_chains-page06.text": [
+    "请数一数白棋有几块。"
+  ],
+  "ogs-count_chains-page06.option.2": "2",
+  "ogs-count_chains-page06.option.3": "3",
+  "ogs-count_chains-page06.option.4": "4",
+  "ogs-in_atari.title": "打吃",
+  "ogs-in_atari.subtext": "只剩一口气",
+  "ogs-in_atari-page01.text": [
+    "一块棋只剩一口气时，就处于被打吃的状态。标记的这块棋被打吃了吗？"
+  ],
+  "ogs-in_atari-page01.option.yes": "是",
+  "ogs-in_atari-page01.option.no": "否",
+  "ogs-in_atari-page02.text": [
+    "标记的这块棋被打吃了吗？"
+  ],
+  "ogs-in_atari-page02.option.yes": "是",
+  "ogs-in_atari-page02.option.no": "否",
+  "ogs-in_atari-page06.text": [
+    "标记的这块棋被打吃了吗？"
+  ],
+  "ogs-in_atari-page06.option.yes": "是",
+  "ogs-in_atari-page06.option.no": "否",
+  "ogs-capture_stone.title": "提一颗子",
+  "ogs-capture_stone.subtext": "提掉一颗棋子",
+  "ogs-capture_stone-page01.text": [
+    "黑先。请提掉标记的白子。"
+  ],
+  "ogs-capture_stone-page03.text": [
+    "黑先。请提掉标记的白子。"
+  ],
+  "ogs-capture_stone-page06.text": [
+    "黑先。请提掉标记的白子。"
+  ],
+  "ogs-capture_chain.title": "提一块棋",
+  "ogs-capture_chain.subtext": "提掉一整块相连的棋子",
+  "ogs-capture_chain-page01.text": [
+    "黑先。标记的这块白棋被打吃了，请提掉它。"
+  ],
+  "ogs-capture_chain-page08.text": [
+    "白先。请提掉一颗或更多黑子。"
+  ],
+  "ogs-capture_chain-page14.text": [
+    "白先。双方都有棋被打吃，请提掉一颗或更多黑子。"
+  ],
+  "ogs-escape.title": "逃出打吃",
+  "ogs-escape.subtext": "救出被打吃的棋",
+  "ogs-escape-page01.text": [
+    "白先。请把标记的白棋向外延伸，增加它的气，救出这块被打吃的棋。"
+  ],
+  "ogs-escape-page03.text": [
+    "白先。请救出标记的、被打吃的白棋。"
+  ],
+  "ogs-escape-page06.text": [
+    "白先。请救出标记的、被打吃的白棋。"
+  ],
+  "ogs-connect.title": "连接",
+  "ogs-connect.subtext": "把自己的棋连起来",
+  "ogs-connect-page01.text": [
+    "棋子连成一块，可以相互照应，通常比单独一颗棋子更难被提掉。把自己的棋连接起来，就能形成一块棋。请连接白棋。"
+  ],
+  "ogs-connect-page03.text": [
+    "白先。请连接白棋。"
+  ],
+  "ogs-connect-page06.text": [
+    "白先。请连接白棋。"
+  ],
+  "ogs-cut.title": "切断",
+  "ogs-cut.subtext": "切断对方的棋",
+  "ogs-cut-page01.text": [
+    "白棋可以在 A 点落子，把棋连接起来。现在轮到黑棋，你可以阻止白棋连接。请切断白棋。"
+  ],
+  "ogs-cut-page03.text": [
+    "黑先。请切断白棋。"
+  ],
+  "ogs-cut-page06.text": [
+    "黑先。请切断白棋。"
+  ],
+  "ogs-real-false-eye.title": "真假眼",
+  "ogs-real-false-eye.subtext": "分辨真眼和假眼",
+  "ogs-real-false-eye-page01.text": [
+    "如果围眼的棋能被攻击，眼就可能保不住，这叫“假眼”。A 点是真眼还是假眼？"
+  ],
+  "ogs-real-false-eye-page01.option.real": "真眼",
+  "ogs-real-false-eye-page01.option.false": "假眼",
+  "ogs-real-false-eye-page03.text": [
+    "A 点是真眼还是假眼？"
+  ],
+  "ogs-real-false-eye-page03.option.real": "真眼",
+  "ogs-real-false-eye-page03.option.false": "假眼",
+  "ogs-real-false-eye-page06.text": [
+    "A 点是真眼还是假眼？"
+  ],
+  "ogs-real-false-eye-page06.option.real": "真眼",
+  "ogs-real-false-eye-page06.option.false": "假眼",
+  "ogs-make-alive.title": "做出两眼",
+  "ogs-make-alive.subtext": "做出两只眼",
+  "ogs-make-alive-page01.text": [
+    "这块白棋还不安全，黑棋可以在 A 点落子，阻止白棋做出两眼。白先。请做出两眼，让白棋活下来。"
+  ],
+  "ogs-make-alive-page03.text": [
+    "白先。请做出两眼。"
+  ],
+  "ogs-make-alive-page06.text": [
+    "白先。请做出两眼。"
+  ],
+  "ogs-stage-3.title": "基础技巧",
+  "ogs-atari-correct-side.title": "打吃的方向",
+  "ogs-atari-correct-side.subtext": "选择正确的打吃方向",
+  "ogs-atari-correct-side-page01.text": [
+    "白棋在 A 或 B 点落子，都能打吃标记的黑棋。请选择正确的方向打吃。"
+  ],
+  "ogs-atari-correct-side-page02.text": [
+    "白先。请从正确的方向打吃标记的棋。"
+  ],
+  "ogs-atari-correct-side-page04.text": [
+    "白先。请从正确的方向打吃标记的棋。"
+  ],
+  "ogs-atari-correct-side-page06.text": [
+    "白先。请从正确的方向打吃标记的棋。"
+  ],
+  "ogs-play_double_atari.title": "双打吃",
+  "ogs-play_double_atari.subtext": "同时打吃两块棋",
+  "ogs-play_double_atari-page01.text": [
+    "白棋只下一手，就能同时打吃两处标记的黑棋，这叫“双打吃”。黑棋只能救其中一处。请对标记的棋走出双打吃。"
+  ],
+  "ogs-play_double_atari-page06.text": [
+    "白先。请对标记的棋走出双打吃。"
+  ],
+  "ogs-play_double_atari-page10.text": [
+    "黑先。请对标记的棋走出双打吃。"
+  ],
+  "ogs-play_double_atari-page18.text": [
+    "黑先。请对标记的棋走出双打吃。"
+  ],
+  "ogs-ladder.title": "征吃",
+  "ogs-ladder.subtext": "沿着征子路线吃棋",
+  "ogs-ladder-page01.text": [
+    "黑先。标记的白棋只有两口气。黑棋可以不断挡在它的前面打吃，最终把它吃住，这叫“征吃”。关键是不能让白棋获得三口气。请征吃标记的白棋。"
+  ],
+  "ogs-ladder-page06.text": [
+    "黑先。请征吃标记的这颗棋子。"
+  ],
+  "ogs-ladder-page13.text": [
+    "白先。请征吃标记的这颗棋子。"
+  ],
+  "ogs-ladder-page24.text": [
+    "白先。请征吃标记的棋。"
+  ],
+  "ogs-snapback.title": "倒扑",
+  "ogs-snapback.subtext": "先让对方提子，再反提",
+  "ogs-snapback-page01.text": [
+    "黑棋可以吃掉标记的两颗白子，但不能直接在 A 点打吃，否则白棋会在 B 点补住。黑棋应先在 B 点落子，让自己的这一子只剩一口气。白棋在 A 点提掉它后，三颗白子反而被打吃，黑棋就能提回来。这种吃法叫“倒扑”。请提掉标记的白棋。"
+  ],
+  "ogs-snapback-page07.text": [
+    "黑先。请提掉标记的棋。"
+  ],
+  "ogs-snapback-page14.text": [
+    "白先。请提掉标记的棋。"
+  ],
+  "ogs-snapback-page25.text": [
+    "白先。请提掉标记的棋。"
+  ],
+  "ogs-net.title": "枷吃",
+  "ogs-net.subtext": "用枷封住出路",
+  "ogs-net-page01.text": [
+    "如果黑棋只是连续打吃，标记的白子就能逃走。黑棋可以在 A 点落子，用“枷”封住它的出路。请枷吃标记的白子。"
+  ],
+  "ogs-net-page04.text": [
+    "白先。请枷吃标记的棋。"
+  ],
+  "ogs-net-page08.text": [
+    "白先。请枷吃标记的棋。"
+  ],
+  "ogs-net-page13.text": [
+    "白先。请枷吃标记的棋。"
+  ],
+  "ogs-count-territory.title": "地盘",
+  "ogs-count-territory.subtext": "数一数地盘",
+  "ogs-count-territory-page01.text": [
+    "白棋这块地盘合计多少目？注意，一颗死子合计两目。"
+  ],
+  "ogs-count-territory-page01.option.2": "2",
+  "ogs-count-territory-page01.option.3": "3",
+  "ogs-count-territory-page01.option.4": "4",
+  "ogs-count-territory-page04.text": [
+    "白棋这块地盘合计多少目？注意，一颗死子合计两目。"
+  ],
+  "ogs-count-territory-page04.option.5": "5",
+  "ogs-count-territory-page04.option.7": "7",
+  "ogs-count-territory-page04.option.9": "9",
+  "ogs-count-territory-page08.text": [
+    "白棋这块地盘合计多少目？注意，一颗死子合计两目。"
+  ],
+  "ogs-count-territory-page08.option.5": "5",
+  "ogs-count-territory-page08.option.8": "8",
+  "ogs-count-territory-page08.option.11": "11",
+  "ogs-count-territory-page12.text": [
+    "白棋这块地盘合计多少目？注意，一颗死子合计两目。"
+  ],
+  "ogs-count-territory-page12.option.5": "5",
+  "ogs-count-territory-page12.option.6": "6",
+  "ogs-count-territory-page12.option.7": "7",
+  "ogs-close_territory.title": "封住地盘",
+  "ogs-close_territory.subtext": "",
+  "ogs-close_territory-page01.text": [
+    "黑棋有一小块地盘，但白棋可以在 A 点落子缩小它。黑先。请用一手封住地盘，防止白棋侵入。"
+  ],
+  "ogs-close_territory-page04.text": [
+    "黑先。请用一手封住黑棋的地盘。"
+  ],
+  "ogs-close_territory-page08.text": [
+    "黑先。请用一手封住黑棋的地盘。"
+  ],
+  "ogs-close_territory-page12.text": [
+    "黑先。请用一手封住黑棋的地盘。"
+  ],
+  "ogs-capturing_race.title": "对杀",
+  "ogs-capturing_race.subtext": "赢下比气的对杀",
+  "ogs-capturing_race-page01.text": [
+    "标记的两块棋各有两口气。白棋可以紧黑棋的气，把它提掉；如果轮到黑棋，黑棋也能这样做。这叫“对杀”。在这里双方气数相同，先下的一方能赢。白先，请赢下这场对杀。"
+  ],
+  "ogs-capturing_race-page06.text": [
+    "白先。请赢下这场对杀。"
+  ],
+  "ogs-capturing_race-page13.text": [
+    "黑先。请赢下对杀，提掉标记的棋，同时避免让自己被打吃。"
+  ],
+  "ogs-capturing_race-page18.text": [
+    "黑先。请赢下对杀，提掉标记的棋，同时避免让自己被打吃。"
+  ]
+}

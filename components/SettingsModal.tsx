@@ -1,18 +1,14 @@
-import { getDefaultKomi } from '../core/go/config';
 import React, { useState, useEffect } from 'react';
-import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, RotateCcw, Palette, FileUp, Home, CircleDot } from 'lucide-react';
-import { BoardSize, GameType, GameMode, Player, Difficulty } from '../types';
+import { X, Cpu, LayoutGrid, BarChart3, Wind, Volume2, VolumeX, Smartphone, RotateCcw, Palette, FileUp, Home, CircleDot, ArrowLeft, MessageCircle, Sparkles, BookOpen } from 'lucide-react';
+import type { BoardSize, Player, Difficulty, GameSettingsData } from '../types';
 import { getSliderBackground } from '../utils/helpers';
+import { Button } from '../ui/common';
 
-export interface GameSettingsData {
-    boardSize: BoardSize;
-    gameType: GameType;
-    gameMode: GameMode;
-    difficulty: Difficulty;
-    userColor: Player;
-}
+const settingsActionClass = 'w-full h-12 flex items-center justify-center gap-2';
 
 interface SettingsModalProps {
+    coachSettings?: React.ReactNode;
+    coachMode?: boolean;
     isOpen: boolean;
     onClose: () => void;
     currentGameSettings: GameSettingsData;
@@ -23,6 +19,8 @@ interface SettingsModalProps {
     setShowWinRate: (val: boolean) => void;
     showCoordinates: boolean;
     setShowCoordinates: (val: boolean) => void;
+    stoneAnimationEnabled: boolean;
+    setStoneAnimationEnabled: (val: boolean) => void;
     musicVolume: number;
     setMusicVolume: (val: number) => void;
     hapticEnabled: boolean;
@@ -34,14 +32,15 @@ interface SettingsModalProps {
     setSeparatePieces: (val: boolean) => void;
     onStartSetup: () => void;
     onOpenImport: () => void;
+    onOpenTutorial: () => void;
     onOpenOnline: () => void;
     onOpenAbout: () => void;
-    onOpenTutorial: () => void;
-    onOpenTsumego: () => void;
     onOpenSkinShop: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
+    coachSettings,
+    coachMode = false,
     isOpen,
     onClose,
     currentGameSettings,
@@ -49,17 +48,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     showQi, setShowQi,
     showWinRate, setShowWinRate,
     showCoordinates, setShowCoordinates,
+    stoneAnimationEnabled, setStoneAnimationEnabled,
     musicVolume, setMusicVolume,
     hapticEnabled, setHapticEnabled,
     vibrate,
     skipStartScreen, setSkipStartScreen,
     separatePieces, setSeparatePieces,
     onOpenImport,
+    onOpenTutorial,
     onOpenSkinShop
 }) => {
     const [tempBoardSize, setTempBoardSize] = useState<BoardSize>(currentGameSettings.boardSize);
     const [tempDifficulty, setTempDifficulty] = useState<Difficulty>(currentGameSettings.difficulty);
     const [tempUserColor, setTempUserColor] = useState<Player>(currentGameSettings.userColor);
+    const [showCoachSettings, setShowCoachSettings] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) setShowCoachSettings(false);
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -83,14 +89,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const title = isGomokuSettings
         ? '五子棋设置'
         : isFunGoSettings
-            ? '围棋娱乐设置'
+            ? (coachMode ? '陪练设置' : '围棋启蒙设置')
             : isChallengeGoSettings
                 ? '挑战 AI 设置'
                 : '围棋设置';
-    const showAiDifficulty = isAiSettings && !isFunGoSettings;
+    const showAiDifficulty = isAiSettings && (!isFunGoSettings || coachMode);
     const showWinRateSetting = isChallengeGoSettings;
     const showGoOnlyAssist = currentGameSettings.gameType === 'Go';
     const showImportExport = currentGameSettings.gameType === 'Go';
+    const isCoachPage = showCoachSettings && !!coachSettings;
 
     const handleApply = () => {
         onApplyGameSettings({
@@ -104,12 +111,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     return (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-[#fcf6ea] rounded-[2rem] w-full max-w-sm landscape:max-w-3xl shadow-2xl border-[6px] border-[#8c6b38] flex flex-col max-h-[90vh] overflow-hidden relative">
+          <div role="dialog" aria-modal="true" aria-label={isCoachPage ? '陪练讲解服务' : title} className={`bg-[#fcf6ea] rounded-[2rem] w-full max-w-sm ${isCoachPage ? 'landscape:max-w-lg' : 'landscape:max-w-3xl'} shadow-2xl border-[6px] border-[#8c6b38] flex flex-col max-h-[90vh] overflow-hidden relative`}>
             <div className="bg-[#fcf6ea] border-b-2 border-[#e3c086] border-dashed p-4 landscape:p-3 flex justify-between items-center shrink-0">
-                <h2 className="text-2xl landscape:text-xl font-black text-[#5c4033] tracking-wide">{title}</h2>
-                <button onClick={onClose} className="text-[#8c6b38] hover:text-[#5c4033] bg-[#fff] rounded-full p-2 border-2 border-[#e3c086] transition-colors"><X size={20}/></button>
+                <div className="flex min-w-0 items-center gap-2">
+                    {isCoachPage && <Button appearance="retro" variant="ghost" size="sm" className="h-11 w-11 shrink-0 flex items-center justify-center" aria-label="返回设置" title="返回设置" onClick={() => setShowCoachSettings(false)}><ArrowLeft size={20} /></Button>}
+                    <h2 className={`${isCoachPage ? 'text-lg' : 'text-2xl landscape:text-xl'} font-black text-[#5c4033] tracking-wide`}>{isCoachPage ? '陪练讲解服务' : title}</h2>
+                </div>
+                <button aria-label="关闭设置" onClick={onClose} className="h-11 w-11 shrink-0 flex items-center justify-center text-[#8c6b38] hover:text-[#5c4033] bg-[#fff] rounded-full p-2 border-2 border-[#e3c086] transition-colors"><X size={20}/></button>
             </div>
 
+            {isCoachPage ? coachSettings : <>
             <div className="p-6 landscape:p-4 overflow-y-auto custom-scrollbar flex flex-col landscape:grid landscape:grid-cols-2 gap-6 landscape:gap-x-6 landscape:gap-y-2">
                 <div className="space-y-4 landscape:contents">
                    <div className="space-y-4">
@@ -140,7 +151,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                             </span>
                                         </div>
                                         <div className="flex gap-2">
-                                            {(['Easy', 'Medium', 'Hard'] as const).map(diff => (
+                                            {(coachMode ? ['Fun', 'Easy', 'Medium', 'Hard'] as const : ['Easy', 'Medium', 'Hard'] as const).map(diff => (
                                                 <button
                                                     key={diff}
                                                     onClick={() => setTempDifficulty(diff)}
@@ -150,7 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                                         : 'bg-[#fff] text-[#8c6b38] border-[#e3c086] hover:bg-[#fcf6ea]'
                                                     }`}
                                                 >
-                                                    {diff === 'Easy' ? '简单' : diff === 'Medium' ? '中等' : '困难'}
+                                                    {diff === 'Fun' ? '启蒙' : diff === 'Easy' ? '简单' : diff === 'Medium' ? '中等' : '困难'}
                                                 </button>
                                             ))}
                                         </div>
@@ -184,9 +195,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
                         </div>
 
-                        {!isGomokuSettings && <p className="text-xs font-bold text-[#8c6b38] px-1">
-                            数目法：围空＋提子＋死子；白贴 {getDefaultKomi(tempBoardSize)} 目
-                        </p>}
                         <div className="h-px bg-[#e3c086] border-dashed border-b border-[#e3c086]/50 landscape:hidden"></div>
                    </div>
                 </div>
@@ -195,48 +203,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="space-y-4">
                         <h3 className="text-sm font-bold text-[#8c6b38] uppercase tracking-widest mb-1">辅助与音效</h3>
 
-                        <div className="flex gap-2 justify-between">
-                            {showWinRateSetting && (
-                                <button onClick={() => setShowWinRate(!showWinRate)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showWinRate ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
-                                    <BarChart3 size={18} />
-                                    <span className="text-xs font-bold">胜率</span>
-                                </button>
-                            )}
-                            <button onClick={() => setShowCoordinates(!showCoordinates)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showCoordinates ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
+                        <div role="group" aria-label="棋盘显示" className="grid grid-cols-2 gap-2">
+                            <Button appearance="retro" variant={showCoordinates ? 'primary' : 'secondary'} size="sm" aria-pressed={showCoordinates} onClick={() => setShowCoordinates(!showCoordinates)} className="flex flex-col items-center justify-center gap-1 h-16">
                                 <LayoutGrid size={18} />
                                 <span className="text-xs font-bold">坐标</span>
-                            </button>
+                            </Button>
                             {showGoOnlyAssist && (
-                                <button onClick={() => setShowQi(!showQi)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${showQi ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
+                                <Button appearance="retro" variant={showQi ? 'primary' : 'secondary'} size="sm" aria-pressed={showQi} onClick={() => setShowQi(!showQi)} className="flex flex-col items-center justify-center gap-1 h-16">
                                     <Wind size={18} />
                                     <span className="text-xs font-bold">气</span>
-                                </button>
+                                </Button>
                             )}
                             {showGoOnlyAssist && (
-                                <button onClick={() => setSeparatePieces(!separatePieces)} className={`btn-retro flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl h-16 ${separatePieces ? 'bg-[#8c6b38] border-[#5c4033] text-[#fcf6ea]' : 'bg-[#fff] border-[#e3c086] text-[#8c6b38]'}`}>
+                                <Button appearance="retro" variant={separatePieces ? 'primary' : 'secondary'} size="sm" aria-pressed={separatePieces} onClick={() => setSeparatePieces(!separatePieces)} className="flex flex-col items-center justify-center gap-1 h-16">
                                     <CircleDot size={18} />
                                     <span className="text-xs font-bold">独立</span>
-                                </button>
+                                </Button>
                             )}
+                            <Button appearance="retro" variant={stoneAnimationEnabled ? 'primary' : 'secondary'} size="sm" aria-pressed={stoneAnimationEnabled} onClick={() => setStoneAnimationEnabled(!stoneAnimationEnabled)} className="flex flex-col items-center justify-center gap-1 h-16">
+                                <Sparkles size={18} />
+                                <span className="text-xs font-bold">落子动画</span>
+                            </Button>
                         </div>
 
+                        {showWinRateSetting && (
+                            <Button appearance="retro" variant={showWinRate ? 'primary' : 'secondary'} size="sm" aria-pressed={showWinRate} onClick={() => setShowWinRate(!showWinRate)} className={settingsActionClass}>
+                                <BarChart3 size={18} />
+                                <span className="text-xs font-bold">胜率</span>
+                            </Button>
+                        )}
+
                         {showImportExport && (
-                            <button
+                            <Button appearance="retro" variant="secondary" className={settingsActionClass}
                                 onClick={() => { onOpenImport(); onClose(); }}
-                                className="btn-retro bg-[#fff] border-[#e3c086] text-[#8c6b38] hover:text-[#5c4033] hover:border-[#8c6b38] w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all"
                             >
                                 <FileUp size={18} />
                                 <span className="text-sm">导入 / 导出棋谱</span>
-                            </button>
+                            </Button>
                         )}
 
-                        <button
+                        {showGoOnlyAssist && <Button appearance="retro" variant="secondary" className={settingsActionClass}
+                            aria-label="重看新手教学" onClick={() => { onOpenTutorial(); onClose(); }}>
+                            <BookOpen size={18} />
+                            <span className="text-sm">重看新手教学</span>
+                        </Button>}
+
+                        <Button appearance="retro" variant="secondary" className={settingsActionClass}
                             onClick={() => { onOpenSkinShop(); onClose(); }}
-                            className="btn-retro bg-[#fff] border-[#e3c086] text-[#8c6b38] hover:text-[#5c4033] hover:border-[#8c6b38] w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all"
                         >
                             <Palette size={18} />
                             <span className="text-sm">外观商店</span>
-                        </button>
+                        </Button>
+
+                        {coachSettings && (
+                            <Button appearance="retro" variant="secondary" className={settingsActionClass}
+                                type="button"
+                                aria-label="陪练讲解服务"
+                                onClick={() => setShowCoachSettings(true)}
+                            >
+                                <MessageCircle size={18} />
+                                <span className="text-sm">陪练讲解服务</span>
+                            </Button>
+                        )}
 
                         <div className="flex gap-3">
                             <div className="flex-[2] flex items-center gap-3 bg-[#fff] px-3 py-2 rounded-2xl border-2 border-[#e3c086]">
@@ -258,7 +286,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
 
                             <button
-                                onClick={() => { setHapticEnabled(!hapticEnabled); vibrate(10); }}
+                                onClick={() => { setHapticEnabled(!hapticEnabled); if (!hapticEnabled) vibrate(10); }}
                                 className={`flex-1 btn-retro rounded-xl border-2 flex items-center justify-center gap-2 ${hapticEnabled ? 'bg-[#e3c086] text-[#5c4033] border-[#b88742]' : 'bg-[#fff] text-[#d7ccc8] border-[#e0e0e0]'}`}
                             >
                                 <Smartphone size={18} className={hapticEnabled ? 'animate-pulse' : ''}/>
@@ -285,6 +313,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <RotateCcw size={18} /> 应用设置并重新开始
                 </button>
             </div>
+            </>}
           </div>
         </div>
     );

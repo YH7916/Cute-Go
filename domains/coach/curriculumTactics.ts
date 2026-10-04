@@ -1,0 +1,51 @@
+import { lesson, teacherSources } from './curriculumTypes';
+import { exercisePosition } from './exercise';
+
+export const tacticsLessons = [
+  lesson('E', 'tactics.escape-atari', '救棋不只向外逃',
+    '被打吃时，接长不一定脱险。先比较接长、连接和反提，看看原来的棋能得到几气。',
+    '眼前的出口很窄，硬逃可能继续被吃。换个方向，提掉堵路的棋也能给自己腾出气。',
+    '附近多一颗接应子，正确的救法就可能改变。每次都看整块棋，别背上一次的坐标。', [
+      { kind: 'point', familyId: 'go.tactics.escape-atari.countercapture-1',
+        position: exercisePosition(['..X....', '.XO....', '.OXO...', '.O.O...', '.......', '.......', '.......']),
+        rubric: { kind: 'escape', anchor: { x: 2, y: 2 }, minimumLiberties: 2 },
+        prompt: '轮黑。中央黑子被打吃了。救出它，让它至少获得两气。',
+        hints: ['先算直接接长后还有几气，再找附近能提掉的白棋。', '上方的白子也只有一气。提掉它，原来的黑棋会多一个出口。'],
+        explanation: '反提上方的白子，也能帮自己解围。',
+        refutations: [{ after: { x: 2, y: 3 }, reply: { x: 2, y: 4 }, text: '硬往下逃，新棋块还是只有一气。白继续堵住出口，把两颗黑棋一起提走了。' }] },
+      { kind: 'point', familyId: 'go.tactics.escape-atari.countercapture-support',
+        position: exercisePosition(['..X....', '.XO....', '.OXO...', '.O.O...', '..X....', '.......', '.......']),
+        rubric: { kind: 'escape', anchor: { x: 2, y: 2 }, minimumLiberties: 2 },
+        prompt: '轮黑。下方多了一颗黑棋。再救一次中央的黑子，让它至少获得两气。',
+        hints: ['这次接长能连上自己的棋，重新数连接后的气。', '接长连回和反提都值得检查；只要原黑棋脱离打吃，就达到了目标。'],
+        explanation: '有接应时，接长能借到外面的气；反提也仍然可行。同一处危险，可以有不止一种救法。' },
+    ], ['basics.escape', 'rules.suicide'], { position: exercisePosition(['..X....', '.XO....', '.OXO...', '.O.O...', '.......', '.......', '.......']),
+      exposedFamilyIds: ['go.tactics.escape-atari.countercapture-1'], steps: [
+        { text: '先比较两条路。向下接长仍只有一气；上方的白子也只剩一气。' },
+        { point: { x: 3, y: 1 }, text: '黑先反提白子，让原黑棋多出一个出口。救棋不必总沿着原来的气逃。' },
+      ] }, [teacherSources.escape]),
+  lesson('E', 'tactics.double-atari', '打吃两边，抓住救不了的一边',
+    '一手让两块独立的对方棋都只剩一气，对方可能只能救一边。关键是看它救了哪边，再兑现另一边。',
+    '先在两块白棋之间找同时紧气的一手，等白应手后重新数气，不抢着按原计划落子。',
+    '两次威胁要分清：若对方能一手连接或反提，同时救两边，就不能照搬双打吃的结果。', [
+      { kind: 'sequence', position: exercisePosition(['.X.X.', 'XO.OX', '.....', '.....', '.....']), minimumCaptures: 1,
+        prompt: '轮黑。一手同时威胁两块白棋；白救棋后，提掉另一块。',
+        hints: ['看看两块白棋是否共用同一个外气。', '在两块白棋之间下，让它们各剩一气；然后看白选择救哪边。'],
+        explanation: '同时打吃两边以后，白救左边，黑便提掉右边。威胁要接着兑现。',
+        solution: [{ point: { x: 2, y: 1 }, reply: { x: 1, y: 2 }, text: '白已经救了左边。现在由你找出仍然被打吃的那一块。',
+          next: [{ point: { x: 3, y: 2 }, text: '右边白棋被提走，双打吃的收益落实了。' }],
+          refutations: [{ after: { x: 4, y: 4 }, reply: { x: 3, y: 2 }, text: '黑在远处下一手，白把右边也接长了。双打吃的机会需要及时兑现。' }] }] },
+      { kind: 'sequence', position: exercisePosition(['.X.X...', 'XO.OX..', '..XOX..', '.......', '.......', '.......', '.......']), minimumCaptures: 1,
+        prompt: '轮黑。两块白棋大小不同。制造双打吃，并根据白的应手继续。',
+        hints: ['白棋分别还剩哪些气？找两边都能照顾到的一点。', '白救较大的棋块后，别追着已经逃出的棋，看看另一边。'],
+        explanation: '这次白保住较大的右边，黑提左边。应手变了，下一手也要跟着变。',
+        solution: [{ point: { x: 2, y: 1 }, reply: { x: 3, y: 3 }, text: '白接长了右边的大块。哪块白棋还剩最后一气？',
+          next: [{ point: { x: 1, y: 2 }, text: '黑提走左边的一子，完成这次双打吃。' }] }] },
+    ], ['tactics.capture-direction'], { position: exercisePosition(['.X.X.', 'XO.OX', '.....', '.....', '.....']),
+      exposedFamilyIds: ['go.tactics.double-atari.board-1'], steps: [
+        { text: '两颗白棋分别有两气，中间那个空点同时挨着它们。' },
+        { point: { x: 2, y: 1 }, text: '黑占共同的一气，两边一起被打吃。' },
+        { point: { x: 1, y: 2 }, text: '白救左边，右边仍然只剩一气。' },
+        { point: { x: 3, y: 2 }, text: '黑提掉右边。双打吃以后，必须看清对方到底救了哪边。' },
+      ] }, [teacherSources.curriculum]),
+];

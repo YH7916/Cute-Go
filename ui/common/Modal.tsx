@@ -7,6 +7,7 @@ interface ModalProps {
   zIndex?: string;
   maxWidth?: string;
   className?: string;
+  position?: 'absolute' | 'fixed';
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -16,11 +17,12 @@ export const Modal: React.FC<ModalProps> = ({
   zIndex = 'z-50',
   maxWidth = 'max-w-sm',
   className = '',
+  position = 'absolute',
 }) => {
   if (!isOpen) return null;
 
   return (
-    <div className={`absolute inset-0 ${zIndex} flex items-center justify-center p-4 pointer-events-auto`}>
+    <div className={`${position} inset-0 ${zIndex} flex items-center justify-center p-4 pointer-events-auto`}>
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}

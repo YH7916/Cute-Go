@@ -16,16 +16,22 @@ export const useEndGameAction = ({
   myColor,
   onlineStatus,
   opponentProfile,
+  pendingEndGameRef,
   playSfx,
   session,
   setEloDiffStyle,
   setEloDiffText,
   setIsThinking,
   settings,
+  stopWebThinking,
   userProfile,
   vibrate,
-}: UseGameActionsOptions) => useCallback(async (winnerColor: Player, reason: string) => {
+}: UseGameActionsOptions) => useCallback(async (
+  winnerColor: Player, reason: string, settledScore?: { black: number; white: number },
+) => {
   gameState.setGameOver(true);
+  pendingEndGameRef.current = null;
+  stopWebThinking();
   aiTurnLock.current = false;
   setIsThinking(false);
   if (aiTimerRef.current) {
@@ -38,17 +44,27 @@ export const useEndGameAction = ({
   vibrate([50, 50, 50, 50]);
   playSfx('win');
 
+  // Assisted practice never changes competitive ratings or achievements.
+  if (settings.coachMode && settings.gameType === 'Go' && settings.gameMode === 'PvAI' && onlineStatus !== 'connected') {
+    setEloDiffText(null);
+    setEloDiffStyle(null);
+    return;
+  }
+
   if (session?.user?.id && (settings.gameMode === 'PvAI' || onlineStatus === 'connected')) {
     const myPlayerColor = onlineStatus === 'connected' ? myColor : settings.userColor;
 
-    const finalBoard = gameState.boardRef.current;
+    const position = gameState.readPosition();
+    const captures = { black: position.blackCaptures, white: position.whiteCaptures };
     const komi = getDefaultKomi(settings.boardSize);
-    const currentScore = calculateScore(finalBoard, displayTerritory, komi, { black: gameState.blackCaptures, white: gameState.whiteCaptures });
+    // The displayed board may already have had dead stones removed. Reusing
+    // settlement preserves their prisoner points as well as the displayed total.
+    const currentScore = settledScore ?? calculateScore(position.board, displayTerritory, komi, captures);
     checkEndGameAchievements({
       winner: winnerColor,
       myColor: myPlayerColor || 'black',
       score: currentScore,
-      captures: { black: gameState.blackCaptures, white: gameState.whiteCaptures },
+      captures,
     });
   }
 
@@ -119,12 +135,14 @@ export const useEndGameAction = ({
   myColor,
   onlineStatus,
   opponentProfile,
+  pendingEndGameRef,
   playSfx,
   session,
   setEloDiffStyle,
   setEloDiffText,
   setIsThinking,
   settings,
+  stopWebThinking,
   userProfile,
   vibrate,
 ]);

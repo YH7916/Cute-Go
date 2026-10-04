@@ -1,0 +1,429 @@
+{
+  "ogs-stage-1.title": "Fundamentals",
+  "ogs-rules-intro.title": "The Game of Go",
+  "ogs-rules-intro.subtext": "Build territory one stone at a time",
+  "ogs-rules-intro-page1.text": [
+    "The game starts with an empty board. Two players, Black and White, take turns placing stones on the board. Black starts. You can play a stone on any empty intersection, even the outer ones. Make a move to continue."
+  ],
+  "ogs-rules-intro-page2.text": [
+    "Black has played the first move. Now it is White's turn. Make a move to continue."
+  ],
+  "ogs-rules-intro-page3.text": [
+    "The points next to a stone are called liberties. Fill one of the liberties of the black stone."
+  ],
+  "ogs-rules-intro-page4.text": [
+    "A stone is captured when all its liberties are occupied by the opponent's stones. Capture the black stone by filling the last liberty of the black stone."
+  ],
+  "ogs-rules-intro-page5.text": [
+    "Stones of the same color next to each other form a chain. Fill one of the liberties of the black chain."
+  ],
+  "ogs-rules-intro-page6.text": [
+    "The black chain has only one liberty left. This is called 'atari'. Capture the black chain that is in atari."
+  ],
+  "ogs-self-capture.title": "Self-capture",
+  "ogs-self-capture.subtext": "Do not capture your own stones",
+  "ogs-self-capture-page01.text": [
+    "White to play. Playing at A or B is called 'self-capture' (no liberties for White) and is not allowed. But playing at C is allowed, because it captures the marked stones, creating liberties for White. Capture the marked black stones."
+  ],
+  "ogs-self-capture-page02.text": [
+    "White to play. Both players are in atari. Placing a stone where you have no liberties is not allowed, unless you can capture stones. Capture one or more black stones."
+  ],
+  "ogs-self-capture-page03.text": [
+    "White to play. Both players are in atari. Placing a stone where you have no liberties is not allowed, unless you can capture stones. Capture one or more black stones."
+  ],
+  "ogs-eyes.title": "Eyes",
+  "ogs-eyes.subtext": "One and two eyes",
+  "ogs-eyes-page01.text": [
+    "Point A is surrounded by white stones; it is called an 'eye'. Black can not play at A (self-capture). Point B is also an eye, but Black can play at B and capture. Capture the white stones."
+  ],
+  "ogs-eyes-page02.text": [
+    "White has a single bigger eye of two points, but the white group is not safe. Black to play. Capture the white stones by filling the eye point by point."
+  ],
+  "ogs-eyes-page03.text": [
+    "White has two groups of stones. One group has two eyes. The other group has a single big eye. The group with two eyes is safe and can never be captured. Black to play. Capture a white group."
+  ],
+  "ogs-eyes-page04.text": [
+    "One white group has two 'real' eyes. The other group has a real eye at A and a 'false' eye at B. The false eye is not safe and can be attacked. Black to play. Capture the white group by attacking the false eye."
+  ],
+  "ogs-ko.title": "Ko",
+  "ogs-ko.subtext": "The recapture rule",
+  "ogs-ko-page01.text": [
+    "To prevent endlessly recapturing the same space, there is a special rule called the 'Ko rule' which prevents immediately recapturing the same position. Black can capture the marked white stone. White is not allowed to recapture the black stone immediately. White has to play elsewhere first. Capture the marked stone."
+  ],
+  "ogs-ko-page02.text": [
+    "Capture the white group by exploiting the Ko rule."
+  ],
+  "ogs-ko-page03.text": [
+    "Connect your black stones."
+  ],
+  "ogs-ko-page04.text": [
+    "Capture two white stones by exploiting the Ko rule."
+  ],
+  "ogs-ko-page05.text": [
+    "White just captured a black stone by playing 1. To move past the ko rule, find a place to play for Black where White must capture. This is called a 'ko threat'. Next, Black can capture White's marked group."
+  ],
+  "ogs-territory.title": "Territory",
+  "ogs-territory.subtext": "Count territory",
+  "ogs-territory-page01.text": [
+    "If you have surrounded a part of the board by your stones, that part is called your 'territory'. Each empty point in your territory counts as a point for you. Points can be scored by territory and by capturing stones. Whoever has the most points at the end of the game wins. How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page01.option.3": "3",
+  "ogs-territory-page01.option.4": "4",
+  "ogs-territory-page01.option.5": "5",
+  "ogs-territory-page02.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page02.option.6": "6",
+  "ogs-territory-page02.option.7": "7",
+  "ogs-territory-page02.option.8": "8",
+  "ogs-territory-page03.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page03.option.5": "5",
+  "ogs-territory-page03.option.6": "6",
+  "ogs-territory-page03.option.7": "7",
+  "ogs-territory-page04.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page04.option.7": "7",
+  "ogs-territory-page04.option.8": "8",
+  "ogs-territory-page04.option.9": "9",
+  "ogs-territory-page05.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page05.option.7": "7",
+  "ogs-territory-page05.option.8": "8",
+  "ogs-territory-page05.option.9": "9",
+  "ogs-territory-page06.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page06.option.6": "6",
+  "ogs-territory-page06.option.7": "7",
+  "ogs-territory-page06.option.8": "8",
+  "ogs-territory-page07.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page07.option.8": "8",
+  "ogs-territory-page07.option.9": "9",
+  "ogs-territory-page07.option.10": "10",
+  "ogs-territory-page08.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page08.option.7": "7",
+  "ogs-territory-page08.option.8": "8",
+  "ogs-territory-page08.option.9": "9",
+  "ogs-territory-page09.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page09.option.12": "12",
+  "ogs-territory-page09.option.14": "14",
+  "ogs-territory-page09.option.15": "15",
+  "ogs-territory-page10.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page10.option.8": "8",
+  "ogs-territory-page10.option.10": "10",
+  "ogs-territory-page10.option.12": "12",
+  "ogs-territory-page11.text": [
+    "Opponent's stones in your territory are lost if they do not have two eyes. These lost stones are called 'dead'. At the end of the game, dead stones are taken from the board as prisoners, leaving behind an empty territory point. So, a dead stone counts as two points: prisoner and territory. How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page11.option.6": "6",
+  "ogs-territory-page11.option.7": "7",
+  "ogs-territory-page11.option.8": "8",
+  "ogs-territory-page12.text": [
+    "How many points is the territory in the corner?"
+  ],
+  "ogs-territory-page12.option.7": "7",
+  "ogs-territory-page12.option.9": "9",
+  "ogs-territory-page12.option.11": "11",
+  "ogs-ending-the-game.title": "End of the Game",
+  "ogs-ending-the-game.subtext": "Both players pass",
+  "ogs-ending-the-game-page01.text": [
+    "You are not obliged to place a stone on the board when it is your turn. You can instead pass. When they don't think there are any more good moves to make, to end the game both players pass their turns. This game is finished. Click pass to end it."
+  ],
+  "ogs-ending-the-game-page01.action": "Pass",
+  "ogs-ending-the-game-page02.text": [
+    "After both players have passed, you enter a \"Stone Removal Phase\", where you can remove obviously dead stones from play. Remove the dead black stones by clicking them."
+  ],
+  "ogs-ending-the-game-page03.text": [
+    "After removing the dead stones, the sizes of the black and white territories are counted. The size of the black territory is 24 points. White has 18 territory points. The captured 4 dead stones are added to this resulting in 22 points for White. So, Black has won the game. Click Finish to end the game."
+  ],
+  "ogs-ending-the-game-page03.action": "Finish",
+  "ogs-the-board.title": "The Board",
+  "ogs-the-board.subtext": "Corners, sides and middle",
+  "ogs-the-board-page1.text": [
+    "You can play anywhere, but a good general strategy is to focus on the corners first, then sides, then the middle. Play a stone in the upper right hand corner."
+  ],
+  "ogs-the-board-page2.text": [
+    "Go can be played on any size board, but the most common are 9x9 (which you should start on), 13x13, and the most popular, 19x19. Play on the right side of the board (not in a corner)."
+  ],
+  "ogs-the-board-page3.text": [
+    "You will note that there are several circles on the board, these are called \"Star Points\". These are not particularly special, they are just useful for orienting yourself with the board. Play on a star point."
+  ],
+  "ogs-stage-2.title": "Basic Principles",
+  "ogs-count-liberties.title": "Liberties",
+  "ogs-count-liberties.subtext": "Count liberties",
+  "ogs-count-liberties-page01.text": [
+    "Count the number of liberties of the black chain."
+  ],
+  "ogs-count-liberties-page01.option.3": "3",
+  "ogs-count-liberties-page01.option.4": "4",
+  "ogs-count-liberties-page01.option.6": "6",
+  "ogs-count-liberties-page05.text": [
+    "Count the number of liberties of the black chain."
+  ],
+  "ogs-count-liberties-page05.option.2": "2",
+  "ogs-count-liberties-page05.option.3": "3",
+  "ogs-count-liberties-page05.option.4": "4",
+  "ogs-count-liberties-page11.text": [
+    "Count the number of liberties of the black chain."
+  ],
+  "ogs-count-liberties-page11.option.6": "6",
+  "ogs-count-liberties-page11.option.7": "7",
+  "ogs-count-liberties-page11.option.8": "8",
+  "ogs-count_chains.title": "Chains",
+  "ogs-count_chains.subtext": "Count chains",
+  "ogs-count_chains-page01.text": [
+    "Only stones that are directly connected form a chain. Count the number of white chains."
+  ],
+  "ogs-count_chains-page01.option.2": "2",
+  "ogs-count_chains-page01.option.4": "4",
+  "ogs-count_chains-page01.option.7": "7",
+  "ogs-count_chains-page03.text": [
+    "Count the number of white chains."
+  ],
+  "ogs-count_chains-page03.option.3": "3",
+  "ogs-count_chains-page03.option.4": "4",
+  "ogs-count_chains-page03.option.5": "5",
+  "ogs-count_chains-page06.text": [
+    "Count the number of white chains."
+  ],
+  "ogs-count_chains-page06.option.2": "2",
+  "ogs-count_chains-page06.option.3": "3",
+  "ogs-count_chains-page06.option.4": "4",
+  "ogs-in_atari.title": "Atari",
+  "ogs-in_atari.subtext": "In atari",
+  "ogs-in_atari-page01.text": [
+    "If a chain has only one liberty, it is in atari. Is the marked chain in atari?"
+  ],
+  "ogs-in_atari-page01.option.yes": "Yes",
+  "ogs-in_atari-page01.option.no": "No",
+  "ogs-in_atari-page02.text": [
+    "Is the marked chain in atari?"
+  ],
+  "ogs-in_atari-page02.option.yes": "Yes",
+  "ogs-in_atari-page02.option.no": "No",
+  "ogs-in_atari-page06.text": [
+    "Is the marked chain in atari?"
+  ],
+  "ogs-in_atari-page06.option.yes": "Yes",
+  "ogs-in_atari-page06.option.no": "No",
+  "ogs-capture_stone.title": "Capture Stone",
+  "ogs-capture_stone.subtext": "Capture a stone",
+  "ogs-capture_stone-page01.text": [
+    "Black to play. Capture the marked white stone."
+  ],
+  "ogs-capture_stone-page03.text": [
+    "Black to play. Capture the marked white stone."
+  ],
+  "ogs-capture_stone-page06.text": [
+    "Black to play. Capture the marked white stone."
+  ],
+  "ogs-capture_chain.title": "Capture Chain",
+  "ogs-capture_chain.subtext": "Capture a chain of stones",
+  "ogs-capture_chain-page01.text": [
+    "Black to play. The marked white chain is in atari. Capture these stones."
+  ],
+  "ogs-capture_chain-page08.text": [
+    "White to play. Capture one or more black stones."
+  ],
+  "ogs-capture_chain-page14.text": [
+    "White to play. Both players are in atari. Capture one or more black stones."
+  ],
+  "ogs-escape.title": "Escape",
+  "ogs-escape.subtext": "Escape from atari",
+  "ogs-escape-page01.text": [
+    "White to play. Escape with the marked chain that is in atari, by lengthening the white chain and creating more liberties."
+  ],
+  "ogs-escape-page03.text": [
+    "White to play. Escape with the marked chain that is in atari."
+  ],
+  "ogs-escape-page06.text": [
+    "White to play. Escape with the marked chain that is in atari."
+  ],
+  "ogs-connect.title": "Connect",
+  "ogs-connect.subtext": "Connect your stones",
+  "ogs-connect-page01.text": [
+    "Stones can help each other by forming a chain. Chains are harder to capture than single stones. You can form a chain by connecting your stones. Connect the white stones."
+  ],
+  "ogs-connect-page03.text": [
+    "White to play. Connect the white stones."
+  ],
+  "ogs-connect-page06.text": [
+    "White to play. Connect the white stones."
+  ],
+  "ogs-cut.title": "Cut",
+  "ogs-cut.subtext": "Cut opponent's stones",
+  "ogs-cut-page01.text": [
+    "White can connect the stones by playing at A. Black is to play and can prevent White from connecting these white stones. Cut the white stones."
+  ],
+  "ogs-cut-page03.text": [
+    "Black to play. Cut the white stones."
+  ],
+  "ogs-cut-page06.text": [
+    "Black to play. Cut the white stones."
+  ],
+  "ogs-real-false-eye.title": "Eye",
+  "ogs-real-false-eye.subtext": "Real or false eye",
+  "ogs-real-false-eye-page01.text": [
+    "If an eye can be challenged, it is not a real, but a false eye. Is A a real or a false eye?"
+  ],
+  "ogs-real-false-eye-page01.option.real": "Real",
+  "ogs-real-false-eye-page01.option.false": "False",
+  "ogs-real-false-eye-page03.text": [
+    "Is A a real or a false eye?"
+  ],
+  "ogs-real-false-eye-page03.option.real": "Real",
+  "ogs-real-false-eye-page03.option.false": "False",
+  "ogs-real-false-eye-page06.text": [
+    "Is A a real or a false eye?"
+  ],
+  "ogs-real-false-eye-page06.option.real": "Real",
+  "ogs-real-false-eye-page06.option.false": "False",
+  "ogs-make-alive.title": "Two Eyes",
+  "ogs-make-alive.subtext": "Make two eyes",
+  "ogs-make-alive-page01.text": [
+    "The white group is not safe yet. Black can prevent White from making two eyes by playing at A. White to play. Make the white group alive by making two eyes."
+  ],
+  "ogs-make-alive-page03.text": [
+    "White to play. Make two eyes."
+  ],
+  "ogs-make-alive-page06.text": [
+    "White to play. Make two eyes."
+  ],
+  "ogs-stage-3.title": "Basic Skills",
+  "ogs-atari-correct-side.title": "Atari Correct Side",
+  "ogs-atari-correct-side.subtext": "Choose correct side for atari",
+  "ogs-atari-correct-side-page01.text": [
+    "White can put the marked stones in atari by playing at A or B. Put the marked stones in atari at the correct side."
+  ],
+  "ogs-atari-correct-side-page02.text": [
+    "White to play. Put the marked stones in atari at the correct side."
+  ],
+  "ogs-atari-correct-side-page04.text": [
+    "White to play. Put the marked stones in atari at the correct side."
+  ],
+  "ogs-atari-correct-side-page06.text": [
+    "White to play. Put the marked stones in atari at the correct side."
+  ],
+  "ogs-play_double_atari.title": "Play Double-Atari",
+  "ogs-play_double_atari.subtext": "Put two chains in atari",
+  "ogs-play_double_atari-page01.text": [
+    "White can put both marked stones in atari with one stone. This is called 'double-atari'. Black can only defend one of the stones. Play double-atari on the marked stones."
+  ],
+  "ogs-play_double_atari-page06.text": [
+    "White to play. Play double-atari on the marked stones."
+  ],
+  "ogs-play_double_atari-page10.text": [
+    "Black to play. Play double-atari on the marked stones."
+  ],
+  "ogs-play_double_atari-page18.text": [
+    "Black to play. Play double-atari on the marked stones."
+  ],
+  "ogs-ladder.title": "Ladder",
+  "ogs-ladder.subtext": "Capture in a ladder",
+  "ogs-ladder-page01.text": [
+    "Black to play. The marked chain has only two liberties. By repeatedly playing at the head of the white chain, Black can capture the marked stones. This is called a 'ladder'. Black should prevent White from creating three liberties. Capture the marked stones in a ladder."
+  ],
+  "ogs-ladder-page06.text": [
+    "Black to play. Capture the marked stone in a ladder."
+  ],
+  "ogs-ladder-page13.text": [
+    "White to play. Capture the marked stone in a ladder."
+  ],
+  "ogs-ladder-page24.text": [
+    "White to play. Capture the marked stones in a ladder."
+  ],
+  "ogs-snapback.title": "Snapback",
+  "ogs-snapback.subtext": "Capture with snapback",
+  "ogs-snapback-page01.text": [
+    "Black can capture the two marked white stones. Black should not give atari at A, because white would defend by playing at B. Black should first put himself in atari by playing at B. White can take this stone, by playing at A. But then the three white stones are in atari. Capturing the white stones this way is called a 'snapback'. Capture the marked white stones."
+  ],
+  "ogs-snapback-page07.text": [
+    "Black to play. Capture the marked stones."
+  ],
+  "ogs-snapback-page14.text": [
+    "White to play. Capture the marked stones."
+  ],
+  "ogs-snapback-page25.text": [
+    "White to play. Capture the marked stones."
+  ],
+  "ogs-net.title": "Net",
+  "ogs-net.subtext": "Capture in net",
+  "ogs-net-page01.text": [
+    "If Black tries to capture the marked white stone by playing a series of ataris, White can escape. But Black can capture the stone in a 'net' by playing at A. Capture the marked stone in a net."
+  ],
+  "ogs-net-page04.text": [
+    "White to play. Capture the marked stones in a net."
+  ],
+  "ogs-net-page08.text": [
+    "White to play. Capture the marked stones in a net."
+  ],
+  "ogs-net-page13.text": [
+    "White to play. Capture the marked stones in a net."
+  ],
+  "ogs-count-territory.title": "Territory",
+  "ogs-count-territory.subtext": "Count territory",
+  "ogs-count-territory-page01.text": [
+    "How many points is the white territory? Note: a dead stone counts for two."
+  ],
+  "ogs-count-territory-page01.option.2": "2",
+  "ogs-count-territory-page01.option.3": "3",
+  "ogs-count-territory-page01.option.4": "4",
+  "ogs-count-territory-page04.text": [
+    "How many points is the white territory? Note: a dead stone counts for two."
+  ],
+  "ogs-count-territory-page04.option.5": "5",
+  "ogs-count-territory-page04.option.7": "7",
+  "ogs-count-territory-page04.option.9": "9",
+  "ogs-count-territory-page08.text": [
+    "How many points is the white territory? Note: a dead stone counts for two."
+  ],
+  "ogs-count-territory-page08.option.5": "5",
+  "ogs-count-territory-page08.option.8": "8",
+  "ogs-count-territory-page08.option.11": "11",
+  "ogs-count-territory-page12.text": [
+    "How many points is the white territory? Note: a dead stone counts for two."
+  ],
+  "ogs-count-territory-page12.option.5": "5",
+  "ogs-count-territory-page12.option.6": "6",
+  "ogs-count-territory-page12.option.7": "7",
+  "ogs-close_territory.title": "Close Territory",
+  "ogs-close_territory.subtext": "",
+  "ogs-close_territory-page01.text": [
+    "Black has a small territory, but White can reduce it by playing at A. Black to play. Prevent this reduction by closing the territory with one move."
+  ],
+  "ogs-close_territory-page04.text": [
+    "Black to play. Close the black territory with one move."
+  ],
+  "ogs-close_territory-page08.text": [
+    "Black to play. Close the black territory with one move."
+  ],
+  "ogs-close_territory-page12.text": [
+    "Black to play. Close the black territory with one move."
+  ],
+  "ogs-capturing_race.title": "Capturing Race",
+  "ogs-capturing_race.subtext": "Win the capturing race",
+  "ogs-capturing_race-page01.text": [
+    "The two marked chains both have two liberties. White can capture the black chain by reducing its liberties. Black can do the same if it was Black's turn to play. This is called a 'capturing race'. If both players have the same number of liberties, the player that plays first will win the capturing race. White to play. Win the capturing race."
+  ],
+  "ogs-capturing_race-page06.text": [
+    "White to play. Win the capturing race."
+  ],
+  "ogs-capturing_race-page13.text": [
+    "Black to play. Win the capturing race and capture the marked stones without putting yourself in atari."
+  ],
+  "ogs-capturing_race-page18.text": [
+    "Black to play. Win the capturing race and capture the marked stones without putting yourself in atari."
+  ]
+}

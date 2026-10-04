@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { X, Check, Gem, Box } from 'lucide-react';
+import { X, Check, Gem, Box, Sparkles } from 'lucide-react';
 import { BOARD_THEMES, STONE_THEMES } from '../utils/themes';
 import { StoneSkinPreview } from './common/StoneSkinPreview';
+import { Button, Panel } from '../ui/common';
+import { COACH_SKINS, COACH_SKIN_IDS, type CoachSkinId } from '../utils/coachSkins';
 
 interface SkinShopModalProps {
     isOpen: boolean;
     onClose: () => void;
     currentBoardSkin: string;
     currentStoneSkin: string;
+    currentCoachSkin: CoachSkinId;
     onSetBoardSkin: (skin: string) => void;
     onSetStoneSkin: (skin: string) => void;
+    onSetCoachSkin: (skin: CoachSkinId) => void;
 }
 
 export const SkinShopModal: React.FC<SkinShopModalProps> = ({
@@ -17,10 +21,12 @@ export const SkinShopModal: React.FC<SkinShopModalProps> = ({
     onClose,
     currentBoardSkin,
     currentStoneSkin,
+    currentCoachSkin,
     onSetBoardSkin,
     onSetStoneSkin,
+    onSetCoachSkin,
 }) => {
-    const [activeTab, setActiveTab] = useState<'stone' | 'board'>('stone');
+    const [activeTab, setActiveTab] = useState<'stone' | 'board' | 'coach'>('stone');
 
     if (!isOpen) return null;
 
@@ -35,7 +41,8 @@ export const SkinShopModal: React.FC<SkinShopModalProps> = ({
                     {/* Header */}
                     <div className="bg-[#fcf6ea] border-b-2 border-[#e3c086] border-dashed p-4 flex justify-between items-center shrink-0">
                         <h2 className="text-2xl font-black text-[#5c4033] tracking-wide">外观商店</h2>
-                        <button 
+                        <button
+                            aria-label="关闭外观商店"
                             onClick={onClose} 
                             className="text-[#8c6b38] hover:text-[#5c4033] bg-[#fff] rounded-full p-2 border-2 border-[#e3c086] transition-colors"
                         >
@@ -43,59 +50,87 @@ export const SkinShopModal: React.FC<SkinShopModalProps> = ({
                         </button>
                     </div>
 
-                    {/* Tab Slider */}
-                    <div className="p-6 pb-4 shrink-0">
-                        <div className="inset-track rounded-xl p-1 relative h-12 flex items-center">
-                            <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${activeTab === 'board' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
-                            <button 
-                                onClick={() => setActiveTab('stone')} 
-                                className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 flex items-center justify-center gap-2 ${activeTab === 'stone' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}
+                    {/* Appearance categories */}
+                    <div className="p-3 sm:p-6 pb-4 shrink-0">
+                        <div className="flex gap-2" role="group" aria-label="外观分类">
+                            <Button
+                                size="sm"
+                                appearance="retro" variant={activeTab === 'stone' ? 'primary' : 'secondary'}
+                                aria-pressed={activeTab === 'stone'} onClick={() => setActiveTab('stone')}
+                                className="min-h-11 min-w-0 flex-1 flex items-center justify-center gap-1 px-2 sm:gap-2 whitespace-nowrap"
                             >
-                                <Gem size={16} />
+                                <Gem size={16} className="hidden sm:block shrink-0" />
                                 棋子皮肤
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('board')} 
-                                className={`flex-1 relative z-10 font-bold text-sm transition-colors duration-200 flex items-center justify-center gap-2 ${activeTab === 'board' ? 'text-[#5c4033]' : 'text-[#8c6b38]/70 hover:text-[#5c4033]'}`}
+                            </Button>
+                            <Button
+                                size="sm"
+                                appearance="retro" variant={activeTab === 'board' ? 'primary' : 'secondary'}
+                                aria-pressed={activeTab === 'board'} onClick={() => setActiveTab('board')}
+                                className="min-h-11 min-w-0 flex-1 flex items-center justify-center gap-1 px-2 sm:gap-2 whitespace-nowrap"
                             >
-                                <Box size={16} />
+                                <Box size={16} className="hidden sm:block shrink-0" />
                                 棋盘主题
-                            </button>
+                            </Button>
+                            <Button
+                                size="sm"
+                                appearance="retro" variant={activeTab === 'coach' ? 'primary' : 'secondary'}
+                                aria-pressed={activeTab === 'coach'} onClick={() => setActiveTab('coach')}
+                                className="min-h-11 min-w-0 flex-1 flex items-center justify-center gap-1 px-2 sm:gap-2 whitespace-nowrap"
+                            >
+                                <Sparkles size={16} className="hidden sm:block shrink-0" />
+                                陪练精灵
+                            </Button>
                         </div>
                     </div>
                 </div>
 
                 {/* Content Area */}
                 <div className="p-6 overflow-y-auto custom-scrollbar flex-grow">
+                    {activeTab === 'coach' && (
+                        <div className="space-y-4">
+                            <p className="text-sm text-[#8c6b38]">选一位棋友，陪你慢慢学棋。</p>
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                {COACH_SKIN_IDS.map(id => {
+                                    const skin = COACH_SKINS[id];
+                                    const isCurrent = currentCoachSkin === id;
+                                    return <Panel key={id} className="flex min-w-0 flex-col items-center gap-2 p-3 sm:p-4 text-center">
+                                        <span className="w-full h-36 sm:h-44 flex items-center justify-center rounded-xl bg-[#f4e7d3]/65">
+                                            <img src={`${import.meta.env.BASE_URL}${skin.assetRoot}poster.png?v=${skin.artVersion}`}
+                                                alt={`${skin.name} Q版精灵`} className="w-full h-full object-contain p-2" />
+                                        </span>
+                                        <span className="text-lg font-black">{skin.name}</span>
+                                        <span className="text-xs text-[#8c6b38]">{skin.subtitle}</span>
+                                        <span className="text-xs leading-5 font-normal text-[#8c6b38]">{skin.description}</span>
+                                        <Button type="button" appearance="retro" variant={isCurrent ? 'primary' : 'secondary'}
+                                            aria-label={`选择${skin.name}陪练精灵`} aria-pressed={isCurrent}
+                                            onClick={() => onSetCoachSkin(id)}
+                                            className="mt-auto min-h-11 w-full flex items-center justify-center gap-1">
+                                            {isCurrent && <Check size={14} strokeWidth={3} aria-hidden="true" />}
+                                            {isCurrent ? '使用中' : '使用'}
+                                        </Button>
+                                    </Panel>;
+                                })}
+                            </div>
+                        </div>
+                    )}
                     {activeTab === 'stone' && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                             {stoneThemes.map(([id, theme]) => {
                                 const isCurrent = currentStoneSkin === id;
                                 return (
-                                    <button
-                                        key={id}
-                                        onClick={() => onSetStoneSkin(id)}
-                                        className={`relative group cursor-pointer rounded-2xl p-4 border-3 transition-all duration-200 flex flex-col items-center gap-3 bg-white/80 ${
-                                            isCurrent 
-                                                ? 'border-[#5c4033] shadow-inner ring-4 ring-[#e3c086] scale-105' 
-                                                : 'border-[#e3c086] hover:border-[#8c6b38] hover:shadow-xl hover:-translate-y-1'
-                                        }`}
-                                    >
+                                    <Panel key={id} className="flex min-w-0 flex-col items-center gap-3 p-3 sm:p-4 text-center">
                                         {/* Preview Area */}
                                         <StoneSkinPreview stoneSkin={id} />
                                         
-                                        {/* Name & Check */}
-                                        <div className="flex justify-between items-center w-full px-1">
-                                            <span className="font-bold text-[#5c4033] text-sm">{theme.name}</span>
-                                            {isCurrent && (
-                                                <div className="bg-green-500 text-white rounded-full p-1.5 shadow-md">
-                                                    <Check size={14} strokeWidth={4}/>
-                                                </div>
-                                            )}
-                                        </div>
-                                        
-
-                                    </button>
+                                        <span className="font-bold text-sm">{theme.name}</span>
+                                        <Button type="button" appearance="retro" variant={isCurrent ? 'primary' : 'secondary'}
+                                            aria-label={`选择${theme.name}棋子皮肤`} aria-pressed={isCurrent}
+                                            onClick={() => onSetStoneSkin(id)}
+                                            className="mt-auto min-h-11 w-full flex items-center justify-center gap-1">
+                                            {isCurrent && <Check size={14} strokeWidth={3} aria-hidden="true" />}
+                                            {isCurrent ? '使用中' : '使用'}
+                                        </Button>
+                                    </Panel>
                                 );
                             })}
                         </div>
@@ -106,15 +141,7 @@ export const SkinShopModal: React.FC<SkinShopModalProps> = ({
                             {boardThemes.map(([id, theme]) => {
                                 const isCurrent = currentBoardSkin === id;
                                 return (
-                                    <button
-                                        key={id}
-                                        onClick={() => onSetBoardSkin(id)}
-                                        className={`relative group cursor-pointer rounded-2xl p-4 border-3 transition-all duration-200 flex flex-col items-center gap-3 bg-white/80 ${
-                                            isCurrent 
-                                                ? 'border-[#5c4033] shadow-inner ring-4 ring-[#e3c086] scale-105' 
-                                                : 'border-[#e3c086] hover:border-[#8c6b38] hover:shadow-xl hover:-translate-y-1'
-                                        }`}
-                                    >
+                                    <Panel key={id} className="flex min-w-0 flex-col items-center gap-3 p-3 sm:p-4 text-center">
                                         {/* Preview Area */}
                                         <div 
                                             className="w-full h-28 rounded-xl shadow-inner relative overflow-hidden border-2 border-[#e3c086]"
@@ -136,18 +163,15 @@ export const SkinShopModal: React.FC<SkinShopModalProps> = ({
                                             </div>
                                         </div>
                                         
-                                        {/* Name & Check */}
-                                        <div className="flex justify-between items-center w-full px-1">
-                                            <span className="font-bold text-[#5c4033] text-sm">{theme.name}</span>
-                                            {isCurrent && (
-                                                <div className="bg-green-500 text-white rounded-full p-1.5 shadow-md">
-                                                    <Check size={14} strokeWidth={4}/>
-                                                </div>
-                                            )}
-                                        </div>
-
-
-                                    </button>
+                                        <span className="font-bold text-sm">{theme.name}</span>
+                                        <Button type="button" appearance="retro" variant={isCurrent ? 'primary' : 'secondary'}
+                                            aria-label={`选择${theme.name}棋盘主题`} aria-pressed={isCurrent}
+                                            onClick={() => onSetBoardSkin(id)}
+                                            className="mt-auto min-h-11 w-full flex items-center justify-center gap-1">
+                                            {isCurrent && <Check size={14} strokeWidth={3} aria-hidden="true" />}
+                                            {isCurrent ? '使用中' : '使用'}
+                                        </Button>
+                                    </Panel>
                                 );
                             })}
                         </div>

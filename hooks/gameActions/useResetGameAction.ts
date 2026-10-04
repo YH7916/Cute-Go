@@ -1,14 +1,16 @@
 import { useCallback, useRef } from 'react';
-import { createBoard } from '../../utils/goLogic';
+import { createInitialPosition } from '../../domains/game/positionState';
 import type { UseGameActionsOptions } from './types';
 
 export const useResetGameAction = ({
+  aiTimerRef,
   aiTurnLock,
   boardSizeRef,
   cleanupOnline,
   clearInitialStones,
   gameState,
   onlineStatusRef,
+  pendingEndGameRef,
   sendData,
   setEloDiffStyle,
   setEloDiffText,
@@ -17,10 +19,6 @@ export const useResetGameAction = ({
   setShowMenu,
   setShowPassModal,
   settings,
-  setShowTsumegoResult,
-  setTsumegoCurrentNode,
-  setTsumegoInstruction,
-  setTsumegoRoot,
   webAiEngine,
 }: UseGameActionsOptions) => {
   const onlineRestartPendingRef = useRef(false);
@@ -41,22 +39,15 @@ export const useResetGameAction = ({
         boardSizeRef.current = sizeToUse;
       }
 
-      const nextBoard = createBoard(sizeToUse);
-      gameState.boardRef.current = nextBoard;
-      gameState.currentPlayerRef.current = 'black';
-      gameState.setBoard(nextBoard);
-      gameState.setCurrentPlayer('black');
-      gameState.setBlackCaptures(0);
-      gameState.setWhiteCaptures(0);
-      gameState.setLastMove(null);
+      if (aiTimerRef.current !== null) clearTimeout(aiTimerRef.current);
+      aiTimerRef.current = null;
+      pendingEndGameRef.current = null;
+      gameState.writePosition(createInitialPosition(sizeToUse));
       gameState.setGameOver(false);
       gameState.setWinner(null);
       gameState.setWinReason('');
-      gameState.setConsecutivePasses(0);
       gameState.setPassNotificationDismissed(false);
       gameState.setFinalScore(null);
-      gameState.setHistory([]);
-      gameState.historyRef.current = [];
       clearInitialStones();
       setShowMenu(false);
       setShowPassModal(false);
@@ -65,10 +56,6 @@ export const useResetGameAction = ({
       gameState.setAppMode('playing');
       setEloDiffText(null);
       setEloDiffStyle(null);
-      setTsumegoRoot(null);
-      setTsumegoCurrentNode(null);
-      setShowTsumegoResult(false);
-      setTsumegoInstruction(null);
 
       webAiEngine.resetAI();
 
@@ -78,12 +65,14 @@ export const useResetGameAction = ({
       }
     },
     [
+      aiTimerRef,
       aiTurnLock,
       boardSizeRef,
       cleanupOnline,
       clearInitialStones,
       gameState,
       onlineStatusRef,
+      pendingEndGameRef,
       sendData,
       setEloDiffStyle,
       setEloDiffText,
@@ -91,10 +80,6 @@ export const useResetGameAction = ({
       setMyColor,
       setShowMenu,
       setShowPassModal,
-      setShowTsumegoResult,
-      setTsumegoCurrentNode,
-      setTsumegoInstruction,
-      setTsumegoRoot,
       settings,
       webAiEngine,
     ]

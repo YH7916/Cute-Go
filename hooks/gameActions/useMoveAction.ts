@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { Player } from '../../types';
-import type { HistoryItem } from '../../types';
+import { recordMove } from '../../domains/game/positionState';
 import { attemptMove, checkGomokuWin } from '../../utils/goLogic';
 import { getBoardHash } from './boardHash';
 import type { UseGameActionsOptions } from './types';
@@ -9,25 +9,19 @@ export const useMoveAction = ({
   checkMoveAchievements,
   gameState,
   gameTypeRef,
-  handleTsumegoMoveRef,
   playSfx,
   session,
   settings,
-  tsumegoCurrentNode,
   vibrate,
 }: UseGameActionsOptions, endGame: (winnerColor: Player, reason: string) => void) => useCallback((x: number, y: number, isRemote: boolean) => {
-  const currentBoard = gameState.boardRef.current;
-  const activePlayer = gameState.currentPlayerRef.current;
+  const position = gameState.readPosition();
+  const currentBoard = position.board;
+  const activePlayer = position.currentPlayer;
   const currentType = gameTypeRef.current;
 
   let prevHash = null;
-  if (gameState.historyRef.current.length >= 1) {
-    prevHash = getBoardHash(gameState.historyRef.current[gameState.historyRef.current.length - 1].board);
-  }
-
-  if (settings.gameMode === 'Tsumego' && !isRemote && tsumegoCurrentNode) {
-    const isValid = handleTsumegoMoveRef.current(x, y);
-    if (!isValid) return;
+  if (position.history.length >= 1) {
+    prevHash = getBoardHash(position.history[position.history.length - 1].board);
   }
 
   const result = attemptMove(currentBoard, x, y, activePlayer, currentType, prevHash);
@@ -43,13 +37,13 @@ export const useMoveAction = ({
       }
     } catch { }
 
-    if (!isRemote && session?.user?.id) {
+    if (!isRemote && session?.user?.id && !settings.coachMode) {
       try {
         checkMoveAchievements({
           x,
           y,
           color: activePlayer,
-          moveNumber: gameState.historyRef.current.length + 1,
+          moveNumber: position.history.length + 1,
           boardSize: settings.boardSize,
         });
       } catch (achError) {
@@ -57,54 +51,31 @@ export const useMoveAction = ({
       }
     }
 
-    const newHistoryItem: HistoryItem = {
-      board: currentBoard,
-      currentPlayer: activePlayer,
-      blackCaptures: gameState.blackCaptures,
-      whiteCaptures: gameState.whiteCaptures,
-      lastMove: gameState.lastMove,
-      move: { x, y },
-      consecutivePasses: gameState.consecutivePasses,
-    };
-
-    const nextHistory = [...gameState.historyRef.current, newHistoryItem];
-    gameState.boardRef.current = result.newBoard;
-    gameState.historyRef.current = nextHistory;
-
-    gameState.setHistory(nextHistory);
-    gameState.setBoard(result.newBoard);
-    gameState.setLastMove({ x, y });
-    gameState.setConsecutivePasses(0);
+    const wins = currentType === 'Gomoku' && checkGomokuWin(result.newBoard, { x, y });
+    const nextPosition = recordMove(position, result.newBoard, { x, y }, result.captured, wins);
+    gameState.writePosition(nextPosition);
     gameState.setPassNotificationDismissed(false);
 
-    if (result.captured > 0) {
-      if (activePlayer === 'black') gameState.setBlackCaptures(prev => prev + result.captured);
-      else gameState.setWhiteCaptures(prev => prev + result.captured);
+    if (wins) {
+      setTimeout(() => {
+        if (gameState.readPosition() === nextPosition) endGame(activePlayer, '五子连珠！');
+      }, 0);
     }
-
-    if (currentType === 'Gomoku' && checkGomokuWin(result.newBoard, { x, y })) {
-      setTimeout(() => endGame(activePlayer, '五子连珠！'), 0);
-      return;
-    }
-
-    const nextPlayer = activePlayer === 'black' ? 'white' : 'black';
-    gameState.currentPlayerRef.current = nextPlayer;
-    gameState.setCurrentPlayer(nextPlayer);
+    return true;
   } else if (!isRemote) {
     try {
       playSfx('error');
     } catch { }
   }
+  return false;
 }, [
   checkMoveAchievements,
   endGame,
   gameState,
   gameTypeRef,
-  handleTsumegoMoveRef,
   playSfx,
   session?.user?.id,
   settings.boardSize,
-  settings.gameMode,
-  tsumegoCurrentNode,
+  settings.coachMode,
   vibrate,
 ]);

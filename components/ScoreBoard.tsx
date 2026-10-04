@@ -7,8 +7,10 @@ interface ScoreBoardProps {
     blackCaptures: number;
     whiteCaptures: number;
     gameType: GameType;
+    stoneSkin: string;
     isThinking: boolean;
     showWinRate: boolean;
+    showCaptures?: boolean;
     appMode: AppMode;
     gameOver: boolean;
     userColor: Player;
@@ -20,8 +22,10 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
     blackCaptures,
     whiteCaptures,
     gameType,
+    stoneSkin,
     isThinking,
     showWinRate,
+    showCaptures = true,
     appMode,
     gameOver,
     userColor,
@@ -38,17 +42,17 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
     return (
         <div className="flex flex-col gap-2.5">
-            <div className="grid grid-cols-2 gap-3">
-                <div className={`${blackCardClass} flex h-16 items-center rounded-2xl px-4 py-3 transition-all duration-300`}>
-                    <div className="flex w-full items-center gap-2.5">
+            <div className="score-cards grid grid-cols-2 gap-3">
+                <div className={`${blackCardClass} flex ${showCaptures ? 'h-16' : 'h-12'} items-center rounded-2xl px-2 sm:px-4 py-3 transition-all duration-300`}>
+                    <div className="flex w-full items-center gap-1.5 sm:gap-2.5">
                         <div className="relative shrink-0">
-                            <RenderStoneIcon color="black" />
+                            <RenderStoneIcon color="black" stoneSkin={stoneSkin} />
                             {blackActive && isThinking && <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-yellow-400 animate-ping" />}
                         </div>
                         <div className="flex min-w-0 flex-1 flex-col justify-center">
-                            <span className={`text-base font-black tracking-tight ${blackActive ? 'text-[#f7e7ce]' : 'text-[#5d4037]'}`}>黑子</span>
-                            {gameType === 'Go' && (
-                                <span className={`text-xs font-bold ${blackActive ? 'text-[#f7e7ce]/85' : 'text-[#7a5b49]'}`}>
+                            <span className={`text-base font-black tracking-tight whitespace-nowrap ${blackActive ? 'text-[#f7e7ce]' : 'text-[#5d4037]'}`}>黑子</span>
+                            {gameType === 'Go' && showCaptures && (
+                                <span className={`text-xs font-bold whitespace-nowrap ${blackActive ? 'text-[#f7e7ce]/85' : 'text-[#7a5b49]'}`}>
                                     提子: {blackCaptures}
                                 </span>
                             )}
@@ -56,18 +60,18 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                     </div>
                 </div>
 
-                <div className={`${whiteCardClass} flex h-16 items-center rounded-2xl px-4 py-3 transition-all duration-300`}>
-                    <div className="flex w-full items-center justify-end gap-2.5 text-right">
+                <div className={`${whiteCardClass} flex ${showCaptures ? 'h-16' : 'h-12'} items-center rounded-2xl px-2 sm:px-4 py-3 transition-all duration-300`}>
+                    <div className="flex w-full items-center justify-end gap-1.5 sm:gap-2.5 text-right">
                         <div className="flex min-w-0 flex-1 flex-col justify-center items-end">
-                            <span className="text-base font-black tracking-tight text-[#5c4033]">白子</span>
-                            {gameType === 'Go' && (
-                                <span className="text-xs font-bold text-[#7a5b49]">
+                            <span className="text-base font-black tracking-tight whitespace-nowrap text-[#5c4033]">白子</span>
+                            {gameType === 'Go' && showCaptures && (
+                                <span className="text-xs font-bold text-[#7a5b49] whitespace-nowrap">
                                     提子: {whiteCaptures}
                                 </span>
                             )}
                         </div>
                         <div className="relative shrink-0">
-                            <RenderStoneIcon color="white" />
+                            <RenderStoneIcon color="white" stoneSkin={stoneSkin} />
                             {whiteActive && isThinking && <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-yellow-400 animate-ping" />}
                         </div>
                     </div>

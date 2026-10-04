@@ -231,7 +231,8 @@ body {
   background-color: #ffe1ea;
 }
 
-.theme-sakura .btn-beige {
+.theme-sakura .btn-beige,
+.theme-sakura .panel-retro {
   background-color: var(--cg-surface);
   border-color: var(--cg-wood-border);
   color: var(--cg-text);
@@ -270,4 +271,282 @@ body {
 
 .theme-sakura .winrate-fill-dark {
   background: linear-gradient(90deg, #62444d 0%, #73535d 55%, #8b6570 100%);
+}
+
+.coach-pet {
+  width: 96px;
+  height: 104px;
+  animation-name: coach-pet-frames;
+  animation-iteration-count: infinite;
+  transform: scale(1);
+}
+
+.coach-pet-frame { width: 96px; height: 104px; }
+
+/* Full-body artwork, speech and tools share one unobstructed row. */
+.coach-assistant {
+  --coach-module-height: 158px;
+  --coach-art-height: 138.667px;
+  --coach-art-width: 128px;
+  --coach-art-scale: 1.3333333333;
+  --coach-character-width: var(--coach-art-width);
+  position: relative;
+  z-index: 21;
+  overflow: visible;
+  width: 100%;
+  height: var(--coach-module-height);
+  margin-top: max(0px, calc(var(--coach-art-height) + 16px - var(--coach-module-height)));
+  min-height: 0;
+  padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+  gap: 8px;
+  align-items: flex-end;
+}
+.coach-assistant.coach-configured { --coach-module-height: 230px; height: auto; min-height: calc(var(--coach-art-height) + 16px); }
+.coach-character {
+  pointer-events: auto; align-self: flex-end; padding: 0; border: 0; background: none;
+  cursor: grab; touch-action: none; user-select: none;
+}
+.coach-character:active { cursor: grabbing; }
+.coach-character:focus-visible { outline: 2px dashed var(--cg-wood-border, #c29550); outline-offset: 2px; border-radius: 12px; }
+.coach-assistant .coach-pet-frame { width: var(--coach-character-width); height: var(--coach-art-height); }
+.coach-assistant .coach-pet {
+  top: auto;
+  bottom: 0;
+  left: 0;
+  transform: scale(var(--coach-art-scale));
+  transform-origin: bottom left;
+}
+.coach-conversation { align-self: flex-end; height: auto; max-height: calc(var(--coach-module-height) - 16px); gap: 6px; padding: 8px; border-radius: 20px; pointer-events: auto; }
+.coach-speech { flex-shrink: 1; min-height: 26px; max-height: 100%; padding: 2px 4px; }
+.coach-actions { gap: 8px; flex-wrap: wrap; }
+.coach-actions > button { min-width: 44px; padding: 0 4px; border-radius: 12px; }
+.coach-composer { margin-top: 6px; gap: 8px; }
+.coach-message > div, .coach-layout, .coach-layout > .game-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cg-wood-border, #c29550) transparent;
+}
+
+.course-menu-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cg-border, #e3c086) transparent;
+}
+
+.course-card,
+.theme-sakura .course-card {
+  border-color: var(--cg-border, #e3c086);
+  border-bottom-width: 3px;
+}
+
+/* Keep Panel spacing/theme. Open its left edge where the outlined tail joins. */
+.coach-conversation,
+.theme-sakura .coach-conversation {
+  --coach-speech-surface: color-mix(in srgb, var(--cg-surface, #fcf6ea) 82%, transparent);
+  --coach-outline: var(--cg-wood-border, #c29550);
+  /* Character and conversation share a baseline; keep the tip at mouth height. */
+  --coach-tail-offset: calc(var(--coach-art-height) * .46);
+  position: relative;
+  isolation: isolate;
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+.coach-conversation::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  pointer-events: none;
+  border: 2px solid var(--coach-outline);
+  border-radius: inherit;
+  background: var(--coach-speech-surface);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--coach-outline) 14%, transparent);
+}
+.coach-has-speech::before {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%,
+    0 max(40px, calc(100% - var(--coach-tail-offset) + 6px)), 2px max(40px, calc(100% - var(--coach-tail-offset) + 6px)),
+    2px max(24px, calc(100% - var(--coach-tail-offset) - 10px)), 0 max(24px, calc(100% - var(--coach-tail-offset) - 10px)));
+}
+.coach-speech-tail {
+  position: absolute;
+  left: -12px;
+  /* Clamp the matching notch and tip below the rounded corner for short text. */
+  top: max(21px, calc(100% - var(--coach-tail-offset) - 9px));
+  z-index: -1;
+  overflow: visible;
+  pointer-events: none;
+  fill: var(--coach-speech-surface);
+  stroke: var(--coach-outline);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+}
+
+/* Once moved, the same frame follows the character on the available side. */
+[data-coach-floating] { pointer-events: none; }
+[data-coach-side="right"] .coach-speech-tail,
+[data-coach-side="left"] .coach-speech-tail { top: calc(var(--coach-tail-position) - 11px); }
+[data-coach-side="right"].coach-has-speech::before {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%,
+    0 calc(var(--coach-tail-position) + 8px), 2px calc(var(--coach-tail-position) + 8px),
+    2px calc(var(--coach-tail-position) - 8px), 0 calc(var(--coach-tail-position) - 8px));
+}
+[data-coach-side="left"] .coach-speech-tail { left: auto; right: -12px; transform: scaleX(-1); }
+[data-coach-side="left"].coach-has-speech::before {
+  clip-path: polygon(0 0, 100% 0, 100% calc(var(--coach-tail-position) - 8px),
+    calc(100% - 2px) calc(var(--coach-tail-position) - 8px), calc(100% - 2px) calc(var(--coach-tail-position) + 8px),
+    100% calc(var(--coach-tail-position) + 8px), 100% 100%, 0 100%);
+}
+[data-coach-side="above"] .coach-speech-tail,
+[data-coach-side="below"] .coach-speech-tail { left: calc(var(--coach-tail-position) - 8px); }
+[data-coach-side="above"] .coach-speech-tail { top: auto; bottom: -15px; transform: rotate(-90deg); }
+[data-coach-side="above"].coach-has-speech::before {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, calc(var(--coach-tail-position) + 8px) 100%,
+    calc(var(--coach-tail-position) + 8px) calc(100% - 2px), calc(var(--coach-tail-position) - 8px) calc(100% - 2px),
+    calc(var(--coach-tail-position) - 8px) 100%, 0 100%);
+}
+[data-coach-side="below"] .coach-speech-tail { top: -15px; transform: rotate(90deg); }
+[data-coach-side="below"].coach-has-speech::before {
+  clip-path: polygon(0 0, calc(var(--coach-tail-position) - 8px) 0,
+    calc(var(--coach-tail-position) - 8px) 2px, calc(var(--coach-tail-position) + 8px) 2px,
+    calc(var(--coach-tail-position) + 8px) 0, 100% 0, 100% 100%, 0 100%);
+}
+
+@keyframes coach-pet-frames {
+  from { background-position-x: 0; }
+  to { background-position-x: var(--coach-sprite-end); }
+}
+
+/* A single illustration keeps its own gentle motion; it is not a sprite strip. */
+.coach-pet-portrait { animation-name: coach-pet-breathe; }
+.coach-pet-portrait[data-pet-state="thinking"] { animation-name: coach-pet-think; }
+.coach-pet-portrait[data-pet-state="explaining"] { animation-name: coach-pet-explain; }
+.coach-pet-portrait[data-pet-state="encouraging"] { animation-name: coach-pet-cheer; }
+@keyframes coach-pet-breathe { 50% { translate: 0 -2px; } }
+@keyframes coach-pet-think { 50% { translate: 0 -1px; rotate: -2deg; } }
+@keyframes coach-pet-explain { 50% { translate: 0 -2px; rotate: 1deg; } }
+@keyframes coach-pet-cheer { 35%, 65% { translate: 0 -4px; } 50% { translate: 0 0; } }
+
+/* Portrait gives the board its full width; short screens scroll instead of shrinking it. */
+.coach-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: max-content max-content max-content;
+  grid-template-areas: "controls" "board" "coach";
+  align-items: stretch;
+  align-content: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.coach-layout > .game-sidebar { grid-area: controls; width: 100%; height: auto; }
+.coach-layout .game-actions { gap: 12px; }
+.coach-layout .game-play-controls > button { padding: 6px 8px; }
+.coach-layout > .game-board-area {
+  grid-area: board;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  align-self: start;
+}
+.coach-layout > .game-board-area > .board-viewport {
+  width: 100%;
+  height: auto;
+  max-height: none;
+  aspect-ratio: 1;
+}
+.coach-layout > .coach-assistant { grid-area: coach; position: sticky; bottom: 0; }
+.coach-layout .board-viewport .touch-none { touch-action: pan-y; }
+
+.teaching-layout { position: relative; }
+.teaching-layout > .game-sidebar { align-self: start; }
+.teaching-assistant { --coach-module-height: 190px; }
+.coach-assistant.teaching-number { --coach-module-height: 224px; }
+
+@media (min-height: 740px) {
+  .coach-assistant {
+    --coach-module-height: 180px;
+    --coach-art-height: 173.333px;
+    --coach-art-width: 160px;
+    --coach-art-scale: 1.6666666667;
+  }
+}
+
+@media (max-width: 360px) {
+  .coach-assistant { --coach-art-width: 112px; --coach-art-height: 121.333px; --coach-art-scale: 1.1666666667; }
+  .coach-conversation { padding-inline: 6px; }
+  .coach-actions > button { padding-inline: 2px; }
+  .coach-action-icon { display: none; }
+}
+@media (max-height: 739px) and (max-width: 639px), (max-height: 739px) and (orientation: portrait) {
+  /* Flex lets the existing assistant stick within the whole scrolling page. */
+  .coach-layout { display: flex; flex-direction: column; }
+  .coach-layout > :is(.game-sidebar, .game-board-area, .coach-assistant) { flex: 0 0 auto; }
+  .coach-layout > .game-sidebar { order: 1; }
+  .coach-layout > .game-board-area { order: 2; }
+  .coach-layout > .coach-assistant {
+    order: 3;
+    position: sticky;
+    bottom: 0;
+    height: auto;
+    min-height: 0;
+    margin-top: 0;
+    pointer-events: none;
+  }
+  .coach-character { position: absolute; left: 12px; bottom: max(8px, env(safe-area-inset-bottom)); }
+  .coach-conversation {
+    align-self: flex-end;
+    margin-left: calc(var(--coach-character-width) + 8px);
+    max-height: min(320px, calc(100dvh - 32px));
+    pointer-events: auto;
+  }
+}
+@media (min-width: 640px) and (orientation: landscape) {
+  .coach-layout {
+    grid-template-columns: minmax(0, 1fr) clamp(24rem, 46vw, 29rem);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "board controls" "board coach";
+    align-content: stretch;
+    overflow: hidden;
+  }
+  /* One divider belongs to the whole sidebar, including its bottom assistant. */
+  .coach-layout::before {
+    content: "";
+    grid-column: 2;
+    grid-row: 1 / -1;
+    justify-self: start;
+    align-self: stretch;
+    width: 3px;
+    margin-bottom: calc(0px - env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--cg-border, #e3c086) 70%, transparent);
+    /* Repeated 8px capsules keep each dash rounded, not only the whole line. */
+    mask-image:
+      linear-gradient(to bottom, transparent 1.5px, #000 1.5px 6.5px, transparent 6.5px),
+      radial-gradient(circle at 1.5px 1.5px, #000 1.5px, transparent 1.5px),
+      radial-gradient(circle at 1.5px 6.5px, #000 1.5px, transparent 1.5px);
+    mask-size: 3px 14px;
+    mask-repeat: repeat-y;
+    pointer-events: none;
+    z-index: 22;
+  }
+  .coach-layout > :is(.game-sidebar, .coach-assistant) {
+    background-color: var(--cg-bg-alt, #f2e6d6) !important;
+  }
+  .coach-layout > .game-board-area { height: 100%; aspect-ratio: auto; }
+  .coach-layout > .game-board-area > .board-viewport {
+    width: min(100%, calc(100vh - 16px));
+    width: min(100%, calc(100dvh - 16px));
+    height: auto;
+  }
+  .coach-layout > .game-sidebar { height: 100%; width: 100%; min-width: 0; min-height: 0; overflow-y: auto; border-left-width: 0; }
+  .coach-layout > .coach-assistant { align-self: end; position: relative; }
+  .coach-conversation { align-self: flex-end; }
+  .coach-layout .board-viewport .touch-none { touch-action: none; }
+  .coach-assistant { --coach-module-height: 172px; --coach-art-height: 156px; --coach-art-width: 144px; --coach-art-scale: 1.5; }
+}
+@media (min-width: 640px) and (orientation: landscape) and (max-height: 480px) {
+  .coach-layout > .game-sidebar { gap: 8px; padding-bottom: 4px; }
+  .coach-layout .game-actions { gap: 8px; }
+  .coach-layout .score-cards > div { height: 56px; padding: 6px 10px; }
+  .coach-layout .game-sidebar > :first-child > div { padding-top: 4px; padding-bottom: 4px; }
+  .coach-assistant.coach-configured { --coach-module-height: min(230px, calc(100dvh - 76px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coach-pet, .coach-pet-portrait[data-pet-state] { animation: none; }
 }

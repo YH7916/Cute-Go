@@ -23,26 +23,19 @@ export interface Group {
   libertyPoints: Point[]; // Added for face direction logic
 }
 
-export type GameMode = 'PvP' | 'PvAI' | 'Tsumego';
+export type GameMode = 'PvP' | 'PvAI';
 export type GameType = 'Go' | 'Gomoku';
 export type BoardSize = number; 
 
-export interface TsumegoProblem {
-  id: string;
-  setup: {
-      ab?: string[]; // Add Black
-      aw?: string[]; // Add White
-  };
-  solution: unknown; // SGF Node logic
-}
-
-export interface TsumegoSet {
-  title: string;
-  filename: string;
-  difficulty: string;
-} 
-
 export type Difficulty = 'Fun' | 'Easy' | 'Medium' | 'Hard';
+
+export interface GameSettingsData {
+  boardSize: BoardSize;
+  gameType: GameType;
+  gameMode: GameMode;
+  difficulty: Difficulty;
+  userColor: Player;
+}
 
 export type AchievementCategory = 'milestone' | 'skill' | 'social' | 'fun';
 

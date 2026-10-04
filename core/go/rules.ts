@@ -1,14 +1,19 @@
 import { BoardState, Player, Point } from '../../types';
 import { getNeighbors, getGroup, getBoardHash } from '../board';
 
-export const attemptMove = (
+export type MoveRejectionReason = 'occupied' | 'out-of-bounds' | 'suicide' | 'ko';
+export interface MoveResult { newBoard: BoardState; captured: number }
+export type MoveInspection = { legal: true; result: MoveResult }
+  | { legal: false; reason: MoveRejectionReason };
+
+export const inspectMove = (
   board: BoardState,
   x: number,
   y: number,
   player: Player,
   gameType: 'Go' | 'Gomoku' = 'Go',
   previousBoardStateHash: string | null = null
-): { newBoard: BoardState; captured: number } | null => {
+): MoveInspection => {
   const size = board.length;
   if (
     !Number.isInteger(x) ||
@@ -17,13 +22,13 @@ export const attemptMove = (
     y < 0 ||
     y >= size ||
     x >= (board[y]?.length ?? 0)
-  ) return null;
-  if (board[y][x] !== null) return null;
+  ) return { legal: false, reason: 'out-of-bounds' };
+  if (board[y][x] !== null) return { legal: false, reason: 'occupied' };
 
   const safeBoard = board.map(row => [...row]);
   safeBoard[y][x] = { color: player, id: `${player}-${Date.now()}-${x}-${y}`, x, y };
 
-  if (gameType === 'Gomoku') return { newBoard: safeBoard, captured: 0 };
+  if (gameType === 'Gomoku') return { legal: true, result: { newBoard: safeBoard, captured: 0 } };
 
   let capturedCount = 0;
   const opponent = player === 'black' ? 'white' : 'black';
@@ -45,13 +50,25 @@ export const attemptMove = (
   }
 
   const myGroup = getGroup(safeBoard, { x, y });
-  if (myGroup && myGroup.liberties === 0 && capturedCount === 0) return null;
+  if (myGroup && myGroup.liberties === 0 && capturedCount === 0) return { legal: false, reason: 'suicide' };
 
   if (previousBoardStateHash) {
-    if (getBoardHash(safeBoard) === previousBoardStateHash) return null;
+    if (getBoardHash(safeBoard) === previousBoardStateHash) return { legal: false, reason: 'ko' };
   }
 
-  return { newBoard: safeBoard, captured: capturedCount };
+  return { legal: true, result: { newBoard: safeBoard, captured: capturedCount } };
+};
+
+export const attemptMove = (
+  board: BoardState,
+  x: number,
+  y: number,
+  player: Player,
+  gameType: 'Go' | 'Gomoku' = 'Go',
+  previousBoardStateHash: string | null = null
+): MoveResult | null => {
+  const inspection = inspectMove(board, x, y, player, gameType, previousBoardStateHash);
+  return inspection.legal ? inspection.result : null;
 };
 
 export const isSimpleEye = (board: BoardState, x: number, y: number, color: Player): boolean => {

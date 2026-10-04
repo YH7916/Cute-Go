@@ -195,12 +195,13 @@ export const getGoAIMove = (
   return bestMove;
 };
 
-// --- 初学者 AI（Easy 模式）---
+// --- 启蒙 AI；简单档只在相同的局部候选内接受有限的模型建议 ---
 // 模拟刚学围棋的人：只看局部、会提子、会叫吃、不会做眼、不会判断死活
 export const getBeginnerAIMove = (
   board: BoardState,
   player: Player,
-  previousBoardHash: string | null = null
+  previousBoardHash: string | null = null,
+  policy?: ReadonlyArray<Point & { prior: number }>
 ): Point | null => {
   const size = board.length;
   const opponent: Player = player === 'black' ? 'white' : 'black';
@@ -224,6 +225,8 @@ export const getBeginnerAIMove = (
   // 没有子时走天元
   if (localCandidates.size === 0) {
     const center = Math.floor(size / 2);
+    // Keep the existing Fun path unchanged; guided selection also handles a full board.
+    if (policy && !attemptMove(board, center, center, player, 'Go', previousBoardHash)) return null;
     return { x: center, y: center };
   }
 
@@ -291,5 +294,21 @@ export const getBeginnerAIMove = (
 
   // 从前3个里随机选，模拟初学者的不确定性
   const topN = scored.slice(0, Math.min(3, scored.length));
+  if (policy) {
+    // The model cannot introduce a distant move or override the local rule filter.
+    // Even a very sharp policy only changes each candidate's weight from 1 to 3.
+    const priors = topN.map(({ pt }) => {
+      const prior = policy.find(move => move.x === pt.x && move.y === pt.y)?.prior ?? 0;
+      return Number.isFinite(prior) && prior > 0 ? prior : 0;
+    });
+    const maxPrior = Math.max(...priors);
+    const weights = priors.map(prior => 1 + (maxPrior > 0 ? 2 * (prior / maxPrior) : 0));
+    let roll = Math.random() * weights.reduce((sum, weight) => sum + weight, 0);
+    for (let i = 0; i < topN.length; i++) {
+      roll -= weights[i];
+      if (roll <= 0) return topN[i].pt;
+    }
+    return topN[topN.length - 1].pt;
+  }
   return topN[Math.floor(Math.random() * topN.length)].pt;
 };

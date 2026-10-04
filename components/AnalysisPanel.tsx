@@ -1,6 +1,7 @@
 import React, { useDeferredValue } from 'react';
 import { Map } from 'lucide-react';
 import { Player } from '../types';
+import { Panel, ProgressBar } from '../ui/common';
 
 interface AnalysisPanelProps {
     winRate: number; // 0-100 (Black%)
@@ -34,13 +35,12 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
         ? '--'
         : leader === null
             ? '局势接近'
-            : `${leader === 'black' ? '黑' : '白'}领先 ${leadValue}`;
+            : `预估${leader === 'black' ? '黑' : '白'}领先 ${leadValue}`;
 
-    const blackWidth = `${blackWinRate}%`;
     const leadTone = leadMatchesUser ? 'btn-beige' : 'btn-sand';
 
     return (
-        <div className="rounded-2xl border-2 border-[#e3c086] bg-[#fcf6ea] p-2 shadow-md text-[#5c4033]">
+        <Panel className="p-2 shadow-md">
             <div className="flex items-stretch gap-2">
                 <div className={`btn-retro ${leadTone} flex h-10 shrink-0 items-center rounded-xl px-3`}>
                     <span className="whitespace-nowrap text-[12px] font-black tracking-tight text-[#5c4033]">
@@ -59,12 +59,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
                             </span>
                         </div>
                         <div className="relative min-w-0 px-0.5">
-                            <div className="winrate-track relative h-2.5 overflow-hidden rounded-full border">
-                                <div
-                                    className="winrate-fill-dark absolute inset-y-[1px] left-[1px] rounded-full transition-all duration-500 ease-out"
-                                    style={{ width: blackWidth }}
-                                />
-                            </div>
+                            <ProgressBar value={blackWinRate} label="黑方胜率" />
                         </div>
                     </div>
                 </div>
@@ -79,7 +74,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
                     {showTerritory && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#9be26f]" />}
                 </button>
             </div>
-        </div>
+        </Panel>
     );
 };
 

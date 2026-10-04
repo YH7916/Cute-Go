@@ -1,8 +1,22 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { BoardState, Difficulty, GameType, HistoryItem, Player, Point } from '../../types';
 
 // Worker message protocol types — shared between main thread and ai.worker.ts
 
-export type WorkerInMessage =
+export interface RequestIdentity { requestId: number; generation: number }
+export interface AnalysisCandidate { point: Point; visits: number }
+export interface CoachAnalysisDetails {
+  purpose?: 'coach';
+  visits?: number;
+  candidates?: AnalysisCandidate[];
+  estimatedBlackLead?: number;
+}
+export interface AnalysisResponse extends CoachAnalysisDetails {
+  winRate: number;
+  lead: number;
+  ownership: Float32Array | null;
+}
+
+export type WorkerInMessage = { generation: number } & (
   | {
       type: 'init';
       payload: {
@@ -15,32 +29,42 @@ export type WorkerInMessage =
     }
   | {
       type: 'compute';
+      requestId: number;
       data: {
-        board: any[][];
-        history: any[];
-        color: 'black' | 'white';
+        board: BoardState;
+        history: HistoryItem[];
+        color: Player;
         size: number;
-        gameType?: 'Go' | 'Gomoku';
+        gameType?: GameType;
         simulations?: number;
         komi?: number;
-        difficulty?: 'Fun' | 'Easy' | 'Medium' | 'Hard';
+        difficulty?: Difficulty;
         temperature?: number;
         mode?: 'play' | 'analyze';
+        purpose?: 'coach';
       };
     }
   | { type: 'stop' }
   | { type: 'release' }
-  | { type: 'reinit' };
+  | { type: 'reinit' });
 
-export type WorkerOutMessage =
-  | { type: 'ready' }
-  | { type: 'error'; message: string }
-  | { type: 'progress'; message: string }
+export type WorkerReply =
+  | { type: 'init-complete' }
+  | { type: 'released' }
+  | { type: 'error'; message: string; requestId?: number }
+  | { type: 'status'; message: string }
   | {
-      type: 'result';
-      move: { x: number; y: number } | null;
-      winRate?: number;
-      lead?: number;
-      ownership?: number[];
-    }
-  | { type: 'stopped' };
+      type: 'ai-response';
+      data: CoachAnalysisDetails & {
+        move: Point | null;
+        winRate: number;
+        lead?: number;
+        scoreStdev?: number;
+        ownership?: Float32Array | null;
+      };
+    };
+
+export type WorkerOutMessage = { generation: number } & (
+  | Exclude<WorkerReply, { type: 'ai-response' }>
+  | (Extract<WorkerReply, { type: 'ai-response' }> & { requestId: number })
+);

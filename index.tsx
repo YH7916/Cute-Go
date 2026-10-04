@@ -16,9 +16,11 @@ root.render(
 );
 
 if ('serviceWorker' in navigator) {
+  const appScope = new URL(import.meta.env.BASE_URL, document.baseURI);
+  const workerUrl = new URL('service-worker.js', appScope);
   if (import.meta.env.PROD) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/service-worker.js')
+      navigator.serviceWorker.register(workerUrl.href, { scope: appScope.href })
         .then((registration) => {
           console.log('ServiceWorker registration successful with scope: ', registration.scope);
         })
@@ -28,6 +30,11 @@ if ('serviceWorker' in navigator) {
     });
   } else {
     void navigator.serviceWorker.getRegistrations()
-      .then(registrations => Promise.all(registrations.map(registration => registration.unregister())));
+      .then(registrations => Promise.all(registrations
+        .filter(registration => registration.scope === appScope.href &&
+          [registration.active, registration.waiting, registration.installing]
+            .some(worker => worker?.scriptURL === workerUrl.href))
+        .map(registration => registration.unregister())))
+      .catch(err => console.warn('ServiceWorker development cleanup failed:', err));
   }
 }

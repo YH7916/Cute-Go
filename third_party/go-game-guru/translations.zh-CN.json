@@ -1,0 +1,18 @@
+{
+  "Black to play.\n\nhttps://gogameguru.com/": "黑先。\n\nhttps://gogameguru.com/",
+  "Black to play.\n\nHow can Black capture the cutting stones?\n\nhttps://gogameguru.com/": "黑先。\n\n黑棋怎样吃掉切断黑棋的白子？\n\nhttps://gogameguru.com/",
+  "Correct": "正确。",
+  "Also correct.": "这样也正确。",
+  "Correct. White can't cut at A because she'll atari herself.": "正确。白棋不能在 A 处切断，因为那样会让自己只剩一口气。",
+  "Now White can fight a ko, but Black could have avoided that.": "现在白棋可以打劫，但黑棋本来可以避免这一点。",
+  "Correct. If White plays at A Black can capture at B. If White plays at B, Black connects at A, so Black's alive with two eyes.": "正确。如果白棋下在 A，黑棋可以在 B 提子。如果白棋下在 B，黑棋就在 A 连接，因此黑棋有两只眼，可以活棋。",
+  "Black can't make two eyes now.": "现在黑棋无法做出两只眼。",
+  "This is the vital point. Black will die after White plays here.": "这是要点。白棋下在这里后，黑棋就会死。",
+  "Correct. White doesn't have enough liberties to atari at A or B, so Black will win the capturing race.": "正确。白棋气不够，无法在 A 或 B 打吃，因此黑棋会赢得对杀。",
+  "Correct. White only has two liberties and all of Black's groups have more than that. No matter what White does next, Black can atari.": "正确。白棋只有两口气，而黑棋各块棋的气都比这多。无论白棋接下来怎样下，黑棋都能打吃。",
+  "This variation is even worse for Black than the previous one because White's stones are safe and Black still has to worry about White cutting at A.": "这条变化对黑棋比前一条还差，因为白棋已经安全，而黑棋仍须担心白棋在 A 切断。",
+  "This move gives Black a shortage of liberties.": "这一手使黑棋气紧。",
+  "How can you stop this happening?": "怎样才能避免这种情况？",
+  "It's a snapback.": "这是倒扑。",
+  "It's also possible, but not the best. When White pushes at A, Black can't block at B, because of cut at C.": "这样也可以，但不是最佳下法。白棋在 A 推进时，黑棋不能在 B 挡住，因为白棋可以在 C 切断。"
+}

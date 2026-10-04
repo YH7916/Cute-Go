@@ -1,9 +1,10 @@
 import type { MutableRefObject } from 'react';
-import type { GameType, HistoryItem, Player } from '../../types';
+import type { GameType, HistoryItem, Player, Point } from '../../types';
 import type { useAppSettings } from '../useAppSettings';
 import type { useGameState } from '../useGameState';
 import type { AppProfile, AppSession, PlatformOpponentSummary } from '../../services/platform';
-import type { SGFNode } from '../../utils/sgfParser';
+import type { ScoringRequest } from '../../domains/game/scoringResult';
+import type { GamePosition } from '../../domains/game/positionState';
 
 export type AppSettingsReturn = ReturnType<typeof useAppSettings>;
 export type GameStateReturn = ReturnType<typeof useGameState>;
@@ -36,7 +37,6 @@ export interface UseGameActionsOptions {
   fetchProfile: (userId: string) => Promise<void>;
   gameState: GameStateReturn;
   gameTypeRef: MutableRefObject<GameType>;
-  handleTsumegoMoveRef: MutableRefObject<(x: number, y: number) => boolean>;
   isThinking: boolean;
   isWebThinking: boolean;
   isWorkerReady: boolean;
@@ -44,8 +44,9 @@ export interface UseGameActionsOptions {
   myColorRef: MutableRefObject<Player | null>;
   onlineStatus: 'disconnected' | 'connecting' | 'connected';
   onlineStatusRef: MutableRefObject<'disconnected' | 'connecting' | 'connected'>;
+  onIllegalMove?: (point: Point, position: GamePosition) => void;
   opponentProfile: PlatformOpponentSummary | null;
-  pendingEndGameRef: MutableRefObject<boolean>;
+  pendingEndGameRef: MutableRefObject<ScoringRequest | null>;
   playSfx: (type: 'move' | 'capture' | 'error' | 'win' | 'lose') => void;
   requestAnalysis: (
     board: GameStateReturn['board'],
@@ -53,7 +54,7 @@ export interface UseGameActionsOptions {
     history: HistoryItem[],
     komi: number,
     gameType: GameType,
-  ) => void;
+  ) => boolean;
   sendData: (message: OnlineMessage) => Promise<boolean>;
   session: AppSession | null;
   setEloDiffStyle: (style: 'gold' | 'normal' | 'negative' | null) => void;
@@ -63,12 +64,7 @@ export interface UseGameActionsOptions {
   setShowMenu: (show: boolean) => void;
   setShowPassModal: (show: boolean) => void;
   settings: AppSettingsReturn;
-  setTsumegoCurrentNode: (node: SGFNode | null) => void;
-  setTsumegoInstruction: (message: string | null) => void;
-  setTsumegoRoot: (node: SGFNode | null) => void;
-  setShowTsumegoResult: (show: boolean) => void;
   stopWebThinking: () => void;
-  tsumegoCurrentNode: SGFNode | null;
   userProfile: AppProfile | null;
   vibrate: (pattern: number | number[]) => void;
   webAiEngine: { resetAI: () => void };

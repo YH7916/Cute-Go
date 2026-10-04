@@ -4,6 +4,7 @@ type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  appearance?: 'plain' | 'retro';
   variant?: ButtonVariant;
   size?: ButtonSize;
   children: React.ReactNode;
@@ -22,7 +23,15 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: 'px-6 py-3 text-base',
 };
 
+const retroClasses: Record<ButtonVariant, string> = {
+  primary: 'btn-retro btn-brown',
+  secondary: 'btn-retro btn-beige',
+  danger: 'btn-retro bg-red-600 text-white border-red-800',
+  ghost: 'text-[#8c6b38] hover:bg-[#e3c086]/20',
+};
+
 export const Button: React.FC<ButtonProps> = ({
+  appearance = 'plain',
   variant = 'primary',
   size = 'md',
   children,
@@ -30,7 +39,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => (
   <button
-    className={`font-bold rounded-xl border-2 transition-colors ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+    className={`font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${appearance === 'retro' ? retroClasses[variant] : `border-2 ${variantClasses[variant]}`} ${sizeClasses[size]} ${className}`}
     {...props}
   >
     {children}

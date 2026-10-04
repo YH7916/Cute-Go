@@ -7,9 +7,10 @@ interface FaceProps {
   color: string;
   mood: 'happy' | 'neutral' | 'worried' | 'dead';
   lookOffset?: { x: number, y: number };
+  stoneAnimationEnabled?: boolean;
 }
 
-export const StoneFace: React.FC<FaceProps> = React.memo(({ x, y, size, color, mood, lookOffset }) => {
+export const StoneFace: React.FC<FaceProps> = React.memo(({ x, y, size, color, mood, lookOffset, stoneAnimationEnabled = true }) => {
   const cx = x + size / 2;
   const cy = y + size / 2;
   const scale = size * 0.55; 
@@ -87,7 +88,7 @@ export const StoneFace: React.FC<FaceProps> = React.memo(({ x, y, size, color, m
   return (
     <g 
         transform={`translate(${cx}, ${cy}) scale(${scale / 24}) rotate(${rotation})`}
-        style={{ transition: 'transform 0.3s ease-out' }}
+        style={{ transition: stoneAnimationEnabled ? 'transform 0.3s ease-out' : 'none' }}
     >
       {getFaceContent()}
     </g>

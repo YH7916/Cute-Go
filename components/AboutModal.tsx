@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { X, Heart, Check, ChevronLeft, Github, ExternalLink } from 'lucide-react';
-import { isTapTapEnv } from '../utils/tapTapBridge';
+import { isTapTapEnv } from '../services/platform/environment';
+import { Button } from '../ui/common';
 
 const PROJECT_REPOSITORY_URL = 'https://github.com/YH7916/Cute-Go';
+const OGS_REPOSITORY_URL = 'https://github.com/online-go/online-go.com';
+const GO_GAME_GURU_REPOSITORY_URL = 'https://github.com/gogameguru/go-problems';
 
 interface AboutModalProps {
     isOpen: boolean;
@@ -139,14 +142,17 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                             <p className="text-[10px] font-bold text-[#8c6b38] leading-tight">如果喜欢这个应用，<br/>欢迎投喂一杯奶茶☕️！<br/>你们的支持是我更新的动力🤗 </p>
 
                             <div className="bg-[#fff] p-4 rounded-2xl border-2 border-[#e3c086]">
-                                <div className="inset-track rounded-xl p-1 relative h-10 flex items-center mb-4">
-                                    <div className={`absolute top-1 bottom-1 w-1/2 bg-[#fcf6ea] rounded-lg shadow-md transition-all duration-300 ease-out z-0 ${donationMethod === 'alipay' ? 'translate-x-full left-[-2px]' : 'left-1'}`} />
-                                    <button onClick={() => setDonationMethod('wechat')} className={`flex-1 relative z-10 font-bold text-xs transition-colors duration-200 flex items-center justify-center gap-1 ${donationMethod === 'wechat' ? 'text-[#07c160]' : 'text-[#8c6b38]/60'}`}>
+                                <div className="flex gap-2 mb-4" role="group" aria-label="支持方式">
+                                    <Button appearance="retro" size="sm" variant={donationMethod === 'wechat' ? 'primary' : 'secondary'}
+                                        aria-pressed={donationMethod === 'wechat'} onClick={() => setDonationMethod('wechat')}
+                                        className="min-h-11 flex-1">
                                         微信支付
-                                    </button>
-                                    <button onClick={() => setDonationMethod('alipay')} className={`flex-1 relative z-10 font-bold text-xs transition-colors duration-200 flex items-center justify-center gap-1 ${donationMethod === 'alipay' ? 'text-[#1677ff]' : 'text-[#8c6b38]/60'}`}>
+                                    </Button>
+                                    <Button appearance="retro" size="sm" variant={donationMethod === 'alipay' ? 'primary' : 'secondary'}
+                                        aria-pressed={donationMethod === 'alipay'} onClick={() => setDonationMethod('alipay')}
+                                        className="min-h-11 flex-1">
                                         支付宝
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 <div className="w-full aspect-square bg-[#fcf6ea] rounded-xl border-2 border-dashed border-[#e3c086] flex items-center justify-center relative overflow-hidden group">
@@ -197,7 +203,41 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                                 <li>• 感谢所有反馈 Bug 和提出建议的用户</li>
                             </ul>
                         </div>
-                        
+
+                        <section className="bg-[#fff]/50 p-4 rounded-2xl border border-[#e3c086] text-left">
+                            <h4 className="text-sm font-bold text-[#5c4033] mb-2">OGS · Learn to Play Go</h4>
+                            <p className="text-xs text-[#8c6b38] leading-relaxed">
+                                感谢 Online-Go.com 与社区贡献者提供官方入门课程。相关课程棋图、任务与解答来自上游，按 AGPL-3.0-or-later 使用。
+                            </p>
+                            <p className="text-xs text-[#8c6b38] leading-relaxed mt-2">中文翻译、整理与交互适配由 Cute-Go 完成。</p>
+                            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-bold text-[#5c4033] mt-3">
+                                <a href={OGS_REPOSITORY_URL} target="_blank" rel="noopener noreferrer" className="underline py-1">官方仓库</a>
+                                <a href={new URL('../third_party/ogs-learning/LICENSE', import.meta.url).href} target="_blank" rel="noopener noreferrer" className="underline py-1">许可原文</a>
+                                <a href={new URL('../third_party/ogs-learning/README.md', import.meta.url).href} target="_blank" rel="noopener noreferrer" className="underline py-1">来源与改编说明</a>
+                            </div>
+                        </section>
+
+                        <section className="bg-[#fff]/50 p-4 rounded-2xl border border-[#e3c086] text-left">
+                            <h4 className="text-sm font-bold text-[#5c4033] mb-2">Go Game Guru · 围棋习题</h4>
+                            <p className="text-xs text-[#8c6b38] leading-relaxed">
+                                感谢 An Younggil（职业八段）与 David Ormerod。相关棋图、解答变化与原讲解来自 Go Game Guru 题库。
+                            </p>
+                            <p className="text-xs text-[#8c6b38] leading-relaxed mt-2">
+                                中文翻译与交互适配由 Cute-Go 完成；原题及改编内容按 CC BY-NC-SA 4.0（署名—非商业性使用—相同方式共享）使用。
+                            </p>
+                            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-bold text-[#5c4033] mt-3">
+                                <a href={GO_GAME_GURU_REPOSITORY_URL} target="_blank" rel="noopener noreferrer" className="underline py-1">官方仓库</a>
+                                <a href={new URL('../third_party/go-game-guru/LICENSE', import.meta.url).href} target="_blank" rel="noopener noreferrer" className="underline py-1">许可原文</a>
+                                <a href={new URL('../third_party/go-game-guru/README.md', import.meta.url).href} target="_blank" rel="noopener noreferrer" className="underline py-1">来源与改编说明</a>
+                            </div>
+                        </section>
+
+                        <p className="text-[11px] text-[#8c6b38] leading-relaxed text-left">
+                            以上署名用于标明来源，不表示原作者审校或背书本项目。软件代码采用
+                            {' '}<a href={new URL('../LICENSE', import.meta.url).href} target="_blank" rel="noopener noreferrer" className="underline">AGPL-3.0-or-later</a>；
+                            题库与其他资源保留各自许可，详见
+                            {' '}<a href={new URL('../THIRD_PARTY_NOTICES.md?no-inline', import.meta.url).href} target="_blank" rel="noopener noreferrer" className="underline">第三方声明</a>。
+                        </p>
                     </div>
                 )}
 

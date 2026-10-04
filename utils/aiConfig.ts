@@ -20,13 +20,13 @@ export function getAIConfig(difficulty: string): AIConfig {
         };
     }
 
-    // Easy — ONNX模型，高temperature随机采样
+    // Easy — 复用启蒙的局部候选，模型仅提供有上限的选点偏好
     if (difficulty === 'Easy') {
         return {
             useModel: true,
             simulations: 1,
             randomness: 0,
-            temperature: 2.1,
+            temperature: 0,
             heuristicFactor: 1.0
         };
     }

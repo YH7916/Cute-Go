@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "name": "柯洁",
+  "format": "transparent-portrait",
+  "poster": "poster.png",
+  "source": "Built-in image_gen; version 2 redraw with Chu Ying as the primary 2D chibi style reference and a tournament photograph as secondary identity reference",
+  "artVersion": "kejie-chuying-style-2",
+  "referencePage": "https://k.sina.cn/article_6839266384_197a6ec5000100e5dm.html",
+  "styleReference": "../chuying/poster.png",
+  "animation": "CSS motion of one illustration; not a frame-by-frame character animation"
+}

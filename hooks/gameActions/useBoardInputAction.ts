@@ -5,15 +5,17 @@ export const useBoardInputAction = (
   {
     aiTurnLock,
     gameState,
+    gameTypeRef,
     isThinking,
     myColor,
     onlineStatus,
+    onIllegalMove,
     playSfx,
     sendData,
     settings,
     vibrate,
   }: UseGameActionsOptions,
-  executeMove: (x: number, y: number, isRemote: boolean) => void
+  executeMove: (x: number, y: number, isRemote: boolean) => boolean | void
 ) => {
   const onlineMovePendingRef = useRef(false);
 
@@ -23,7 +25,8 @@ export const useBoardInputAction = (
         `[Click] (${x}, ${y}) Mode: ${gameState.appMode}, Current: ${gameState.currentPlayer}, User: ${settings.userColor}, Lock: ${aiTurnLock.current}, Thinking: ${isThinking}`
       );
 
-      const boardRow = gameState.board[y];
+      const position = gameState.readPosition();
+      const boardRow = position.board[y];
       if (
         !Number.isInteger(x) ||
         !Number.isInteger(y) ||
@@ -36,7 +39,7 @@ export const useBoardInputAction = (
 
       if (gameState.appMode === 'review') return;
       if (gameState.appMode === 'setup') {
-        const newBoard = gameState.board.map((row) => row.map((stone) => stone));
+        const newBoard = position.board.map((row) => [...row]);
         if (gameState.setupTool === 'erase') {
           if (newBoard[y][x]) {
             newBoard[y][x] = null;
@@ -53,7 +56,7 @@ export const useBoardInputAction = (
           playSfx('move');
           vibrate(15);
         }
-        gameState.setBoard(newBoard);
+        gameState.writePosition({ ...position, board: newBoard });
         return;
       }
 
@@ -68,7 +71,7 @@ export const useBoardInputAction = (
 
       const aiColor = settings.userColor === 'black' ? 'white' : 'black';
 
-      const activePlayer = gameState.currentPlayerRef.current;
+      const activePlayer = position.currentPlayer;
       if (
         onlineStatus !== 'connected' &&
         settings.gameMode === 'PvAI' &&
@@ -81,19 +84,32 @@ export const useBoardInputAction = (
       if (onlineStatus === 'connected') {
         if (activePlayer !== myColor || onlineMovePendingRef.current) return;
         onlineMovePendingRef.current = true;
-        const sent = await sendData({ type: 'MOVE', x, y });
-        onlineMovePendingRef.current = false;
-        if (!sent) return;
+        try {
+          const sent = await sendData({ type: 'MOVE', x, y });
+          if (!sent || gameState.readPosition() !== position) return;
+        } finally {
+          onlineMovePendingRef.current = false;
+        }
       }
-      executeMove(x, y, false);
+      const accepted = executeMove(x, y, false);
+      // Only a rejected player gesture may trigger rule teaching. AI and
+      // remote replies also call executeMove directly and must remain silent.
+      if (accepted === false && settings.coachMode && settings.gameMode === 'PvAI'
+        && gameTypeRef.current === 'Go' && gameState.appMode === 'playing'
+        && onlineStatus === 'disconnected' && activePlayer === settings.userColor
+        && gameState.readPosition() === position) {
+        onIllegalMove?.({ x, y }, position);
+      }
     },
     [
       aiTurnLock,
       executeMove,
       gameState,
+      gameTypeRef,
       isThinking,
       myColor,
       onlineStatus,
+      onIllegalMove,
       playSfx,
       sendData,
       settings,

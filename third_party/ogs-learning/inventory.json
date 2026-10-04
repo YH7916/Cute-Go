@@ -1,0 +1,2733 @@
+[
+  {
+    "section": "Fundamentals",
+    "id": "ogs-rules-intro",
+    "className": "Intro",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/Fundamentals/Intro.tsx"
+  },
+  {
+    "section": "Fundamentals",
+    "id": "ogs-self-capture",
+    "className": "SelfCapture",
+    "pages": 3,
+    "answerKinds": {
+      "move-tree": 3
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/Fundamentals/SelfCapture.tsx"
+  },
+  {
+    "section": "Fundamentals",
+    "id": "ogs-eyes",
+    "className": "Eyes",
+    "pages": 4,
+    "answerKinds": {
+      "move-tree": 4
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/Fundamentals/Eyes.tsx"
+  },
+  {
+    "section": "Fundamentals",
+    "id": "ogs-ko",
+    "className": "Ko",
+    "pages": 5,
+    "answerKinds": {
+      "move-tree": 5
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/Fundamentals/Ko.tsx"
+  },
+  {
+    "section": "Fundamentals",
+    "id": "ogs-territory",
+    "className": "Territory",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/Fundamentals/Territory.tsx"
+  },
+  {
+    "section": "Fundamentals",
+    "id": "ogs-ending-the-game",
+    "className": "EndingTheGame",
+    "pages": 3,
+    "answerKinds": {
+      "action": 2,
+      "remove-stones": 1
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/Fundamentals/EndingTheGame.tsx"
+  },
+  {
+    "section": "Fundamentals",
+    "id": "ogs-the-board",
+    "className": "TheBoard",
+    "pages": 3,
+    "answerKinds": {
+      "move-tree": 3
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/Fundamentals/TheBoard.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-count-liberties",
+    "className": "CountLiberties",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/CountLiberties.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-count_chains",
+    "className": "CountChains",
+    "pages": 6,
+    "answerKinds": {
+      "choice": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/CountChains.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-in_atari",
+    "className": "InAtari",
+    "pages": 6,
+    "answerKinds": {
+      "choice": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/InAtari.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-count-atari",
+    "className": "CountAtari",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/CountAtari.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-capture_stone",
+    "className": "CaptureStone",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/CaptureStone.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-capture_chain",
+    "className": "CaptureChain",
+    "pages": 16,
+    "answerKinds": {
+      "move-tree": 16
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/CaptureChain.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-both_atari",
+    "className": "BothAtari",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/BothAtari.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-escape",
+    "className": "Escape",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/Escape.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-find_escape",
+    "className": "FindEscape",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/FindEscape.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-create_opening",
+    "className": "CreateOpening",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/CreateOpening.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-connect",
+    "className": "Connect",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/Connect.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-cut",
+    "className": "Cut",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/Cut.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-bp-self-capture",
+    "className": "BPSelfCapture",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/BPSelfCapture.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-real-false-eye",
+    "className": "RealFalseEye",
+    "pages": 6,
+    "answerKinds": {
+      "choice": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/RealFalseEye.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-bp-ko",
+    "className": "BPKo",
+    "pages": 6,
+    "answerKinds": {
+      "choice": 6
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/BPKo.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-group-alive",
+    "className": "GroupAlive",
+    "pages": 6,
+    "answerKinds": {
+      "choice": 6
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/GroupAlive.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-make-alive",
+    "className": "TwoEyes",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/TwoEyes.tsx"
+  },
+  {
+    "section": "Basic Principles",
+    "id": "ogs-capture-group",
+    "className": "CaptureGroup",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicPrinciples/CaptureGroup.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-atari-to-side",
+    "className": "AtariToSide",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/AtariToSide.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-atari-to-stones",
+    "className": "AtariToStones",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/AtariToStones.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-atari-with-cut",
+    "className": "AtariWithCut",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/AtariWithCut.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-atari-correct-side",
+    "className": "AtariCorrectSide",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicSkills/AtariCorrectSide.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-escape-possible",
+    "className": "EscapePossible",
+    "pages": 18,
+    "answerKinds": {
+      "choice": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/EscapePossible.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-make-ko",
+    "className": "MakeKo",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/MakeKo.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-play_double_atari",
+    "className": "PlayDoubleAtari",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicSkills/PlayDoubleAtari.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-prevent_double_atari",
+    "className": "PreventDoubleAtari",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/PreventDoubleAtari.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-connected-shape",
+    "className": "ConnectedShape",
+    "pages": 15,
+    "answerKinds": {
+      "move-tree": 15
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/ConnectedShape.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-basic-skills-cut",
+    "className": "BasicSkillsCut",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/BasicSkillsCut.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-connect_with_hanging_connection",
+    "className": "HangingConnection",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/HangingConnection.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-ladder",
+    "className": "Ladder",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicSkills/Ladder.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-shortage-liberties",
+    "className": "ShortageLiberties",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/ShortageLiberties.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-false-eye",
+    "className": "FalseEye",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/FalseEye.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-large-eye",
+    "className": "LargeEye",
+    "pages": 29,
+    "answerKinds": {
+      "move-tree": 29
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/LargeEye.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-bs-group-alive",
+    "className": "BSGroupAlive",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/BSGroupAlive.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-snapback",
+    "className": "Snapback",
+    "pages": 25,
+    "answerKinds": {
+      "move-tree": 25
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicSkills/Snapback.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-net",
+    "className": "Net",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicSkills/Net.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-count-territory",
+    "className": "CountTerritory",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicSkills/CountTerritory.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-determine-winner",
+    "className": "Winner",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/Winner.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-close_territory",
+    "className": "CloseTerritory",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicSkills/CloseTerritory.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-compare-liberties",
+    "className": "CompareLiberties",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/CompareLiberties.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-capturing_race",
+    "className": "CapturingRace",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": true,
+    "path": "src/views/LearningHub/Sections/BasicSkills/CapturingRace.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-correct-side",
+    "className": "CorrectSide",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/CorrectSide.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-capture",
+    "className": "Capture",
+    "pages": 21,
+    "answerKinds": {
+      "move-tree": 21
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/Capture.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-bs-escape",
+    "className": "BSEscape",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/BSEscape.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-bs-liberties",
+    "className": "BSLiberties",
+    "pages": 22,
+    "answerKinds": {
+      "move-tree": 22
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/Liberties.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-enclose",
+    "className": "Enclose",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/Enclose.tsx"
+  },
+  {
+    "section": "Basic Skills",
+    "id": "ogs-first-line",
+    "className": "FirstLine",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BasicSkills/FirstLine.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-atari",
+    "className": "BL1Atari",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Atari.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-escape-from-net",
+    "className": "EscapeFromNet",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/EscapeFromNet.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-calculate-escape",
+    "className": "BL1CalculateEscape",
+    "pages": 24,
+    "answerKinds": {
+      "choice": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/CalculateEscape.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-calculate-ladder",
+    "className": "BL1CalculateLadder",
+    "pages": 8,
+    "answerKinds": {
+      "move-tree": 2,
+      "choice": 6
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/CalculateLadder.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-ladder",
+    "className": "BL1Ladder",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Ladder.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-double-atari",
+    "className": "BL1DoubleAtari",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/DoubleAtari.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-snapback",
+    "className": "BL1Snapback",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Snapback.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-net",
+    "className": "BL1Net",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Net.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-chase-down",
+    "className": "BL1ChaseDown",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/ChaseDown.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-capture1",
+    "className": "BL1Capture1",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Capture1.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-capture2",
+    "className": "BL1Capture2",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Capture2.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-capture3",
+    "className": "BL1Capture3",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Capture3.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-capture4",
+    "className": "BL1Capture4",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Capture4.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-connect",
+    "className": "BL1Connect",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Connect.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-cut",
+    "className": "BL1Cut",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Cut.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-cancel-cut",
+    "className": "BL1CancelCut",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/CancelCut.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-eye",
+    "className": "BL1Eye",
+    "pages": 14,
+    "answerKinds": {
+      "move-tree": 2,
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Eye.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-false-eye",
+    "className": "BL1FalseEye",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/FalseEye.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-count-eyes",
+    "className": "BL1CountEyes",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/CountEyes.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-close-territory",
+    "className": "BL1CloseTerritory",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/CloseTerritory.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-reduce-territory",
+    "className": "BL1ReduceTerritory",
+    "pages": 7,
+    "answerKinds": {
+      "move-tree": 7
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/ReduceTerritory.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-capturing-race-1",
+    "className": "BL1CapturingRace1",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/CapturingRace1.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-capturing-race-2",
+    "className": "BL1CapturingRace2",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/CapturingRace2.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-seki-1",
+    "className": "BL1Seki1",
+    "pages": 14,
+    "answerKinds": {
+      "choice": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Seki1.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-seki-2",
+    "className": "BL1Seki2",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Seki2.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-life-death-1",
+    "className": "BL1LifeDeath1",
+    "pages": 8,
+    "answerKinds": {
+      "move-tree": 8
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/LifeDeath1.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-life-death-2",
+    "className": "BL1LifeDeath2",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/LifeDeath2.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-life-death-3",
+    "className": "BL1LifeDeath3",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/LifeDeath3.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-life-death-4",
+    "className": "BL1LifeDeath4",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/LifeDeath4.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-life-death-5",
+    "className": "BL1LifeDeath5",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/LifeDeath5.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-life-death-6",
+    "className": "BL1LifeDeath6",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/LifeDeath6.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-life-death-7",
+    "className": "BL1LifeDeath7",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/LifeDeath7.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-serial-atari",
+    "className": "BL1SerialAtari",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/SerialAtari.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-ko",
+    "className": "BL1Ko",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Ko.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-good-play",
+    "className": "BL1GoodPlay",
+    "pages": 9,
+    "answerKinds": {
+      "choice": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/GoodPlay.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-block",
+    "className": "BL1Block",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Block.tsx"
+  },
+  {
+    "section": "Beginner Level 1",
+    "id": "ogs-bl1-stretch",
+    "className": "BL1Stretch",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel1/Stretch.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-seki",
+    "className": "BL2Seki",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Seki.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-atari",
+    "className": "BL2Atari",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Atari.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-chase-down",
+    "className": "BL2ChaseDown",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/ChaseDown.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-snapback",
+    "className": "BL2Snapback",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Snapback.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-net",
+    "className": "BL2Net",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Net.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-capture-1",
+    "className": "BL2Capture1",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Capture1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-capture-2",
+    "className": "BL2Capture2",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Capture2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-throw-in-1",
+    "className": "BL2ThrowIn1",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/ThrowIn1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-throw-in-2",
+    "className": "BL2ThrowIn2",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/ThrowIn2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-capture-3",
+    "className": "BL2Capture3",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Capture3.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-connect",
+    "className": "BL2Connect",
+    "pages": 11,
+    "answerKinds": {
+      "move-tree": 11
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Connect.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-cut-1",
+    "className": "BL2Cut1",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Cut1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-cut-2",
+    "className": "BL2Cut2",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Cut2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-opening",
+    "className": "BL2Opening",
+    "pages": 7,
+    "answerKinds": {
+      "move-tree": 7
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Opening.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-corner-1",
+    "className": "BL2Corner1",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Corner1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-corner-2",
+    "className": "BL2Corner2",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Corner2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-defense-1",
+    "className": "BL2Defense1",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Defense1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-defense-2",
+    "className": "BL2Defense2",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Defense2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-defense-3",
+    "className": "BL2Defense3",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Defense3.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-miai",
+    "className": "BL2Miai",
+    "pages": 7,
+    "answerKinds": {
+      "move-tree": 7
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Miai.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-eye1",
+    "className": "BL2Eye1",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Eye1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-eye2",
+    "className": "BL2Eye2",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Eye2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-eye3",
+    "className": "BL2Eye3",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Eye3.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-endgame1",
+    "className": "BL2Endgame1",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Endgame1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-endgame2",
+    "className": "BL2Endgame2",
+    "pages": 13,
+    "answerKinds": {
+      "choice": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Endgame2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-endgame3",
+    "className": "BL2Endgame3",
+    "pages": 24,
+    "answerKinds": {
+      "choice": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Endgame3.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-endgame4",
+    "className": "BL2Endgame4",
+    "pages": 6,
+    "answerKinds": {
+      "choice": 6
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Endgame4.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-endgame5",
+    "className": "BL2Endgame5",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Endgame5.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-life-death-1",
+    "className": "BL2LifeDeath1",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/LifeDeath1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-life-death-2",
+    "className": "BL2LifeDeath2",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/LifeDeath2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-life-death-3",
+    "className": "BL2LifeDeath3",
+    "pages": 19,
+    "answerKinds": {
+      "move-tree": 19
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/LifeDeath3.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-life-death-4",
+    "className": "BL2LifeDeath4",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/LifeDeath4.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-life-death-5",
+    "className": "BL2LifeDeath5",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/LifeDeath5.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-life-death-6",
+    "className": "BL2LifeDeath6",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/LifeDeath6.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-ko-1",
+    "className": "BL2Ko1",
+    "pages": 6,
+    "answerKinds": {
+      "move-tree": 6
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Ko1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-ko-2",
+    "className": "BL2Ko2",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Ko2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-ko-3",
+    "className": "BL2Ko3",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Ko3.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-haengma-1",
+    "className": "BL2Haengma1",
+    "pages": 17,
+    "answerKinds": {
+      "move-tree": 17
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Haengma1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-haengma-2",
+    "className": "BL2Haengma2",
+    "pages": 10,
+    "answerKinds": {
+      "move-tree": 10
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Haengma2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-haengma-3",
+    "className": "BL2Haengma3",
+    "pages": 10,
+    "answerKinds": {
+      "move-tree": 10
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Haengma3.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-haengma-4",
+    "className": "BL2Haengma4",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Haengma4.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-haengma-5",
+    "className": "BL2Haengma5",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Haengma5.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-shape-1",
+    "className": "BL2Shape1",
+    "pages": 17,
+    "answerKinds": {
+      "choice": 17
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Shape1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-shape-2",
+    "className": "BL2Shape2",
+    "pages": 14,
+    "answerKinds": {
+      "choice": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/Shape2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-capturing-race-1",
+    "className": "BL2CapturingRace1",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/CapturingRace1.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-capturing-race-2",
+    "className": "BL2CapturingRace2",
+    "pages": 15,
+    "answerKinds": {
+      "move-tree": 15
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/CapturingRace2.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-capturing-race-3",
+    "className": "BL2CapturingRace3",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/CapturingRace3.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-capturing-race-4",
+    "className": "BL2CapturingRace4",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/CapturingRace4.tsx"
+  },
+  {
+    "section": "Beginner Level 2",
+    "id": "ogs-bl2-capturing-race-5",
+    "className": "BL2CapturingRace5",
+    "pages": 7,
+    "answerKinds": {
+      "move-tree": 7
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel2/CapturingRace5.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capture-1",
+    "className": "BL3Capture1",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Capture1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capture-2",
+    "className": "BL3Capture2",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Capture2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capture-3",
+    "className": "BL3Capture3",
+    "pages": 23,
+    "answerKinds": {
+      "move-tree": 23
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Capture3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capture-4",
+    "className": "BL3Capture4",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Capture4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capture-5",
+    "className": "BL3Capture5",
+    "pages": 14,
+    "answerKinds": {
+      "move-tree": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Capture5.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capture-6",
+    "className": "BL3Capture6",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Capture6.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capture-7",
+    "className": "BL3Capture7",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Capture7.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-joseki-1",
+    "className": "BL3Joseki1",
+    "pages": 19,
+    "answerKinds": {
+      "move-tree": 19
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Joseki1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-joseki-2",
+    "className": "BL3Joseki2",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Joseki2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-joseki-3",
+    "className": "BL3Joseki3",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Joseki3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-joseki-4",
+    "className": "BL3Joseki4",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Joseki4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-opening-1",
+    "className": "BL3Opening1",
+    "pages": 15,
+    "answerKinds": {
+      "move-tree": 15
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Opening1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-opening-2",
+    "className": "BL3Opening2",
+    "pages": 10,
+    "answerKinds": {
+      "move-tree": 10
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Opening2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-opening-3",
+    "className": "BL3Opening3",
+    "pages": 7,
+    "answerKinds": {
+      "move-tree": 7
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Opening3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-opening-4",
+    "className": "BL3Opening4",
+    "pages": 14,
+    "answerKinds": {
+      "move-tree": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Opening4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-haengma-1",
+    "className": "BL3Haengma1",
+    "pages": 19,
+    "answerKinds": {
+      "move-tree": 19
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Haengma1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-haengma-2",
+    "className": "BL3Haengma2",
+    "pages": 14,
+    "answerKinds": {
+      "move-tree": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Haengma2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-haengma-3",
+    "className": "BL3Haengma3",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Haengma3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-haengma-4",
+    "className": "BL3Haengma4",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Haengma4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-seki-1",
+    "className": "BL3Seki1",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Seki1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-seki-2",
+    "className": "BL3Seki2",
+    "pages": 8,
+    "answerKinds": {
+      "move-tree": 8
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Seki2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-skills-1",
+    "className": "BL3Skills1",
+    "pages": 24,
+    "answerKinds": {
+      "choice": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Skills1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-skills-2",
+    "className": "BL3Skills2",
+    "pages": 10,
+    "answerKinds": {
+      "move-tree": 10
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Skills2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-skills-3",
+    "className": "BL3Skills3",
+    "pages": 14,
+    "answerKinds": {
+      "choice": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Skills3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-skills-4",
+    "className": "BL3Skills4",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Skills4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl;3-skills-5",
+    "className": "BL3Skills5",
+    "pages": 24,
+    "answerKinds": {
+      "choice": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Skills5.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-skills-6",
+    "className": "BL3Skills6",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Skills6.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-skills-7",
+    "className": "BL3Skills7",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Skills7.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-endgame-1",
+    "className": "BL3Endgame1",
+    "pages": 13,
+    "answerKinds": {
+      "choice": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Endgame1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-endgame-2",
+    "className": "BL3Endgame2",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Endgame2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-endgame-3",
+    "className": "BL3Endgame3",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Endgame3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-endgame-4",
+    "className": "BL3Endgame4",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Endgame4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-endgame-5",
+    "className": "BL3Endgame5",
+    "pages": 14,
+    "answerKinds": {
+      "choice": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/Endgame5.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-false-eye-1",
+    "className": "BL3FalseEye1",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/FalseEye1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-false-eye-2",
+    "className": "BL3FalseEye2",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/FalseEye2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-false-eye-3",
+    "className": "BL3FalseEye3",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/FalseEye3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-false-eye-4",
+    "className": "BL3FalseEye4",
+    "pages": 21,
+    "answerKinds": {
+      "move-tree": 21
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/FalseEye4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-1",
+    "className": "BL3LifeDeath1",
+    "pages": 10,
+    "answerKinds": {
+      "move-tree": 10
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-2",
+    "className": "BL3LifeDeath2",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-3",
+    "className": "BL3LifeDeath3",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-4",
+    "className": "BL3LifeDeath4",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-5",
+    "className": "BL3LifeDeath5",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath5.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-6",
+    "className": "BL3LifeDeath6",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath6.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-7",
+    "className": "BL3LifeDeath7",
+    "pages": 16,
+    "answerKinds": {
+      "move-tree": 16
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath7.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-8",
+    "className": "BL3LifeDeath8",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath8.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-9",
+    "className": "BL3LifeDeath9",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath9.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-10",
+    "className": "BL3LifeDeath10",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath10.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-11",
+    "className": "BL3LifeDeath11",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath11.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-12",
+    "className": "BL3LifeDeath12",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath12.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-13",
+    "className": "BL3LifeDeath13",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath13.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-14",
+    "className": "BL3LifeDeath14",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath14.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-15",
+    "className": "BL3LifeDeath15",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath15.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-16",
+    "className": "BL3LifeDeath16",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath16.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-17",
+    "className": "BL3LifeDeath17",
+    "pages": 20,
+    "answerKinds": {
+      "choice": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath17.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-life-death-18",
+    "className": "BL3LifeDeath18",
+    "pages": 20,
+    "answerKinds": {
+      "choice": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/LifeDeath18.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capturing-race-1",
+    "className": "BL3CapturingRace1",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/CapturingRace1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capturing-race-2",
+    "className": "BL3CapturingRace2",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/CapturingRace2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capturing-race-3",
+    "className": "BL3CapturingRace3",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/CapturingRace3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capturing-race-4",
+    "className": "BL3CapturingRace4",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/CapturingRace4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capturing-race-5",
+    "className": "BL3CapturingRace5",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/CapturingRace5.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capturing-race-6",
+    "className": "BL3CapturingRace6",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/CapturingRace6.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capturing-race-7",
+    "className": "BL3CapturingRace7",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/CapturingRace7.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-capturing-race-8",
+    "className": "BL3CapturingRace8",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/CapturingRace8.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-preparatory-atari-1",
+    "className": "BL3PreparatoryAtari1",
+    "pages": 10,
+    "answerKinds": {
+      "move-tree": 10
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/PreparatoryAtari1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-preparatory-atari-2",
+    "className": "BL3PreparatoryAtari2",
+    "pages": 10,
+    "answerKinds": {
+      "move-tree": 10
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/PreparatoryAtari2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-preparatory-atari-3",
+    "className": "BL3PreparatoryAtari3",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/PreparatoryAtari3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-preparatory-atari-4",
+    "className": "BL3PreparatoryAtari4",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/PreparatoryAtari4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-connect-cut-1",
+    "className": "BL3ConnectCut1",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/ConnectCut1.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-connect-cut-2",
+    "className": "BL3ConnectCut2",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/ConnectCut2.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-connect-cut-3",
+    "className": "BL3ConnectCut3",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/ConnectCut3.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-connect-cut-4",
+    "className": "BL3ConnectCut4",
+    "pages": 12,
+    "answerKinds": {
+      "move-tree": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/ConnectCut4.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-connect-cut-5",
+    "className": "BL3ConnectCut5",
+    "pages": 12,
+    "answerKinds": {
+      "choice": 12
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/ConnectCut5.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-connect-cut-6",
+    "className": "BL3ConnectCut6",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/ConnectCut6.tsx"
+  },
+  {
+    "section": "Beginner Level 3",
+    "id": "ogs-bl3-connect-cut-7",
+    "className": "BL3ConnectCut7",
+    "pages": 10,
+    "answerKinds": {
+      "move-tree": 10
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel3/ConnectCut7.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-opening-1",
+    "className": "BL4Opening1",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Opening1.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-opening-2",
+    "className": "BL4Opening2",
+    "pages": 9,
+    "answerKinds": {
+      "move-tree": 9
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Opening2.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-opening-3",
+    "className": "BL4Opening3",
+    "pages": 10,
+    "answerKinds": {
+      "move-tree": 10
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Opening3.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-opening-4",
+    "className": "BL4Opening4",
+    "pages": 8,
+    "answerKinds": {
+      "move-tree": 8
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Opening4.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-opening-5",
+    "className": "BL4Opening5",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Opening5.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-opening-6",
+    "className": "BL4Opening6",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Opening6.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-opening-7",
+    "className": "BL4Opening7",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Opening7.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-opening-8",
+    "className": "BL4Opening8",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Opening8.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-opening-9",
+    "className": "BL4Opening9",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Opening9.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-joseki-1",
+    "className": "BL4Joseki1",
+    "pages": 16,
+    "answerKinds": {
+      "move-tree": 16
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Joseki1.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-joseki-2",
+    "className": "BL4Joseki2",
+    "pages": 18,
+    "answerKinds": {
+      "move-tree": 18
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Joseki2.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-skills-1",
+    "className": "BL4Skills1",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Skills1.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-skills-2",
+    "className": "BL4Skills2",
+    "pages": 16,
+    "answerKinds": {
+      "move-tree": 16
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Skills2.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-skills-3",
+    "className": "BL4Skills3",
+    "pages": 13,
+    "answerKinds": {
+      "move-tree": 13
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Skills3.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-skills-4",
+    "className": "BL4Skills4",
+    "pages": 7,
+    "answerKinds": {
+      "move-tree": 7
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Skills4.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capture-1",
+    "className": "BL4Capture1",
+    "pages": 22,
+    "answerKinds": {
+      "move-tree": 22
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Capture1.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capture-2",
+    "className": "BL4Capture2",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Capture2.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capture-3",
+    "className": "BL4Capture3",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Capture3.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capture-4",
+    "className": "BL4Capture4",
+    "pages": 16,
+    "answerKinds": {
+      "move-tree": 16
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Capture4.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-connect-1",
+    "className": "BL4Connect1",
+    "pages": 14,
+    "answerKinds": {
+      "move-tree": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Connect1.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-connect-2",
+    "className": "BL4Connect2",
+    "pages": 14,
+    "answerKinds": {
+      "move-tree": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Connect2.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-connect-3",
+    "className": "BL4Connect3",
+    "pages": 24,
+    "answerKinds": {
+      "move-tree": 24
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Connect3.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-connect-4",
+    "className": "BL4Connect4",
+    "pages": 16,
+    "answerKinds": {
+      "move-tree": 16
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Connect4.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-cut-1",
+    "className": "BL4Cut1",
+    "pages": 22,
+    "answerKinds": {
+      "move-tree": 22
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Cut1.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-cut-2",
+    "className": "BL4Cut2",
+    "pages": 14,
+    "answerKinds": {
+      "move-tree": 14
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/Cut2.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capturing-race-1",
+    "className": "BL4CapturingRace1",
+    "pages": 23,
+    "answerKinds": {
+      "move-tree": 23
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/CapturingRace1.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capturing-race-2",
+    "className": "BL4CapturingRace2",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/CapturingRace2.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capturing-race-3",
+    "className": "BL4CapturingRace3",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/CapturingRace3.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capturing-race-4",
+    "className": "BL4CapturingRace4",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/CapturingRace4.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capturing-race-5",
+    "className": "BL4CapturingRace5",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/CapturingRace5.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capturing-race-6",
+    "className": "BL4CapturingRace6",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/CapturingRace6.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capturing-race-7",
+    "className": "BL4CapturingRace7",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/CapturingRace7.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capturing-race-8",
+    "className": "BL4CapturingRace8",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/CapturingRace8.tsx"
+  },
+  {
+    "section": "Beginner Level 4",
+    "id": "ogs-bl4-capturing-race-9",
+    "className": "BL4CapturingRace9",
+    "pages": 20,
+    "answerKinds": {
+      "move-tree": 20
+    },
+    "selected": false,
+    "path": "src/views/LearningHub/Sections/BeginnerLevel4/CapturingRace9.tsx"
+  }
+]

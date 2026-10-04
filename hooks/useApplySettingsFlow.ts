@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
 import type { MutableRefObject } from 'react';
-import type { GameSettingsData } from '../components/SettingsModal';
+import type { GameSettingsData } from '../types';
 import { getAIConfig } from '../utils/aiConfig';
 import type { AppProfile } from '../services/platform';
 
 interface ApplySettingsSettings {
+  coachMode?: boolean;
   setBoardSize: (boardSize: GameSettingsData['boardSize']) => void;
   setDifficulty: (difficulty: GameSettingsData['difficulty']) => void;
   setGameMode: (gameMode: GameSettingsData['gameMode']) => void;
@@ -22,7 +23,6 @@ interface ApplySettingsWebAi {
 interface UseApplySettingsFlowOptions {
   aiTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   aiTurnLock: MutableRefObject<boolean>;
-  exitTsumegoMode: (nextGameMode: GameSettingsData['gameMode']) => void;
   resetGame: (keepOnline?: boolean, explicitSize?: number, shouldBroadcast?: boolean) => void;
   settings: ApplySettingsSettings;
   setToastMsg: (message: string | null) => void;
@@ -35,7 +35,6 @@ interface UseApplySettingsFlowOptions {
 export const useApplySettingsFlow = ({
   aiTimerRef,
   aiTurnLock,
-  exitTsumegoMode,
   resetGame,
   settings,
   setToastMsg,
@@ -53,14 +52,13 @@ export const useApplySettingsFlow = ({
       aiTimerRef.current = null;
     }
 
-    exitTsumegoMode(newSettings.gameMode);
     settings.setBoardSize(newSettings.boardSize);
     settings.setGameType(newSettings.gameType);
     settings.setDifficulty(newSettings.difficulty);
     settings.setGameMode(newSettings.gameMode);
     settings.setUserColor(newSettings.userColor);
 
-    if (newSettings.gameMode === 'PvAI' && userProfile?.elo !== undefined) {
+    if (newSettings.gameMode === 'PvAI' && !settings.coachMode && userProfile?.elo !== undefined) {
       const lowAi = newSettings.difficulty === 'Easy' || newSettings.difficulty === 'Medium';
       if (userProfile.elo >= 1450 && lowAi) {
         setToastMsg('以你现在的实力，战胜这个难度的 AI 将无法获得积分，建议挑战更高级别或联机对战！');
@@ -91,7 +89,6 @@ export const useApplySettingsFlow = ({
   }, [
     aiTimerRef,
     aiTurnLock,
-    exitTsumegoMode,
     resetGame,
     settings,
     setToastMsg,

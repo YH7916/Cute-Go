@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, User as UserIcon, Shield, LogOut, LogIn, Medal, Sword, Trophy, Disc, Utensils, Clover, Check, Heart, Crown, ListOrdered } from 'lucide-react';
-import { isTapTapEnv } from '../utils/tapTapBridge';
+import { isTapTapEnv } from '../services/platform/environment';
 import { AchievementDef, UserAchievement } from '../types';
 import { getRankBadge } from '../utils/helpers';
 import type { AppProfile, AppSession } from '../services/platform';

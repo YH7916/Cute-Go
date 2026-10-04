@@ -1,14 +1,11 @@
-import { getDefaultKomi } from './core/go/config';
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-    calculateScore,
-    calculateModelScore,
-    cleanBoardWithTerritory, // [New]
-} from './utils/goLogic';
+import React, { useState, useEffect, useRef } from 'react';
 
 // Hooks
-import { useWebKataGo } from './hooks/useWebKataGo';
+import { useGameAiSession } from './hooks/useGameAiSession';
+import { useCoachSession } from './hooks/useCoachSession';
+import { useCoachSettings } from './hooks/useCoachSettings';
+import { useGameReview } from './hooks/useGameReview';
+import { useAppUiState } from './hooks/useAppUiState';
 import { useAchievements } from './hooks/useAchievements';
 import { useAppSettings } from './hooks/useAppSettings';
 import { useGameState } from './hooks/useGameState';
@@ -20,12 +17,10 @@ import { useAppAuthProfile } from './hooks/useAppAuthProfile';
 import { useImportExportFlow } from './hooks/useImportExportFlow';
 import { useOnlineMatch } from './hooks/useOnlineMatch';
 import { useStartGameFlow } from './hooks/useStartGameFlow';
-import { useTsumego } from './domains/tsumego/useTsumego';
-import { useTsumegoFlow } from './domains/tsumego/useTsumegoFlow';
-import { useTsumegoNavigation } from './domains/tsumego/useTsumegoNavigation';
+import { useTeachingWorkspace } from './hooks/useTeachingWorkspace';
 
 // Utils
-import { Player, GameMode } from './types';
+import { Player } from './types';
 
 import { AppView } from './components/AppView';
 
@@ -33,70 +28,12 @@ const App: React.FC = () => {
     // --- Hooks ---
     const settings = useAppSettings();
     const gameState = useGameState(settings.boardSize);
+    const coachSettings = useCoachSettings();
     const { playSfx, vibrate } = useAudio(settings.musicVolume, settings.hapticEnabled);
 
-    // --- Local UI State ---
-    const [showMenu, setShowMenu] = useState(false);
-    const [showUserPage, setShowUserPage] = useState(false);
-    const [showPassModal, setShowPassModal] = useState(false);
-    const [showTutorial, setShowTutorial] = useState(false);
-    const [showTsumegoList, setShowTsumegoList] = useState(false); // [New] Tsumego Modal
-    const [isThinking, setIsThinking] = useState(false);
-    const [toastMsg, setToastMsg] = useState<string | null>(null);
-
-    // Auto-dismiss toast after 3 seconds
-    useEffect(() => {
-        if (toastMsg) {
-            const timer = setTimeout(() => {
-                setToastMsg(null);
-            }, 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [toastMsg]);
-
-    const {
-        completedLevelIds,
-        setCompletedLevelIds,
-        showTsumegoLevelSelector,
-        setShowTsumegoLevelSelector,
-        currentTsumegoLevel,
-        setCurrentTsumegoLevel,
-        tsumegoRoot,
-        setTsumegoRoot,
-        tsumegoCurrentNode,
-        setTsumegoCurrentNode,
-        tsumegoCollection,
-        setTsumegoCollection,
-        tsumegoSetTitle,
-        setTsumegoSetTitle,
-        tsumegoCategories,
-        showTsumegoResult,
-        setShowTsumegoResult,
-        tsumegoIsCorrect,
-        setTsumegoIsCorrect,
-        tsumegoResultMsg,
-        setTsumegoResultMsg,
-        setTsumegoInstruction,
-        getTsumegoFileList,
-    } = useTsumegoFlow();
-    const [showStartScreen, setShowStartScreen] = useState(!settings.skipStartScreen);
-    const [showSkinShop, setShowSkinShop] = useState(false);
-
-    // Ref to break circular dependency between executeMove and handleTsumegoMove
-    const handleTsumegoMoveRef = useRef<(x: number, y: number) => boolean>(() => false);
-
-    // --- Tutorial Init Check ---
-    useEffect(() => {
-        const hasSeen = localStorage.getItem('cute_go_tutorial_seen');
-        if (!hasSeen) {
-            setShowTutorial(true);
-        }
-    }, []);
-
-    // [DEBUG] Monitor showStartScreen changes
-    useEffect(() => {
-        console.log('[App] showStartScreen changed to:', showStartScreen);
-    }, [showStartScreen]);
+    const ui = useAppUiState(settings.skipStartScreen);
+    const { showStartScreen, setShowStartScreen, showPassModal, setShowPassModal,
+        showTerritory, setShowMenu, setToastMsg } = ui;
 
     // Auth & Profile
     const {
@@ -156,7 +93,6 @@ const App: React.FC = () => {
         setToastMsg,
         vibrate,
     });
-    const [showTerritory, setShowTerritory] = useState(false); // [New] Territory Toggle
 
     const {
         clearInitialStones,
@@ -171,13 +107,13 @@ const App: React.FC = () => {
     } = useImportExportFlow({
         settings,
         gameState,
-        exitTsumegoMode: (nextGameMode = 'PvP') => exitTsumegoMode(nextGameMode),
+        onImported: () => {
+            cancelAiSession(); coach.cancel(); teaching.close();
+            settings.setCoachMode(false); setShowStartScreen(false);
+        },
         playSfx,
         vibrate,
     });
-
-    // About/Update
-    const [showAboutModal, setShowAboutModal] = useState(false);
 
     // ELO Diff display
     const [eloDiffText, setEloDiffText] = useState<string | null>(null);
@@ -189,55 +125,19 @@ const App: React.FC = () => {
     useEffect(() => { onlineStatusRef.current = onlineStatus; }, [onlineStatus]);
     useEffect(() => { myColorRef.current = myColor; }, [myColor]);
 
-    // Other Refs
-    const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const aiTurnLock = useRef(false);
-    const pendingEndGameRef = useRef(false); // [New] Waiting for KataGo endgame analysis
     // --- Achievements ---
     const {
         newUnlocked, clearNewUnlocked, checkEndGameAchievements, checkMoveAchievements, achievementsList, userAchievements
     } = useAchievements(session?.user?.id);
 
-    // --- AI Error Handler ---
-    const handleAiError = useCallback((err: string) => {
-        console.error("AI Error:", err);
-        aiTurnLock.current = false;
-        setIsThinking(false);
-        setToastMsg(`AI 出错: ${err}`);
-        setTimeout(() => setToastMsg(null), 5000);
-    }, []);
-
-    // --- AI Engines ---
-    const webAiEngine = useWebKataGo({
-        boardSize: settings.boardSize,
-        onAiMove: (x, y) => {
-            setTimeout(() => {
-                if (aiTurnLock.current && !gameState.gameOver) executeMove(x, y, false);
-            }, 200);
-        },
-        onAiPass: () => handlePass(false),
-        onAiError: handleAiError,
-        onAnalysisComplete: (data) => {
-            if (!pendingEndGameRef.current) return;
-            pendingEndGameRef.current = false;
-            console.log('[App] KataGo Endgame Analysis:', data);
-            const komi = getDefaultKomi(settings.boardSize);
-            const finalBoard = gameState.boardRef.current;
-            const cleanedBoard = data.ownership ? cleanBoardWithTerritory(finalBoard, data.ownership) : finalBoard;
-            const score = data.ownership
-                ? calculateModelScore(finalBoard, data.ownership, komi, { black: gameState.blackCaptures, white: gameState.whiteCaptures })
-                : calculateScore(cleanedBoard, undefined, komi, { black: gameState.blackCaptures, white: gameState.whiteCaptures });
-            const lead = score.black - score.white;
-            gameState.setBoard(cleanedBoard);
-            gameState.setFinalScore(score);
-            setShowPassModal(false);
-            if (lead > 0) {
-                endGame('black', `AI判定：黑领先 ${lead.toFixed(1)} 目`);
-            } else {
-                endGame('white', `AI判定：白领先 ${Math.abs(lead).toFixed(1)} 目`);
-            }
-        }
+    const endGameRef = useRef<(winner: Player, reason: string, score?: { black: number; white: number }) => void>(() => {});
+    const { webAiEngine, isThinking, setIsThinking, aiTimerRef, aiTurnLock, pendingEndGameRef, cancelAiSession, requestCoachAnalysis } = useGameAiSession({
+        boardSize: settings.boardSize, gameState, executeMoveRef, handlePassRef, endGameRef, setToastMsg, setShowPassModal,
     });
+    const ownerScopeId = session?.user?.id ? `account:${session.user.id}` : 'local:guest';
+    const teaching = useTeachingWorkspace(ownerScopeId, gameState.readPosition(), gameState.appMode === 'review' && !showStartScreen);
+    const review = useGameReview({ gameState, gameType: settings.gameType,
+        showTerritory: showTerritory && !teaching.isOpen && !showStartScreen, engine: webAiEngine, ownerScopeId });
 
     const {
         isWorkerReady,
@@ -265,7 +165,7 @@ const App: React.FC = () => {
         gameState,
         isThinking,
         setIsThinking,
-        showStartScreen,
+        showStartScreen: showStartScreen || teaching.isOpen,
         showPassModal,
         aiTimerRef,
         aiTurnLock,
@@ -282,17 +182,15 @@ const App: React.FC = () => {
         },
     });
 
-    const exitTsumegoMode = (nextGameMode: GameMode = 'PvP') => {
-        if (settings.gameMode === 'Tsumego') {
-            settings.setGameMode(nextGameMode);
-        }
-        setTsumegoRoot(null);
-        setTsumegoCurrentNode(null);
-        setShowTsumegoResult(false);
-        setTsumegoInstruction(null);
-        setShowTsumegoList(false);
-        setShowTsumegoLevelSelector(false);
-    };
+    const coach = useCoachSession({
+        playing: gameState.appMode === 'playing',
+        active: settings.gameType === 'Go' && !showStartScreen && !teaching.isOpen && onlineStatus === 'disconnected'
+            && (gameState.appMode === 'review' || (settings.coachMode && settings.gameMode === 'PvAI' && gameState.appMode === 'playing')),
+        position: review.position, readPosition: review.readPosition, ownerScopeId,
+        conversationRoot: gameState.history[0]?.board ?? gameState.board,
+        userColor: settings.userColor, gameOver: gameState.gameOver, config: coachSettings.config,
+        analyze: gameState.appMode === 'playing' && !gameState.gameOver ? requestCoachAnalysis : undefined,
+    });
 
     const {
         endGame,
@@ -313,7 +211,6 @@ const App: React.FC = () => {
         fetchProfile,
         gameState,
         gameTypeRef,
-        handleTsumegoMoveRef,
         isThinking,
         isWebThinking,
         isWorkerReady,
@@ -321,6 +218,7 @@ const App: React.FC = () => {
         myColorRef,
         onlineStatus,
         onlineStatusRef,
+        onIllegalMove: coach.explainIllegalMove,
         opponentProfile,
         pendingEndGameRef,
         playSfx,
@@ -334,115 +232,22 @@ const App: React.FC = () => {
         setShowMenu,
         setShowPassModal,
         settings,
-        setTsumegoCurrentNode,
-        setTsumegoInstruction,
-        setTsumegoRoot,
-        setShowTsumegoResult,
         stopWebThinking,
-        tsumegoCurrentNode,
         userProfile,
         vibrate,
         webAiEngine,
     });
     resetGameRef.current = resetGame;
-
-    // --- Tsumego Logic (extracted to useTsumego hook) ---
-    const {
-        startTsumego,
-        handleSelectTsumegoSet,
-        handleNextTsumego,
-        handleRetryTsumego,
-        handleTsumegoMove,
-    } = useTsumego({
-        state: {
-            tsumegoRoot,
-            tsumegoCurrentNode,
-            tsumegoCategories,
-            currentTsumegoLevel,
-            showTsumegoResult,
-        },
-        setters: {
-            setTsumegoRoot,
-            setTsumegoCurrentNode,
-            setTsumegoCollection,
-            setTsumegoSetTitle,
-            setShowTsumegoResult,
-            setTsumegoIsCorrect,
-            setTsumegoResultMsg,
-            setTsumegoInstruction,
-            setShowTsumegoLevelSelector,
-            setCurrentTsumegoLevel,
-            setCompletedLevelIds,
-        },
-        gameMode: settings.gameMode,
-        userColor: settings.userColor,
-        boardSize: settings.boardSize,
-        currentPlayer: gameState.currentPlayer,
-        gameOver: gameState.gameOver,
-        boardRef: gameState.boardRef,
-        currentPlayerRef: gameState.currentPlayerRef,
-        setBoardSize: settings.setBoardSize,
-        setBoard: gameState.setBoard,
-        setCurrentPlayer: gameState.setCurrentPlayer,
-        setLastMove: gameState.setLastMove,
-        setGameMode: settings.setGameMode,
-        setGameType: settings.setGameType,
-        setUserColor: settings.setUserColor,
-        resetGame,
-        executeMove: (x, y, isRemote) => executeMoveRef.current(x, y, isRemote),
-        setToastMsg,
-        vibrate,
-        playSfx,
-    });
-
-    // Keep ref in sync so executeMove can call handleTsumegoMove without circular dep
-    handleTsumegoMoveRef.current = handleTsumegoMove;
-
-    const {
-        handleHint,
-        handlePrevProblem,
-        hasNextProblem,
-        hasPrevProblem,
-    } = useTsumegoNavigation({
-        boardRef: gameState.boardRef,
-        currentPlayer: gameState.currentPlayer,
-        currentTsumegoLevel,
-        getTsumegoFileList,
-        handleTsumegoMove,
-        playSfx,
-        setBoard: gameState.setBoard,
-        setCurrentPlayer: gameState.setCurrentPlayer,
-        setCurrentTsumegoLevel,
-        setLastMove: gameState.setLastMove,
-        setToastMsg,
-        startTsumego,
-        tsumegoCategories,
-        tsumegoCurrentNode,
-    });
+    endGameRef.current = endGame;
 
     const handleApplySettings = useApplySettingsFlow({
-        aiTimerRef,
-        aiTurnLock,
-        exitTsumegoMode,
-        resetGame,
-        settings,
-        setToastMsg,
-        stopWebThinking,
-        userProfile,
-        vibrate,
-        webAiEngine,
+        aiTimerRef, aiTurnLock, resetGame, settings,
+        setToastMsg, stopWebThinking, userProfile, vibrate, webAiEngine,
     });
 
-    const { handleStartGame } = useStartGameFlow({
-        settings,
-        showStartScreen,
-        setShowStartScreen,
-        appMode: gameState.appMode,
-        webAiEngine,
-        gameTypeRef,
-        resetGame,
-        exitTsumegoMode,
-        vibrate,
+    const { handleStartGame, handleStartCoach } = useStartGameFlow({
+        settings, showStartScreen: showStartScreen || teaching.isOpen, setShowStartScreen, appMode: gameState.appMode,
+        webAiEngine, gameTypeRef, resetGame, vibrate,
     });
 
     executeMoveRef.current = executeMove;
@@ -451,40 +256,53 @@ const App: React.FC = () => {
     return (
         <AppView
             vm={{
+                ...ui,
+                coach, coachSettings, review, teaching,
+                handleStartCoach: () => { teaching.close(); coach.cancel(); handleStartCoach(); },
+                handleOpenLearning: () => {
+                    if (onlineStatus !== 'disconnected') { setToastMsg('请先结束联机对局，再进入围棋教学。'); return; }
+                    cancelAiSession(); coach.cancel(); review.exitVariation(); ui.setShowTutorial(false); teaching.open();
+                },
+                handleInspectReview: position => { cancelAiSession(); coach.cancel(); review.inspectPosition(position); },
+                handleEnterReview: () => {
+                    cancelAiSession(); coach.cancel(); review.exitVariation();
+                    gameState.setReviewIndex(gameState.readPosition().history.length); gameState.setAppMode('review');
+                },
+                handleSaveReview: () => {
+                    const saved = teaching.savePosition(review.readPosition());
+                    setToastMsg(saved ? '已收藏这个复盘局面。' : '暂时无法保存，请检查学习记录提示。');
+                },
+                handleReturnHome: () => {
+                    cancelAiSession(); coach.cancel(); teaching.close();
+                    settings.setCoachMode(false);
+                    setShowStartScreen(true); vibrate(10);
+                },
+                viewPosition: review.position,
                 achievementsList,
                 aiTurnLock,
                 cancelMatchmaking,
                 createRoom,
                 clearNewUnlocked,
-                completedLevelIds,
                 consecutivePasses: gameState.consecutivePasses,
                 displayLead,
-                displayTerritory,
+                displayTerritory: gameState.appMode === 'review' ? review.territory : displayTerritory,
                 displayWinRate,
                 eloDiffStyle,
                 eloDiffText,
-                exitTsumegoMode,
                 gameCopied,
                 gameState,
                 gameTypeRef,
                 handleApplySettings,
                 handleCopy,
                 handleExportSGF,
-                handleHint,
                 handleImport,
-                handleIntersectionClick,
-                handleNextTsumego,
-                handlePass,
-                handlePrevProblem,
-                handleRetryTsumego,
-                handleSelectTsumegoSet,
+                handleIntersectionClick: (x, y) => { if (!teaching.isActive()) handleIntersectionClick(x, y); },
+                handlePass: async isRemote => { if (!teaching.isActive()) await handlePass(isRemote); },
                 handleSignOut,
-                handleStartGame,
+                handleStartGame: (...args) => { teaching.close(); coach.cancel(); handleStartGame(...args); },
                 handleTapTapLogin,
-                handleUndo,
+                handleUndo: () => { if (!teaching.isActive()) handleUndo(); },
                 handleUpdateNickname,
-                hasNextProblem,
-                hasPrevProblem,
                 hideOfflineLoading,
                 importKey,
                 isFirstRun,
@@ -498,55 +316,25 @@ const App: React.FC = () => {
                 newUnlocked,
                 onlineStatus,
                 roomId,
-                resetGame,
+                resetGame: (...args) => { teaching.close(); resetGame(...args); },
                 session,
-                setCurrentTsumegoLevel,
                 setHideOfflineLoading,
                 setImportKey,
                 setIsThinking,
-                setShowAboutModal,
                 setShowImportModal,
                 setShowLoginModal,
-                setShowMenu,
                 setShowOnlineMenu,
-                setShowSkinShop,
-                setShowStartScreen,
-                setShowTerritory,
-                setShowTsumegoLevelSelector,
-                setShowTsumegoList,
-                setShowTsumegoResult,
-                setShowTutorial,
-                setShowUserPage,
-                setToastMsg,
-                setTsumegoCollection,
                 settings,
-                showAboutModal,
                 showImportModal,
                 showLoginModal,
-                showMenu,
                 showOnlineMenu,
-                showSkinShop,
-                showStartScreen,
-                showTerritory,
                 showThinkingStatus,
-                showTsumegoLevelSelector,
-                showTsumegoList,
-                showTsumegoResult,
-                showTutorial,
-                showUserPage,
                 startMatchmaking,
                 joinRoom,
-                startTsumego,
                 stopWebThinking,
-                toastMsg,
-                tsumegoCollection,
-                tsumegoIsCorrect,
-                tsumegoResultMsg,
-                tsumegoSetTitle,
                 userAchievements,
                 userProfile,
                 vibrate,
-                webAiEngine,
                 webInitStatus,
             }}
         />
