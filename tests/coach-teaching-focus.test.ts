@@ -6,10 +6,8 @@ import { createInitialPosition, recordMove } from '../domains/game/positionState
 import { attemptMove } from '../core/go/rules';
 import type { Player } from '../types';
 
-const config = { endpoint: 'https://coach.example/v1', model: 'coach', apiKey: 'test-key' };
-const response = (text: string) => new Response(JSON.stringify({ choices: [
-  { message: { content: text }, finish_reason: 'stop' },
-] }));
+const config = { endpoint: 'https://coach.example/v1', provider: 'deepseek' as const, model: 'deepseek-flash', apiKey: 'test-key' };
+const response = (text: string) => new Response(JSON.stringify({ text }));
 
 function newDanger(userColor: Player) {
   const position = createInitialPosition(9);
@@ -38,8 +36,9 @@ for (const userColor of ['black', 'white'] as const) {
     assert.equal(result.shouldAutoExplain, false);
     assert.equal(result.source, 'cloud');
     const request = JSON.parse(content);
-    const evidence = JSON.parse(request.messages[1].content.split('\n')[1]);
-    assert.deepEqual(evidence.teachingRequest, { proactive: true, intent: 'explain-last-move' });
+    const evidence = request.evidence;
+    assert.deepEqual(evidence.teachingRequest, { proactive: true, intent: 'explain-last-move', maxParts: 1,
+      maxTextChars: 50, maxSentences: 1, maxRefs: 3, maxBoardPoints: 3 });
     assert.deepEqual(position, original);
   });
 }
@@ -75,7 +74,7 @@ test('a concrete escape stays the teaching hint when the engine suggests an unre
       positionKey: coachPositionKey(position, position.currentPlayer, 3.5),
       candidates: [{ point: { x: 6, y: 6 }, visits: 8 }] } });
   assert.deepEqual(result.hintPoints, [{ x: 1, y: 2, label: 'B7' }]);
-  assert.match(result.text, /圈出的这里/);
+  assert.match(result.text, /在.*这里.*接长/);
   assert.doesNotMatch(result.text, /多一个出口？/);
   assert.ok(result.text.length <= 80);
 });

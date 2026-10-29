@@ -1,20 +1,19 @@
 import { useMemo } from 'react';
 import { getDefaultKomi } from '../core/go/config';
 import { coachPositionKey } from '../domains/coach/evidence';
-import { collectReviewMoments, createReviewExercise } from '../domains/coach/reviewTeaching';
+import { createReviewExercise } from '../domains/coach/reviewTeaching';
 import type { GamePosition } from '../domains/game/positionState';
 import { useLearningProgress } from './useLearningProgress';
 import { useLearningCenter } from './useLearningCenter';
 import { tutorialContent } from '../domains/coach/beginnerTutorial';
 
-export function useTeachingWorkspace(ownerScopeId: string, game: GamePosition, reviewing: boolean) {
+export function useTeachingWorkspace(ownerScopeId: string) {
   const learning = useLearningProgress(ownerScopeId);
   const personalExercises = useMemo(() => learning.savedPositions.flatMap(saved => {
     const exercise = createReviewExercise(saved.position, saved.id);
     return exercise ? [exercise] : [];
   }), [learning.savedPositions]);
   const center = useLearningCenter(learning, personalExercises);
-  const moments = useMemo(() => reviewing ? collectReviewMoments(game) : [], [game, reviewing]);
   const savePosition = (position: GamePosition) => {
     const key = coachPositionKey(position, position.currentPlayer, getDefaultKomi(position.board.length));
     const existing = learning.savedPositions.find(saved => coachPositionKey(saved.position,
@@ -30,8 +29,5 @@ export function useTeachingWorkspace(ownerScopeId: string, game: GamePosition, r
       skillId: exercise.skillId, contentRevision: exercise.contentRevision, hintLevel: 1, occurredAt: Date.now(), source: 'review' });
     return id;
   };
-  return { ...center, moments, savePosition, learning, tutorialContent,
-    savedPositions: learning.savedPositions.map(saved => ({ ...saved,
-      playable: personalExercises.some(exercise => exercise.id === saved.id) })),
-  };
+  return { ...center, savePosition, learning, tutorialContent };
 }

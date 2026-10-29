@@ -33,7 +33,7 @@ function input(tree, label) {
 
 function setup(t) {
   const saved = [];
-  const props = { value: { endpoint: 'https://api.deepseek.com', model: 'deepseek-flash', apiKey: 'deepseek-only-key' },
+  const props = { value: { endpoint: 'https://coach.example/api/coach', provider: 'deepseek', model: 'deepseek-flash', apiKey: 'user-model-key' },
     rememberKey: true, onSave: (config, remember) => saved.push({ config, remember }) };
   const host = renderHook(() => CoachSettings(props));
   t.after(() => host.unmount());
@@ -41,53 +41,68 @@ function setup(t) {
   return { ...host, saved, props };
 }
 
-test('choosing another provider clears the old key and explicit save cannot transmit that credential', t => {
-  const host = setup(t);
-  input(host.render(), 'OpenAI').props.onChange();
-  const tree = host.render();
-  assert.equal(input(tree, '陪练 API 地址').props.value, 'https://api.openai.com/v1');
-  assert.equal(input(tree, '陪练模型').props.value, 'gpt-4.1-mini');
-  assert.equal(input(tree, '陪练 API 密钥').props.value, '');
-  assert.equal(input(tree, '在此设备记住密钥').props['aria-pressed'], false);
-  allElements(tree).find(item => item.props.children === '保存陪练设置').props.onClick();
-  assert.deepEqual(host.saved, [{ config: { endpoint: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', apiKey: '' }, remember: false }]);
-});
-
-test('opening existing configuration and reselecting its provider preserve the saved model and secret', t => {
+test('service and key are primary fields; changing the advanced backend clears credentials', t => {
   const host = setup(t);
   let tree = host.render();
-  assert.equal(input(tree, 'DeepSeek').props.checked, true);
-  assert.equal(input(tree, '陪练 API 密钥').props.type, 'password');
-  input(tree, 'DeepSeek').props.onChange();
+  assert.equal(allElements(tree).some(item => item.props['aria-label'] === '陪练模型'), false);
+  assert.equal(input(tree, '陪练服务商').props.value, 'deepseek');
+  assert.equal(input(tree, '陪练高级设置').props['aria-expanded'], false);
+  input(tree, '陪练高级设置').props.onClick();
   tree = host.render();
-  assert.equal(input(tree, '陪练 API 地址').props.value, host.props.value.endpoint);
-  assert.equal(input(tree, '陪练模型').props.value, host.props.value.model);
-  assert.equal(input(tree, '陪练 API 密钥').props.value, host.props.value.apiKey);
-  assert.equal(input(tree, '在此设备记住密钥').props['aria-pressed'], true);
-  assert.deepEqual(host.saved, []);
+  assert.equal(input(tree, '陪练模型').props.value, 'deepseek-flash');
+  input(tree, '陪练后台地址').props.onChange({ target: { value: 'https://new-coach.example/api/coach' } });
+  tree = host.render();
+  assert.equal(input(tree, '陪练 API 密钥').props.value, '');
+  assert.equal(input(tree, '在此设备记住 API 密钥').props['aria-pressed'], false);
+  allElements(tree).find(item => item.props.children === '保存陪练设置').props.onClick();
+  assert.deepEqual(host.saved, [{ config: { endpoint: 'https://new-coach.example/api/coach', provider: 'deepseek', model: 'deepseek-flash', apiKey: '' }, remember: false }]);
 });
 
-test('remembering a new key remains an explicit choice', t => {
+test('opening an existing backend preserves its model key and remember changes only commit on save', t => {
   const host = setup(t);
-  input(host.render(), 'OpenAI').props.onChange();
-  input(host.render(), '陪练 API 密钥').props.onChange({ target: { value: 'new-provider-key' } });
   let tree = host.render();
-  assert.equal(input(tree, '在此设备记住密钥').props['aria-pressed'], false);
+  assert.equal(input(tree, '陪练 API 密钥').props.type, 'password');
+  assert.equal(input(tree, '陪练 API 密钥').props.value, host.props.value.apiKey);
+  input(tree, '在此设备记住 API 密钥').props.onClick();
+  tree = host.render();
+  assert.equal(input(tree, '在此设备记住 API 密钥').props['aria-pressed'], false);
+  assert.deepEqual(host.saved, []);
   allElements(tree).find(item => item.props.children === '保存陪练设置').props.onClick();
   assert.equal(host.saved[0].remember, false);
-  input(tree, '在此设备记住密钥').props.onClick();
+  input(tree, '在此设备记住 API 密钥').props.onClick();
   tree = host.render();
-  assert.equal(input(tree, '在此设备记住密钥').props['aria-pressed'], true);
-  assert.equal(host.saved.length, 1, 'enabling remember changes only the draft until explicitly saved');
   allElements(tree).find(item => item.props.children === '保存陪练设置').props.onClick();
   assert.equal(host.saved[1].remember, true);
-  input(tree, '在此设备记住密钥').props.onClick();
+});
+
+test('switching provider clears the previous key and selects that provider default model', t => {
+  const host = setup(t);
+  input(host.render(), '陪练服务商').props.onChange({ target: { value: 'openai' } });
+  let tree = host.render();
+  assert.equal(input(tree, '陪练服务商').props.value, 'openai');
+  assert.equal(input(tree, '陪练 API 密钥').props.value, '');
+  assert.equal(input(tree, '在此设备记住 API 密钥').props['aria-pressed'], false);
+  input(tree, '陪练高级设置').props.onClick();
   tree = host.render();
-  assert.equal(input(tree, '在此设备记住密钥').props['aria-pressed'], false);
-  assert.equal(host.saved.length, 2, 'disabling remember changes only the draft until explicitly saved');
-  assert.equal(input(tree, '陪练 API 密钥').props.value, 'new-provider-key');
-  allElements(tree).find(item => item.props.children === '保存陪练设置').props.onClick();
-  assert.equal(host.saved[2].remember, false);
+  assert.equal(input(tree, '陪练模型').props.value, 'gpt-4.1-mini');
+  input(tree, '陪练模型').props.onChange({ target: { value: 'custom-model' } });
+  input(host.render(), '陪练 API 密钥').props.onChange({ target: { value: 'openai-user-key' } });
+  allElements(host.render()).find(item => item.props.children === '保存陪练设置').props.onClick();
+  assert.deepEqual(host.saved[0], { config: { endpoint: host.props.value.endpoint, provider: 'openai',
+    model: 'custom-model', apiKey: 'openai-user-key' }, remember: false });
+});
+
+test('an unconfigured backend exposes advanced setup immediately and explains request-scoped key forwarding', t => {
+  const host = setup(t);
+  host.props.value = { ...host.props.value, endpoint: '', apiKey: '' };
+  host.render();
+  const tree = host.render();
+  assert.equal(input(tree, '陪练高级设置').props['aria-expanded'], true);
+  assert.equal(input(tree, '陪练后台地址').props.value, '');
+  assert.equal(input(tree, '陪练模型').props.value, 'deepseek-flash');
+  const copy = allElements(tree).filter(item => item.type === 'p').map(item => item.props.children).join(' ');
+  assert.match(copy, /后台.*密钥转交所选服务商.*本次讲解.*不在服务端保存/);
+  assert.match(copy, /费用.*你的模型账户/);
 });
 
 function setupModal(t, coachSettings) {
@@ -101,8 +116,7 @@ function setupModal(t, coachSettings) {
     showCoordinates: true, setShowCoordinates: noop, musicVolume: 0, setMusicVolume: noop,
     hapticEnabled: false, setHapticEnabled: noop, vibrate: noop,
     skipStartScreen: false, setSkipStartScreen: noop, separatePieces: true, setSeparatePieces: noop,
-    onStartSetup: noop, onOpenImport: noop, onOpenOnline: noop, onOpenAbout: noop,
-    onOpenTutorial: noop, onOpenSkinShop: noop,
+    onOpenImport: noop, onOpenTutorial: noop, onOpenSkinShop: noop,
   };
   const host = renderHook(() => SettingsModal(props));
   t.after(() => host.unmount());
@@ -113,6 +127,24 @@ function setupModal(t, coachSettings) {
 function boardSlider(tree) {
   return allElements(tree).find(item => item.props.type === 'range' && item.props.max === '19');
 }
+
+test('coach settings keeps its title for model difficulties and applies the selected game choices', t => {
+  const modal = setupModal(t);
+  modal.props.currentGameSettings = { ...modal.props.currentGameSettings, difficulty: 'Hard' };
+  modal.render();
+  let tree = modal.render();
+  assert.equal(allElements(tree).find(item => item.props.role === 'dialog').props['aria-label'], '陪练设置');
+  const difficulty = allElements(tree).find(item => item.type === 'button' && item.props.children === '中等');
+  difficulty.props.onClick();
+  boardSlider(tree).props.onChange({ target: { value: '13' } });
+  tree = modal.render();
+  const apply = allElements(tree).find(item => item.type === 'button'
+    && String(item.props.children).includes('应用设置并重新开始'));
+  assert.ok(apply);
+  apply.props.onClick();
+  assert.deepEqual(modal.calls.applied, [{ gameType: 'Go', gameMode: 'PvAI', boardSize: 13,
+    difficulty: 'Medium', userColor: 'black' }]);
+});
 
 test('Go settings opens the existing beginner tutorial without applying game settings', t => {
   const modal = setupModal(t);
@@ -181,21 +213,20 @@ test('saving service configuration and closing never applies game settings; reop
   assert.deepEqual(modal.calls.applied, []);
 });
 
-test('manual endpoint edits clear credentials before saving and preserve editable model choice', t => {
+test('clearing the backend address switches back to local-only teaching', t => {
   const host = setup(t);
-  input(host.render(), '陪练 API 地址').props.onChange({ target: { value: 'http://localhost:1234/v1' } });
-  let tree = host.render();
-  assert.equal(input(tree, '陪练 API 密钥').props.value, '');
-  input(tree, '陪练模型').props.onChange({ target: { value: 'my-local-model' } });
-  tree = host.render();
-  allElements(tree).find(item => item.props.children === '保存陪练设置').props.onClick();
-  assert.equal(host.saved[0].config.model, 'my-local-model');
-  assert.equal(host.saved[0].config.apiKey, '');
+  input(host.render(), '陪练高级设置').props.onClick();
+  input(host.render(), '陪练后台地址').props.onChange({ target: { value: '' } });
+  allElements(host.render()).find(item => item.props.children === '保存陪练设置').props.onClick();
+  assert.deepEqual(host.saved, [{ config: { endpoint: '', provider: 'deepseek', model: 'deepseek-flash', apiKey: '' }, remember: false }]);
+  const status = allElements(host.render()).find(item => item.props.role === 'status');
+  assert.match(status.props.children, /本地讲解/);
 });
 
 test('invalid endpoint never reaches the save callback and renders a safe validation error', t => {
   const host = setup(t);
-  input(host.render(), '陪练 API 地址').props.onChange({ target: { value: 'https://user:private-key@service.test' } });
+  input(host.render(), '陪练高级设置').props.onClick();
+  input(host.render(), '陪练后台地址').props.onChange({ target: { value: 'https://user:private-key@service.test' } });
   allElements(host.render()).find(item => item.props.children === '保存陪练设置').props.onClick();
   assert.equal(host.saved.length, 0);
   const alert = allElements(host.render()).find(item => item.props.role === 'alert');

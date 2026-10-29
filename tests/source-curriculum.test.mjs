@@ -100,7 +100,11 @@ test('choices use original options; source actions require the appropriate actio
   assert.equal(gradeExercise(removal, { kind: 'action', action: 'remove', points: removal.expectedPoints }).outcome, 'success');
   assert.equal(gradeExercise(removal, { kind: 'action', action: 'remove', points: removal.expectedPoints.slice(1) }).outcome, 'failure');
   assert.equal(gradeExercise(removal, { kind: 'action', action: 'pass', points: [] }).outcome, 'unverified');
-  assert.match(byId.get('ogs-ending-the-game-page01').prompt, /点击“停一手”/);
+  const pass = byId.get('ogs-ending-the-game-page01');
+  assert.match(pass.prompt, /没有值得下的地方.*怎么做/);
+  assert.doesNotMatch(pass.prompt, /点击|停一手/);
+  assert.equal(gradeExercise(pass, { kind: 'action', action: 'pass', points: [] }).outcome, 'success');
+  assert.equal(gradeExercise(pass, { kind: 'action', action: 'finish', points: [] }).outcome, 'unverified');
   for (const id of ['ogs-territory-page01', 'ogs-count-territory-page01', 'ogs-ending-the-game-page03']) {
     assert.match(byId.get(id).teachingNotes, /地盘[＋加]提子/);
   }
@@ -115,6 +119,12 @@ test('GGG annotations, unknown leaves and per-node board labels remain distinct'
     for (let index = 0; index < sourceNodes.length; index += 1) {
       assert.equal(adapted[index].correct, sourceNodes[index].correct, problem.id);
       assert.equal(adapted[index].wrong, sourceNodes[index].wrong, problem.id);
+      assert.deepEqual(adapted[index].point, sourceNodes[index].point, problem.id);
+      assert.equal(adapted[index].color, sourceNodes[index].color, problem.id);
+      const labels = (sourceNodes[index].properties.LB ?? []).map(value => ({
+        point: { x: value.charCodeAt(0) - 97, y: value.charCodeAt(1) - 97 }, label: value.slice(3),
+      }));
+      assert.deepEqual(adapted[index].boardMarks, labels, problem.id);
       assert.ok(Array.isArray(adapted[index].boardMarks), 'empty marks explicitly clear an earlier annotation');
     }
   }
@@ -122,4 +132,11 @@ test('GGG annotations, unknown leaves and per-node board labels remain distinct'
   assert.equal(gradeExercise(short, { kind: 'variation', points: [{ x: 14, y: 17 }] }).outcome, 'unverified');
   assert.equal(gradeExercise(short, { kind: 'variation', points: [{ x: 14, y: 18 }] }).outcome, 'success');
   assert.ok(exercises.filter((item) => item.kind === 'variation').some((item) => nodesOf(item.solution).some((node) => node.boardMarks?.some((mark) => mark.label === 'A'))));
+  const eyes = gradeExercise(byId.get('ggg-easy-71'), { kind: 'variation', points: [{ x: 0, y: 15 }, { x: 0, y: 17 }] });
+  assert.equal(eyes.outcome, 'success');
+  assert.match(eyes.explanation, /白下 A，黑在 B 提子；白下 B，黑在 A 连接/);
+  assert.match(eyes.explanation, /两眼/);
+  assert.ok(eyes.explanation.split('\n').every(line => line.startsWith('- ')));
+  assert.match(byId.get('ggg-easy-99').hints[0], /断子.*连接/);
+  assert.doesNotMatch(byId.get('ggg-easy-99').hints[0], /眼/);
 });

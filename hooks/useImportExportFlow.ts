@@ -2,7 +2,14 @@ import { getDefaultKomi } from '../core/go/config';
 import { useCallback, useState } from 'react';
 import { BoardSize, GameType, Player } from '../types';
 import { deserializeGame, generateSGF, parseSGF } from '../core/go/sgf';
-import type { PositionAccess } from '../domains/game/positionState';
+import type { GamePosition, PositionAccess } from '../domains/game/positionState';
+
+function generatePositionSGF(position: GamePosition) {
+  const size = position.board.length;
+  const rootBoard = position.history[0]?.board ?? position.board;
+  const initialStones = rootBoard.flat().filter(stone => stone !== null);
+  return generateSGF(position.history, size, getDefaultKomi(size), initialStones);
+}
 
 interface ImportExportSettings {
   boardSize: BoardSize;
@@ -34,11 +41,6 @@ export const useImportExportFlow = ({
   const [showImportModal, setShowImportModal] = useState(false);
   const [importKey, setImportKey] = useState('');
   const [gameCopied, setGameCopied] = useState(false);
-  const [initialStones, setInitialStones] = useState<{ x: number, y: number, color: Player }[]>([]);
-
-  const clearInitialStones = useCallback(() => {
-    setInitialStones([]);
-  }, []);
 
   const handleImport = useCallback(() => {
     if (importKey.trim().startsWith('(;')) {
@@ -51,7 +53,6 @@ export const useImportExportFlow = ({
         });
         settings.setGameType(sgfState.gameType);
         settings.setBoardSize(sgfState.boardSize);
-        setInitialStones(sgfState.initialStones);
         gameState.setGameOver(false);
         gameState.setWinner(null);
         gameState.setAppMode('playing');
@@ -74,7 +75,6 @@ export const useImportExportFlow = ({
       settings.setBoardSize(gs.boardSize);
       gameState.setGameOver(false);
       gameState.setWinner(null);
-      setInitialStones([]);
       gameState.setAppMode('playing');
       setShowImportModal(false);
       onImported();
@@ -86,9 +86,7 @@ export const useImportExportFlow = ({
   }, [gameState, importKey, onImported, playSfx, settings, vibrate]);
 
   const handleCopy = useCallback(() => {
-    const position = gameState.readPosition();
-    const size = position.board.length;
-    const sgf = generateSGF(position.history, size, getDefaultKomi(size), initialStones);
+    const sgf = generatePositionSGF(gameState.readPosition());
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(sgf).then(() => {
@@ -102,12 +100,10 @@ export const useImportExportFlow = ({
     } else {
       alert("浏览器限制，请使用下方‘导出 SGF’按钮");
     }
-  }, [gameState, initialStones, vibrate]);
+  }, [gameState, vibrate]);
 
   const handleExportSGF = useCallback(() => {
-    const position = gameState.readPosition();
-    const size = position.board.length;
-    const sgf = generateSGF(position.history, size, getDefaultKomi(size), initialStones);
+    const sgf = generatePositionSGF(gameState.readPosition());
 
     const blob = new Blob([sgf], { type: 'application/x-go-sgf' });
     const url = URL.createObjectURL(blob);
@@ -119,10 +115,9 @@ export const useImportExportFlow = ({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     vibrate(10);
-  }, [gameState, initialStones, vibrate]);
+  }, [gameState, vibrate]);
 
   return {
-    clearInitialStones,
     gameCopied,
     handleCopy,
     handleExportSGF,

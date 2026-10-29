@@ -37,7 +37,7 @@
 
 ## 完成标准
 
-环境：Node.js 22.12+，首次安装 `npm ci`。执行 **`npm run check`**，按 `harness/commands.mjs` 编排依次运行 **contracts → lint → typecheck → test → build**。提交前另跑 `git diff --check`。
+环境：Node.js 22.19+（Pi 后台要求），首次安装 `npm ci`。执行 **`npm run check`**，按 `harness/commands.mjs` 编排依次运行 **contracts → lint → typecheck → test → build**；build 分别产出前端 `dist/` 和后台 `dist-server/`。提交前另跑 `git diff --check`。
 
 新增运行时测试放 `tests/**/*.test.ts` / `.test.tsx` / `.test.mjs`，由 `npm test` 自动发现；只打印 FAILURE 的临时脚本不算回归测试。普通 UI 文案或纯类型搬迁不需要镜像实现的测试。
 

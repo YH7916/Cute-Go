@@ -21,7 +21,6 @@ export interface AppViewModel {
   review: ReturnType<typeof useGameReview>;
   teaching: ReturnType<typeof useTeachingWorkspace>;
   handleOpenLearning: () => void;
-  handleSaveReview: () => void;
   handleInspectReview: (position: ReturnType<GameStateReturn['readPosition']>) => void;
   handleEnterReview: () => void;
   handleStartCoach: () => void;
@@ -69,7 +68,6 @@ export interface AppViewModel {
   session: AppSession | null;
   setHideOfflineLoading: (hide: boolean) => void;
   setImportKey: (key: string) => void;
-  setIsThinking: (thinking: boolean) => void;
   setShowAboutModal: (show: boolean) => void;
   setShowImportModal: (show: boolean) => void;
   setShowLoginModal: (show: boolean) => void;

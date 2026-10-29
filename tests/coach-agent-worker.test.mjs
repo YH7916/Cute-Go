@@ -9,9 +9,9 @@ function worker() {
   let calls = 0;
   const scope = {
     postMessage: message => replies.push(structuredClone(message)),
-    fetch: async () => { calls += 1; return new Response(JSON.stringify({ choices: [{ message: {
-      content: JSON.stringify({ kind: 'explain', parts: [{ id: 'concept.liberties', variant: 1 }] }),
-    }, finish_reason: 'stop' }] })); },
+    fetch: async () => { calls += 1; return new Response(JSON.stringify({
+      text: JSON.stringify({ kind: 'explain', text: '数气要看整块棋旁边的空点，重复的只算一次；斜对角不算相邻。', refs: ['concept.liberties'] }),
+    })); },
     AbortController, DOMException, URL, Response, TextDecoder, setTimeout, clearTimeout,
   };
   vm.runInNewContext(source, scope);
@@ -20,7 +20,7 @@ function worker() {
 const input = (kind = 'inspect') => ({ kind, position: {
   board: Array.from({ length: 9 }, () => Array(9).fill(null)), currentPlayer: 'black',
   blackCaptures: 0, whiteCaptures: 0, lastMove: null, consecutivePasses: 0, history: [],
-}, userColor: 'white', intent: 'hint', config: { endpoint: 'https://api.deepseek.com', model: 'deepseek-flash', apiKey: 'test-private-key' } });
+}, userColor: 'white', intent: 'hint', question: '气是什么？', config: { endpoint: 'https://api.deepseek.com', provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test-private-key' } });
 
 test('actual teaching worker entry announces ready, computes local facts and ignores duplicate dispatch', async () => {
   const host = worker();
@@ -41,7 +41,7 @@ test('actual teaching worker entry uses provider client and only posts presentat
   await host.scope.onmessage({ data: { type: 'run', requestId: 9, input: input('ask') } });
   assert.equal(host.calls(), 1);
   assert.equal(host.replies[1].result.source, 'cloud');
-  assert.equal(host.replies[1].result.text, '数气要看整块棋旁边的空点；斜对角不算相邻，重复的空点只算一次。');
+  assert.equal(host.replies[1].result.text, '数气要看整块棋旁边的空点，重复的只算一次；斜对角不算相邻。');
   assert.ok(!JSON.stringify(host.replies).includes('test-private-key'));
   assert.ok(!JSON.stringify(host.replies).includes('positionKey'));
 });

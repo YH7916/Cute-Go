@@ -42,10 +42,10 @@ export function getAIConfig(difficulty: string): AIConfig {
         };
     }
 
-    // Hard
+    // Hard — one deterministic model policy inference, without search reranking.
     return {
         useModel: true,
-        simulations: isMobile ? 10 : 25,
+        simulations: 1,
         randomness: 0,
         temperature: 0,
         heuristicFactor: 1.0

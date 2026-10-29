@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { LearningExercise, LearningControls, ScoreBoard, LearningCenter, GameBoard, CoachMarkers, CoachBubble, CoachPet, Panel, Modal,
+import { capture, sequence, setup } from './helpers/learningCenter.mjs';
+import { LearningControls, ScoreBoard, LearningCenter, GameBoard, CoachMarkers, CoachBubble, CoachPet, Panel, Modal,
   props, noop, render, elements, text, button, centerInput } from './helpers/learningUi.mjs';
 
 test('board practice uses the existing character, message and frame without revealing an answer', t => {
@@ -37,15 +38,18 @@ test('a hint replaces the original lecture and an explicit explanation takes pri
   assert.equal(speech(), input.instruction, 'old hints must not hide move feedback');
 });
 
-test('a failed attempt keeps restart and demonstration in the top controls without advancing the lesson', t => {
+test('a failed attempt keeps restart in the middle row and demonstration beside the guidance without advancing the lesson', t => {
   const calls = [];
   const input = { ...props, phase: 'feedback', result: { outcome: 'failure', explanation: '还没提到目标棋子。' },
     instruction: '还没提到目标棋子。', continueLabel: '再试一次', onRetry: () => calls.push('retry'),
     onContinue: () => calls.push('continue'), onDemonstrate: () => calls.push('demo') };
   const tree = render(t, input).render();
-  assert.match(button(tree, '重试').props.className, /btn-coffee/);
-  assert.match(button(tree, '示范').props.className, /btn-beige/);
-  button(tree, '重试').props.onClick();
+  assert.match(button(tree, '重开').props.className, /btn-beige/);
+  assert.equal(button(tree, '示范').props.variant, 'secondary');
+  assert.ok(button(tree, '下一题'));
+  assert.equal(elements(tree[0]).some(node => node.props.onClick === input.onDemonstrate), false);
+  assert.equal(button(tree[1], '示范').props.onClick, input.onDemonstrate);
+  button(tree, '重开').props.onClick();
   button(tree, '示范').props.onClick();
   assert.deepEqual(calls, ['retry', 'demo']);
 });
@@ -61,7 +65,7 @@ test('demonstration advances explicitly and feedback uses the supplied verified 
     result: { outcome: 'success', explanation: 'CHECKED_FEEDBACK' } });
   const tree = host.render();
   assert.equal(elements(tree).find(node => node.type === CoachBubble).props.text, 'CHECKED_FEEDBACK');
-  assert.ok(button(tree, '下一课'));
+  assert.ok(button(tree, '下一题'));
   assert.ok(button(tree, '重开'));
   assert.match(text(tree), /本次独立作答/);
   assert.doesNotMatch(text(tree), /PRIVATE_|不计新的独立掌握/);
@@ -95,22 +99,58 @@ test('counting liberties keeps explicit answer submission and undo without a hin
   assert.doesNotMatch(text(tree), /有几口气/);
 });
 
-test('a board mistake keeps exploration recoverable without moving to the next lesson', t => {
-  const calls = [];
-  const input = { ...props, phase: 'exploration', canUndo: true,
-    instruction: '白棋已经接长。可以继续试下观察结果，这段试下不算通关。',
-    result: { outcome: 'unverified', explanation: '这手暂未收录。' },
-    onUndo: () => calls.push('undo'), onRetry: () => calls.push('retry'), onDemonstrate: () => calls.push('demo'),
-    onContinue: () => calls.push('continue') };
-  const tree = render(t, input).render();
-  assert.match(elements(tree).find(node => node.type === CoachBubble).props.text, /继续试下.*不算通关/);
+for (const exercise of [capture, sequence]) test(`${exercise.kind}: real stopped feedback supports undo, retry and demonstration without advancing`, t => {
+  const practice = setup(t, [exercise]);
+  practice.render().openExercise(exercise.id);
+  const progress = practice.render().view.lessons;
+  practice.render().view.active.onPoint(4, 4);
+  const input = { ...practice.render().view.active };
+  const ui = render(t, input);
+  const refresh = () => { Object.assign(input, practice.render().view.active); return ui.render(); };
+  let tree = refresh();
+  assert.equal(input.phase, 'feedback');
+  assert.equal(input.result.outcome, exercise.kind === 'point' ? 'failure' : 'unverified');
+  assert.equal(elements(tree).find(node => node.type === CoachBubble).props.text, input.instruction);
+  assert.match(input.instruction, /重开或悔棋/);
+  assert.doesNotMatch(input.instruction, /继续试下/);
+  assert.match(button(tree, '重开').props.className, /btn-beige/);
   assert.match(button(tree, '悔棋').props.className, /btn-sand/);
+  assert.equal(button(tree, '示范').props.variant, 'secondary');
   assert.equal(button(tree, '悔棋').props.disabled, false);
-  button(tree, '悔棋').props.onClick();
-  button(tree, '重开').props.onClick();
-  button(tree, '示范').props.onClick();
-  assert.deepEqual(calls, ['undo', 'retry', 'demo']);
   assert.equal(elements(tree).some(node => node.props.onClick === input.onContinue), false);
+  const stopped = input.board, original = { ...practice.record.attempts[0] };
+  const events = [...practice.events];
+  input.onPoint(1, 2);
+  tree = refresh();
+  assert.equal(input.board, stopped);
+  assert.deepEqual(practice.events, events, 'feedback blocks further grading and input');
+  button(tree, '示范').props.onClick();
+  tree = refresh();
+  assert.equal(input.phase, 'demonstration');
+  assert.equal(input.board, exercise.position.board);
+  button(tree, '下一手').props.onClick();
+  tree = refresh();
+  button(tree, '返回练习').props.onClick();
+  tree = refresh();
+  assert.equal(input.phase, 'feedback');
+  assert.equal(input.board, stopped, 'returning from the demonstration restores the stopped answer');
+  button(tree, '悔棋').props.onClick();
+  refresh();
+  assert.equal(input.phase, 'practice');
+  assert.equal(input.board, exercise.position.board);
+  assert.equal(input.independent, false);
+  input.onPoint(4, 4);
+  tree = refresh();
+  button(tree, '重开').props.onClick();
+  refresh();
+  assert.equal(input.phase, 'practice');
+  assert.equal(input.board, exercise.position.board);
+  assert.equal(input.currentPlayer, exercise.position.currentPlayer);
+  assert.equal(input.result, null);
+  assert.equal(input.prompt, exercise.prompt);
+  assert.equal(practice.record.attempts.length, 2);
+  assert.deepEqual(practice.record.attempts[0], original);
+  assert.deepEqual(practice.render().view.lessons, progress, 'none of these controls advances course completion');
 });
 
 test('same-board demonstrations show progress and support stepping backward or returning at any point', t => {
@@ -166,7 +206,7 @@ test('a wrong numeric answer remains editable and can be resubmitted without res
   assert.equal(button(tree, '重开').props.onClick, input.onRetry, 'the optional top restart does not replace resubmission');
 });
 
-test('choice questions present actual accessible options and submit only a selected answer', t => {
+test('choice questions dispatch the selected answer directly without a confirm step', t => {
   const calls = [];
   const input = { ...props, kind: 'choice', choices: [{ id: 'a', label: '继续接长' }, { id: 'b', label: '提掉堵路的白棋' }],
     selectedChoice: '', onChoice: id => calls.push(['choice', id]), onSubmit: () => calls.push('submit') };
@@ -176,29 +216,34 @@ test('choice questions present actual accessible options and submit only a selec
   const options = elements(tree).find(node => node.props.role === 'group' && node.props['aria-label'] === '选择答案');
   assert.deepEqual(elements(options).filter(node => node.props.onClick).map(node => [text(node), node.props['aria-pressed']]),
     [['继续接长', false], ['提掉堵路的白棋', false]]);
-  assert.equal(button(tree, '确认').props.disabled, true);
-  elements(tree).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  assert.equal(elements(tree).some(node => node.type === 'form' || node.props.type === 'submit'), false);
+  assert.doesNotMatch(text(tree), /再想一想|答对了|确认/);
   assert.deepEqual(calls, []);
   const second = button(tree, '提掉堵路的白棋');
-  assert.equal(second.props.type, 'button', 'choosing an answer must not submit the enclosing form');
+  assert.equal(second.props.type, 'button');
   second.props.onClick();
   assert.deepEqual(calls, [['choice', 'b']]);
   input.selectedChoice = 'b'; input.canSubmit = true;
   tree = host.render();
   assert.equal(button(tree, '提掉堵路的白棋').props['aria-pressed'], true);
   assert.equal(button(tree, '继续接长').props['aria-pressed'], false);
-  assert.equal(button(tree, '确认').props.disabled, false);
-  elements(tree).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
-  assert.deepEqual(calls, [['choice', 'b'], 'submit']);
+  assert.equal(button(tree, '提掉堵路的白棋').props['data-answer-result'], undefined);
+  assert.deepEqual(calls, [['choice', 'b']]);
   input.phase = 'feedback'; input.result = { outcome: 'failure', explanation: '再看看。' };
-  button(host.render(), '继续接长').props.onClick();
+  tree = host.render();
+  assert.equal(button(tree, '提掉堵路的白棋').props['data-answer-result'], 'wrong');
+  assert.equal(button(tree, '继续接长').props['data-answer-result'], undefined);
+  assert.match(text(tree), /再想一想/);
+  assert.match(elements(tree).find(node => node.props.role === 'status').props.className, /teaching-answer-wrong/);
+  button(tree, '继续接长').props.onClick();
   input.selectedChoice = 'a'; tree = host.render();
   assert.equal(button(tree, '继续接长').props['aria-pressed'], true);
   assert.equal(button(tree, '提掉堵路的白棋').props['aria-pressed'], false);
-  elements(tree).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
-  assert.deepEqual(calls, [['choice', 'b'], 'submit', ['choice', 'a'], 'submit']);
+  assert.deepEqual(calls, [['choice', 'b'], ['choice', 'a']]);
   input.result = { outcome: 'success', explanation: '选对了。' };
   assert.equal(elements(host.render()).some(node => node.props['aria-label'] === '选择答案'), false);
+  assert.match(text(host.render()), /答对了/);
+  assert.match(elements(host.render()).find(node => node.props.role === 'status').props.className, /teaching-answer-correct/);
 });
 
 test('teaching owns one shared board and opens courses only on request', t => {
@@ -240,7 +285,7 @@ test('teaching owns one shared board and opens courses only on request', t => {
   assert.equal(calls.at(-1), 'home');
 });
 
-test('teaching reuses match cards and actions above the board without duplicate bubble controls or win rate', t => {
+test('teaching keeps three shared actions above the board and one demonstration in the bubble without win rate', t => {
   const active = { ...props, blackCaptures: 3, whiteCaptures: 7, onDemonstrate: noop, canUndo: true };
   const tree = render(t, centerInput(active), LearningCenter).render();
   const header = elements(tree).find(node => node.type === 'header');
@@ -254,10 +299,14 @@ test('teaching reuses match cards and actions above the board without duplicate 
   const actions = elements(header).find(node => node.props.className?.includes('game-actions'));
   assert.equal(elements(actions).some(node => node.props['aria-label'] === '课程进度'), false, 'progress only belongs in the top bar');
   assert.equal(elements(header).filter(node => node.type === LearningControls).length, 1);
-  const speech = render(t, active).render().at(-1);
-  assert.deepEqual(elements(speech).filter(node => node.props.onClick && ['悔棋', '重开', '示范'].includes(text(node).trim())), []);
+  const [middle, speech] = render(t, active).render();
+  assert.deepEqual(elements(middle).filter(node => node.props.onClick).map(text), ['悔棋', '下一题', '重开']);
+  assert.deepEqual(elements(speech).filter(node => node.props.onClick && ['悔棋', '下一题', '重开'].includes(text(node).trim())), []);
   assert.equal(elements(speech).some(node => node.props['aria-label'] === '本题示范进度'), false);
-  assert.equal(elements(speech).some(node => node.props.className?.includes('coach-tools')), false, 'board guidance has no empty toolbar');
+  const tools = elements(speech).find(node => node.props.className?.includes('coach-tools'));
+  assert.deepEqual(elements(tools).filter(node => node.props.onClick).map(text), ['示范']);
+  const withoutDemo = render(t, { ...active, onDemonstrate: undefined }).render().at(-1);
+  assert.equal(elements(withoutDemo).some(node => node.props.className?.includes('coach-tools')), false, 'board guidance has no empty toolbar');
   assert.equal(elements(speech).some(node => ['提示', '讲解'].includes(text(node).trim()) && node.props.onClick), false);
 });
 
@@ -289,82 +338,4 @@ test('the completed exercise view keeps course selection beside optional practic
   assert.deepEqual(calls, ['practice']);
   button(empty, '选择课程').props.onClick();
   assert.equal(elements(host.render()).find(node => node.type === Modal).props.isOpen, true);
-});
-
-test('opponent replies first show the student move, block repeat input, then reveal the reply at 420 ms', t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const calls = [];
-  const preview = { board: Array.from({ length: 5 }, () => Array(5).fill(null)), currentPlayer: 'white', lastMove: { x: 2, y: 2 }, blackCaptures: 2, whiteCaptures: 1 };
-  const active = { ...props, replyKey: 'lesson-1-turn-1', replyPreview: preview,
-    instruction: '白救了左边，现在找出另一边的最后一气。', onPoint: (x, y) => calls.push(['move', x, y]),
-    onInspect: (x, y) => calls.push(['inspect', x, y]) };
-  const input = centerInput(active);
-  const host = render(t, input, LearningCenter);
-  let tree = host.render();
-  let board = elements(tree).find(node => node.type === GameBoard);
-  assert.equal(board.props.board, preview.board);
-  assert.equal(board.props.currentPlayer, 'white');
-  assert.equal(board.props.lastMove, preview.lastMove);
-  const beforeScore = elements(tree).find(node => node.type === ScoreBoard).props;
-  assert.deepEqual([beforeScore.currentPlayer, beforeScore.blackCaptures, beforeScore.whiteCaptures], ['white', 2, 1]);
-  const beforeControls = elements(tree).find(node => node.type === LearningControls);
-  const controlRow = LearningControls(beforeControls.props);
-  assert.ok(elements(controlRow.type(controlRow.props)).filter(node => node.type === 'button').every(node => node.props.disabled));
-  board.props.onIntersectionClick(3, 3);
-  board.props.onInspectPoint(2, 2);
-  assert.deepEqual(calls, [], 'input must not skip ahead while the player is watching the response');
-  assert.equal(elements(tree).find(node => node.type === LearningExercise).props.instruction, '你的棋已落下，看看对方怎样应手。');
-  assert.match(text(elements(tree).find(node => node.props.role === 'status')), /对方应手中/);
-  t.mock.timers.tick(419);
-  assert.equal(elements(host.render()).find(node => node.type === GameBoard).props.board, preview.board);
-  t.mock.timers.tick(1);
-  tree = host.render(); board = elements(tree).find(node => node.type === GameBoard);
-  assert.equal(board.props.board, active.board);
-  const afterScore = elements(tree).find(node => node.type === ScoreBoard).props;
-  assert.deepEqual([afterScore.currentPlayer, afterScore.blackCaptures, afterScore.whiteCaptures], ['black', 0, 0]);
-  assert.equal(elements(tree).find(node => node.type === LearningExercise).props.instruction, active.instruction);
-  board.props.onIntersectionClick(3, 3);
-  assert.deepEqual(calls, [['move', 3, 3]]);
-});
-
-test('a replacement reply owns its own delay and the earlier reply cannot reveal it early', t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const preview = { board: Array.from({ length: 5 }, () => Array(5).fill(null)), currentPlayer: 'white', lastMove: { x: 1, y: 1 } };
-  const active = { ...props, replyKey: 'first-turn', replyPreview: preview };
-  const input = centerInput(active);
-  const host = render(t, input, LearningCenter);
-  host.render();
-  t.mock.timers.tick(200);
-  input.active = { ...active, replyKey: 'replacement-turn' };
-  host.render();
-  t.mock.timers.tick(220);
-  assert.equal(elements(host.render()).find(node => node.type === GameBoard).props.board, preview.board, 'the first timer must not finish the new reply');
-  t.mock.timers.tick(199);
-  assert.equal(elements(host.render()).find(node => node.type === GameBoard).props.board, preview.board);
-  t.mock.timers.tick(1);
-  assert.equal(elements(host.render()).find(node => node.type === GameBoard).props.board, active.board);
-});
-
-for (const change of ['lesson', 'undo', 'close', 'unmount']) test(`pending reply cleanup preserves the current view after ${change}`, t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const clearTimer = t.mock.method(globalThis, 'clearTimeout');
-  const preview = { board: Array.from({ length: 5 }, () => Array(5).fill(null)), currentPlayer: 'white', lastMove: { x: 1, y: 1 } };
-  const input = centerInput({ ...props, replyKey: 'obsolete-turn', replyPreview: preview });
-  const host = render(t, input, LearningCenter);
-  host.render();
-  t.mock.timers.tick(100);
-  if (change === 'close') input.isOpen = false;
-  else if (change === 'unmount') host.unmount();
-  else input.active = { ...props, title: change === 'lesson' ? '新的课程' : props.title };
-  if (change !== 'unmount') host.render();
-  t.mock.timers.tick(1_000);
-  assert.equal(clearTimer.mock.callCount(), 1, 'leaving the response cancels its scheduled update');
-  if (change === 'unmount') return;
-  const tree = host.render();
-  if (change === 'close') assert.equal(tree, null);
-  else {
-    assert.equal(elements(tree).find(node => node.type === GameBoard).props.board, props.board);
-    assert.equal(elements(tree).find(node => node.type === LearningExercise).props.title, input.active.title);
-    assert.equal(elements(tree).find(node => node.type === LearningExercise).props.instruction, props.instruction);
-  }
 });

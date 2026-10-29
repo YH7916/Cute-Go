@@ -32,7 +32,7 @@ const App: React.FC = () => {
     const { playSfx, vibrate } = useAudio(settings.musicVolume, settings.hapticEnabled);
 
     const ui = useAppUiState(settings.skipStartScreen);
-    const { showStartScreen, setShowStartScreen, showPassModal, setShowPassModal,
+    const { showStartScreen, setShowStartScreen,
         showTerritory, setShowMenu, setToastMsg } = ui;
 
     // Auth & Profile
@@ -69,7 +69,6 @@ const App: React.FC = () => {
         roomId,
         myColor,
         setMyColor,
-        opponentProfile,
         sendData,
         cleanupOnline,
         startMatchmaking,
@@ -95,7 +94,6 @@ const App: React.FC = () => {
     });
 
     const {
-        clearInitialStones,
         gameCopied,
         handleCopy,
         handleExportSGF,
@@ -128,14 +126,14 @@ const App: React.FC = () => {
     // --- Achievements ---
     const {
         newUnlocked, clearNewUnlocked, checkEndGameAchievements, checkMoveAchievements, achievementsList, userAchievements
-    } = useAchievements(session?.user?.id);
+    } = useAchievements(session?.user?.id, () => playSfx('win'));
 
     const endGameRef = useRef<(winner: Player, reason: string, score?: { black: number; white: number }) => void>(() => {});
-    const { webAiEngine, isThinking, setIsThinking, aiTimerRef, aiTurnLock, pendingEndGameRef, cancelAiSession, requestCoachAnalysis } = useGameAiSession({
-        boardSize: settings.boardSize, gameState, executeMoveRef, handlePassRef, endGameRef, setToastMsg, setShowPassModal,
+    const { webAiEngine, aiTimerRef, aiTurnLock, pendingEndGameRef, cancelAiSession, requestCoachAnalysis } = useGameAiSession({
+        boardSize: settings.boardSize, gameState, executeMoveRef, handlePassRef, endGameRef, setToastMsg,
     });
     const ownerScopeId = session?.user?.id ? `account:${session.user.id}` : 'local:guest';
-    const teaching = useTeachingWorkspace(ownerScopeId, gameState.readPosition(), gameState.appMode === 'review' && !showStartScreen);
+    const teaching = useTeachingWorkspace(ownerScopeId);
     const review = useGameReview({ gameState, gameType: settings.gameType,
         showTerritory: showTerritory && !teaching.isOpen && !showStartScreen, engine: webAiEngine, ownerScopeId });
 
@@ -163,10 +161,7 @@ const App: React.FC = () => {
     } = useGameFlow({
         settings,
         gameState,
-        isThinking,
-        setIsThinking,
         showStartScreen: showStartScreen || teaching.isOpen,
-        showPassModal,
         aiTimerRef,
         aiTurnLock,
         webAi: {
@@ -188,7 +183,7 @@ const App: React.FC = () => {
             && (gameState.appMode === 'review' || (settings.coachMode && settings.gameMode === 'PvAI' && gameState.appMode === 'playing')),
         position: review.position, readPosition: review.readPosition, ownerScopeId,
         conversationRoot: gameState.history[0]?.board ?? gameState.board,
-        userColor: settings.userColor, gameOver: gameState.gameOver, config: coachSettings.config,
+        userColor: settings.userColor, difficulty: settings.difficulty, gameOver: gameState.gameOver, config: coachSettings.config,
         analyze: gameState.appMode === 'playing' && !gameState.gameOver ? requestCoachAnalysis : undefined,
     });
 
@@ -206,12 +201,10 @@ const App: React.FC = () => {
         checkEndGameAchievements,
         checkMoveAchievements,
         cleanupOnline,
-        clearInitialStones,
         displayTerritory,
         fetchProfile,
         gameState,
         gameTypeRef,
-        isThinking,
         isWebThinking,
         isWorkerReady,
         myColor,
@@ -219,7 +212,6 @@ const App: React.FC = () => {
         onlineStatus,
         onlineStatusRef,
         onIllegalMove: coach.explainIllegalMove,
-        opponentProfile,
         pendingEndGameRef,
         playSfx,
         requestAnalysis,
@@ -227,10 +219,8 @@ const App: React.FC = () => {
         session,
         setEloDiffStyle,
         setEloDiffText,
-        setIsThinking,
         setMyColor,
         setShowMenu,
-        setShowPassModal,
         settings,
         stopWebThinking,
         userProfile,
@@ -260,17 +250,13 @@ const App: React.FC = () => {
                 coach, coachSettings, review, teaching,
                 handleStartCoach: () => { teaching.close(); coach.cancel(); handleStartCoach(); },
                 handleOpenLearning: () => {
-                    if (onlineStatus !== 'disconnected') { setToastMsg('请先结束联机对局，再进入围棋教学。'); return; }
+                    if (onlineStatus !== 'disconnected') { setToastMsg('请先结束联机对局，再进入围棋课堂。'); return; }
                     cancelAiSession(); coach.cancel(); review.exitVariation(); ui.setShowTutorial(false); teaching.open();
                 },
                 handleInspectReview: position => { cancelAiSession(); coach.cancel(); review.inspectPosition(position); },
                 handleEnterReview: () => {
                     cancelAiSession(); coach.cancel(); review.exitVariation();
                     gameState.setReviewIndex(gameState.readPosition().history.length); gameState.setAppMode('review');
-                },
-                handleSaveReview: () => {
-                    const saved = teaching.savePosition(review.readPosition());
-                    setToastMsg(saved ? '已收藏这个复盘局面。' : '暂时无法保存，请检查学习记录提示。');
                 },
                 handleReturnHome: () => {
                     cancelAiSession(); coach.cancel(); teaching.close();
@@ -320,7 +306,6 @@ const App: React.FC = () => {
                 session,
                 setHideOfflineLoading,
                 setImportKey,
-                setIsThinking,
                 setShowImportModal,
                 setShowLoginModal,
                 setShowOnlineMenu,

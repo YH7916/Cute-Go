@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { getDefaultKomi } from '../core/go/config';
 import { getBeginnerAIMove } from '../core/go/ai';
 import { getBoardHash } from '../core/board';
-import type { BoardState, Player, BoardSize, Difficulty, GameType, HistoryItem } from '../types';
+import type { BoardState, Player, BoardSize, Difficulty, GameType, HistoryItem, Point } from '../types';
 import { logEvent } from '../utils/logger';
 import { AiRequestLifecycle, initialAiState } from './aiRequestLifecycle';
 import type { AnalysisResponse } from '../core/inference/protocol';
@@ -52,13 +52,15 @@ export const useWebKataGo = (props: UseWebKataGoProps) => {
   }
   const lifecycle = lifecycleRef.current;
   const requestWebAiMove = useCallback((
-    board: BoardState, color: Player, history: HistoryItem[], simulations = 45,
+    board: BoardState, color: Player, history: HistoryItem[], simulations = 1,
     komi = getDefaultKomi(board.length), difficulty: Difficulty = 'Hard', temperature = 0, gameType: GameType = 'Go',
   ) => lifecycle.request({ board, color, history, size: board.length, simulations, komi, difficulty, temperature, gameType, mode: 'play' }), [lifecycle]);
   const requestAnalysis = useCallback((
     board: BoardState, color: Player, history: HistoryItem[], komi = getDefaultKomi(board.length), gameType: GameType = 'Go',
-    simulations = 100, purpose?: 'coach',
-  ) => lifecycle.request({ board, color, history, size: board.length, simulations, komi, difficulty: 'Hard', temperature: 0, gameType, mode: 'analyze', purpose }), [lifecycle]);
+    simulations = 100, purpose?: 'coach', coachFocusPoints?: Point[],
+  ) => lifecycle.request({ board, color, history, size: board.length, simulations, komi, difficulty: 'Hard', temperature: 0,
+    gameType, mode: 'analyze', purpose, ...(purpose === 'coach' && coachFocusPoints?.length
+      ? { coachFocusPoints: coachFocusPoints.map(point => ({ x: point.x, y: point.y })) } : {}) }), [lifecycle]);
 
   useEffect(() => {
     const visibilityChanged = () => { if (document.hidden) lifecycle.stopThinking(); };

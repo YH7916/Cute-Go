@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createBoard } from '../core/board';
-import { calculateScore } from '../core/go/scoring';
 import { evaluateScoring, takeScoringRequest, type ScoringRequest } from '../domains/game/scoringResult';
 
 function request(): ScoringRequest {
@@ -29,7 +28,7 @@ test('endgame analysis consumes the original scoring snapshot exactly once', () 
   const accepted = takeScoringRequest(ref, pending);
   assert.equal(accepted, pending);
   assert.equal(takeScoringRequest(ref, pending), null);
-  assert.deepEqual(evaluateScoring(accepted!).score, calculateScore(pending.board, undefined, 5.5, { black: 3, white: 1 }));
+  assert.deepEqual(evaluateScoring(accepted!), { score: { black: 3, white: 6.5 }, lead: -3.5 });
 });
 
 test('cancelled endgame analysis never scores and ownership cleanup leaves the input untouched', () => {
@@ -39,6 +38,6 @@ test('cancelled endgame analysis never scores and ownership cleanup leaves the i
   const before = structuredClone(pending.board);
   const result = evaluateScoring(pending, new Float32Array(81).fill(-1));
   assert.deepEqual(pending.board, before);
-  assert.notEqual(result.board, pending.board);
+  assert.deepEqual(result, { score: { black: 3, white: 7.5 }, lead: -4.5 });
   assert.ok(Number.isFinite(result.lead));
 });

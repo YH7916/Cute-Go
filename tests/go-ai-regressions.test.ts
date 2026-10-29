@@ -6,7 +6,6 @@ import { getDefaultKomi } from '../core/go/config';
 import { generateSGF, parseSGF } from '../core/go/sgf';
 import { MicroBoard } from '../utils/micro-board';
 import { canPass, extractPolicyMoves } from '../core/inference/policy';
-import { selectMoveByDifficulty } from '../core/inference/selection';
 import { runOwnershipSearch } from '../core/inference/search';
 
 test('komi is consistent across board sizes, scoring and exported records', () => {
@@ -74,21 +73,7 @@ test('pass logit has finite sampling weight and never hides legal alternatives',
   assert.equal(canPass(9, 60, false), true);
 });
 
-test('easy sampling can select weaker candidates instead of always taking argmax', () => {
-  const policy = Float32Array.from({ length: 82 }, (_, i) => -i * 0.01);
-  const moves = extractPolicyMoves(policy, 9, new MicroBoard(9), 1, 2.1).filter(m => m.x >= 0);
-  const originalRandom = Math.random;
-  try {
-    Math.random = () => 0.5;
-    const selected = selectMoveByDifficulty(moves, createBoard(9), 'black', null, 'Easy');
-    assert.ok(selected);
-    assert.notDeepEqual(selected, { x: moves[0].x, y: moves[0].y });
-  } finally {
-    Math.random = originalRandom;
-  }
-});
-
-test('hard search spends its visit budget and backs up values from the opponent perspective', async () => {
+test('analysis search spends its visit budget and backs up values from the opponent perspective', async () => {
   let calls = 0;
   const engine = {
     async analyze(board: MicroBoard, color: 1 | 0 | -1) {

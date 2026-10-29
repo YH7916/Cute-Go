@@ -12,8 +12,8 @@ const { executeCoachAgent, createInitialPosition, coachPositionKey, buildCoachEv
     export { createElement } from 'react';
     export { renderToStaticMarkup } from 'react-dom/server';`,
 });
-const offline = { endpoint: '', model: '', apiKey: '' };
-const configured = { endpoint: 'http://localhost:1234/v1', model: 'fixture', apiKey: '' };
+const offline = { endpoint: '', provider: 'deepseek', model: 'deepseek-flash', apiKey: '' };
+const configured = { endpoint: 'http://localhost:1234/v1', provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test-model-key' };
 const input = position => ({ kind: 'inspect', position, userColor: 'black', intent: 'hint', config: offline });
 function put(position, color, x, y) {
   position.board[y][x] = { color, x, y, id: `${color}-${x}-${y}` };
@@ -32,8 +32,8 @@ function markup(points, boardSize = 9, board = createInitialPosition(boardSize).
 const numbers = svg => [...svg.matchAll(/<text\b[^>]*>([^<]*)<\/text>/g)].map(match => match[1]);
 function singleReference(reply, point) {
   assert.deepEqual(reply.hintPoints, [point]);
-  assert.match(reply.text, /圈出的这里/);
-  assert.doesNotMatch(reply.text, /[A-HJ-T]\d{1,2}|[①②③]/);
+  assert.match(reply.text, /这里/);
+  assert.doesNotMatch(reply.text, /圈出的这里|[A-HJ-T]\d{1,2}|[①②③]/);
   const svg = markup(reply.hintPoints);
   assert.deepEqual(numbers(svg), [], 'one referenced point needs a ring, not an artificial first step');
   assert.match(svg, /<circle\b/, 'the textual reference must have an actual board marker');
@@ -81,10 +81,9 @@ test('cloud choices are renumbered by final prose order and repeated points keep
   const response = JSON.stringify({ kind: 'explain', parts: [
     { id: 'candidate.F7', variant: 0 }, { id: 'current', variant: 0 }, { id: 'candidate.B7', variant: 0 },
   ] });
-  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ choices: [
-    { message: { content: response }, finish_reason: 'stop' },
-  ] })));
-  const reply = await executeCoachAgent({ ...input(threatenedGroups()), kind: 'ask', config: configured });
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ text: response })));
+  const reply = await executeCoachAgent({ ...input(threatenedGroups()), kind: 'ask', config: configured,
+    question: '比较 F7 和 B7 的解围办法，再说明当前提示为何优先 B7。' });
   assert.equal(reply.source, 'cloud');
   assert.deepEqual(reply.hintPoints, [{ x: 5, y: 2, label: 'F7' }, { x: 1, y: 2, label: 'B7' }]);
   assert.deepEqual(reply.text.match(/[①②③]/g), ['①', '②', '②']);
@@ -92,7 +91,7 @@ test('cloud choices are renumbered by final prose order and repeated points keep
   assert.deepEqual(numbers(markup(reply.hintPoints)), ['1', '2']);
 });
 
-test('more than three distinct references reject the cloud selection instead of orphaning its text', () => {
+test('more than three distinct references reject a legacy selection instead of orphaning its text', () => {
   const choices = [{ id: 'many', kind: 'position', variants: ['先看 A1、B2、C3，再比较 D4。'] }];
   const selected = JSON.stringify({ kind: 'explain', parts: [{ id: 'many', variant: 0 }] });
   assert.equal(renderCoachResponse(selected, choices, false, 9), null);
@@ -106,13 +105,13 @@ test('a four-point cloud combination preserves the complete local three-point ex
   const response = JSON.stringify({ kind: 'explain', parts: [
     { id: 'current', variant: 0 }, { id: 'group.A8', variant: 0 },
   ] });
-  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ choices: [
-    { message: { content: response }, finish_reason: 'stop' },
-  ] })));
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ text: response })));
   const local = await executeCoachAgent(input(position));
-  const reply = await executeCoachAgent({ ...input(position), kind: 'ask', config: configured });
+  const reply = await executeCoachAgent({ ...input(position), kind: 'ask', config: configured,
+    question: 'B8 这块有哪些出口？再看看 A8 白棋有几口气。' });
   assert.equal(reply.source, 'local');
-  assert.match(reply.error, /未通过校验/);
+  assert.equal(reply.error, undefined);
+  assert.equal(reply.cacheable, false);
   assert.equal(reply.text, local.text);
   assert.deepEqual(reply.hintPoints, local.hintPoints);
   assert.equal(reply.hintPoints.length, 3);
@@ -122,9 +121,37 @@ test('a four-point cloud combination preserves the complete local three-point ex
 test('repeated full-size coordinates use one stable point and never expose coordinate jargon', () => {
   const choices = [{ id: 'repeat', kind: 'position', variants: ['先看 J19，再回到 J19。'] }];
   const reply = renderCoachResponse(JSON.stringify({ kind: 'explain', parts: [{ id: 'repeat', variant: 0 }] }), choices, false, 19);
-  assert.deepEqual(reply, { kind: 'explain', text: '先看 圈出的这里，再回到 圈出的这里。',
+  assert.deepEqual(reply, { kind: 'explain', text: '先看这里，再回到这里。',
     hintPoints: [{ x: 8, y: 0, label: 'J19' }] });
   assert.deepEqual(numbers(markup(reply.hintPoints, 19)), []);
+});
+
+test('synthesized coordinates bind the same rings across case and full-width variants', () => {
+  const choices = [{ id: 'points', kind: 'position', variants: ['先观察D4，再比较E4。'] }];
+  for (const text of ['先观察d4，再比较e4和D4。', '先观察Ｄ４，再比较ｅ４和ｄ４。']) {
+    const reply = renderCoachResponse(JSON.stringify({ kind: 'explain', text, refs: ['points'] }), choices, false, 9);
+    assert.deepEqual(reply, { kind: 'explain', text: '先观察①，再比较②和①。',
+      hintPoints: [{ x: 3, y: 5, label: 'D4' }, { x: 4, y: 5, label: 'E4' }] });
+    assert.deepEqual(numbers(markup(reply.hintPoints)), ['1', '2']);
+  }
+});
+
+test('unbound here and model-written circle numbers never appear without verified board marks', () => {
+  const choices = [{ id: 'point', kind: 'position', variants: ['可以观察D4。'] }];
+  for (const text of ['可以观察这里。', '可以观察此处。', '可以观察①。', '可以观察④。', '可以观察❶。']) {
+    assert.equal(renderCoachResponse(JSON.stringify({ kind: 'explain', text, refs: ['point'] }), choices, false, 9), null, text);
+  }
+});
+
+test('coordinate normalization accepts legal model points and rejects invalid or off-board points', () => {
+  const choices = [{ id: 'point', kind: 'position', variants: ['D4有4口气。'], coordinates: ['T19'] }];
+  for (const point of ['a4', 'ａ４']) {
+    assert.deepEqual(renderCoachResponse(JSON.stringify({ kind: 'explain', text: `观察${point}。`, refs: ['point'] }), choices, false, 9),
+      { kind: 'explain', text: '观察这里。', hintPoints: [{ x: 0, y: 5, label: 'A4' }] });
+  }
+  for (const point of ['ｉ４', 'd04', 'd0', 'd40', 'ｔ１９']) {
+    assert.equal(renderCoachResponse(JSON.stringify({ kind: 'explain', text: `观察${point}。`, refs: ['point'] }), choices, false, 9), null, point);
+  }
 });
 
 test('empty-point numbers sit in their rings while stone numbers use the stone surface directly', () => {

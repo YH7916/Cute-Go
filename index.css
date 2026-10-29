@@ -350,6 +350,8 @@ body {
   border-color: transparent !important;
 }
 .coach-conversation::before {
+  /* The frame includes both 2px borders; the SVG is positioned in the padding box. */
+  --coach-docked-tail-center: clamp(min(24px, 50%), calc(100% - var(--coach-tail-offset) - 2px), calc(100% - min(24px, 50%)));
   content: "";
   position: absolute;
   inset: -2px;
@@ -362,14 +364,14 @@ body {
 }
 .coach-has-speech::before {
   clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%,
-    0 max(40px, calc(100% - var(--coach-tail-offset) + 6px)), 2px max(40px, calc(100% - var(--coach-tail-offset) + 6px)),
-    2px max(24px, calc(100% - var(--coach-tail-offset) - 10px)), 0 max(24px, calc(100% - var(--coach-tail-offset) - 10px)));
+    0 calc(var(--coach-docked-tail-center) + 8px), 2px calc(var(--coach-docked-tail-center) + 8px),
+    2px calc(var(--coach-docked-tail-center) - 8px), 0 calc(var(--coach-docked-tail-center) - 8px));
 }
 .coach-speech-tail {
   position: absolute;
   left: -12px;
-  /* Clamp the matching notch and tip below the rounded corner for short text. */
-  top: max(21px, calc(100% - var(--coach-tail-offset) - 9px));
+  /* Match the frame's center, including when one line leaves less than 48px. */
+  top: calc(clamp(min(22px, 50%), calc(100% - var(--coach-tail-offset)), calc(100% - min(22px, 50%))) - 9px);
   z-index: -1;
   overflow: visible;
   pointer-events: none;
@@ -545,8 +547,89 @@ body {
   .coach-layout .game-actions { gap: 8px; }
   .coach-layout .score-cards > div { height: 56px; padding: 6px 10px; }
   .coach-layout .game-sidebar > :first-child > div { padding-top: 4px; padding-bottom: 4px; }
+  .teaching-layout > .game-sidebar, .teaching-layout .game-actions { gap: 6px; }
+  .teaching-layout .score-cards > div { height: 44px; }
+  .teaching-layout .game-play-controls > button { flex-direction: row; min-height: 44px; padding: 4px; gap: 6px; }
+  .teaching-layout .teaching-number { --coach-module-height: min(224px, calc(100dvh - 166px)); }
   .coach-assistant.coach-configured { --coach-module-height: min(230px, calc(100dvh - 76px)); }
+}
+/* Wide portrait screens share the existing top bar with the capture cards.
+   Narrow phones and landscape screens keep their original layout. */
+@media (min-width: 640px) and (orientation: portrait) {
+  .game-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: max-content max-content max-content;
+    grid-template-areas: "controls" "board" "coach";
+    align-items: stretch;
+    align-content: start;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .game-layout::before { content: none; }
+  .game-layout > .game-sidebar {
+    grid-area: controls;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(276px, 40%, 340px);
+    align-items: center;
+    width: 100%;
+    height: auto;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-left-width: 0;
+    overflow: visible;
+    background-color: var(--cg-bg, #f7e7ce) !important;
+  }
+  .game-layout > .game-sidebar > :first-child { grid-area: 1 / 1 / 2 / -1; }
+  .game-layout .game-actions { display: contents; }
+  .game-layout :is(.game-score, .game-analysis) { min-width: 0; }
+  .game-layout .game-score {
+    grid-area: 1 / 1 / 2 / -1;
+    justify-self: center;
+    width: clamp(260px, 42.5%, 360px);
+    margin-top: env(safe-area-inset-top);
+  }
+  .game-layout .score-cards > div { height: 51px; padding-block: 2px; }
+  .game-layout .game-analysis { grid-area: 2 / 1; margin-left: 16px; }
+  .game-layout .game-controls { grid-area: 2 / 2; margin: 0 16px 0 0; min-width: 0; }
+  .game-layout .game-actions[data-has-analysis="false"] > .game-controls { grid-column: 1 / -1; margin-left: 16px; }
+  .game-layout .game-play-controls > button { flex-direction: row; min-height: 44px; padding: 4px 6px; gap: 6px; }
+  .game-layout > .game-board-area { grid-area: board; width: 100%; height: auto; aspect-ratio: 1; align-self: start; }
+  .game-layout > .game-board-area > .board-viewport {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    max-height: none;
+    aspect-ratio: 1;
+  }
+  .game-layout > .coach-assistant {
+    grid-area: coach;
+    --coach-module-height: 154px;
+    --coach-art-height: 138.667px;
+    --coach-art-width: 128px;
+    --coach-art-scale: 1.3333333333;
+    position: sticky;
+    bottom: 0;
+    height: var(--coach-module-height);
+    min-height: 0;
+    margin-top: 0;
+    padding-bottom: 8px; /* The game root already reserves the bottom safe area. */
+    pointer-events: none;
+  }
+  .game-layout > .coach-assistant.coach-configured { --coach-module-height: 190px; }
+  .game-layout .coach-character { position: relative; left: auto; bottom: auto; }
+  .game-layout .coach-conversation { margin-left: 0; max-height: calc(var(--coach-module-height) - 16px); }
+  .game-layout .board-viewport .touch-none { touch-action: pan-y; }
 }
 @media (prefers-reduced-motion: reduce) {
   .coach-pet, .coach-pet-portrait[data-pet-state] { animation: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .teaching-answer-correct { animation: popIn 320ms ease-out; }
+  .teaching-answer-wrong { animation: teaching-answer-shake 320ms ease-out; }
+}
+@keyframes teaching-answer-shake {
+  25%, 75% { translate: -3px 0; }
+  50% { translate: 3px 0; }
 }

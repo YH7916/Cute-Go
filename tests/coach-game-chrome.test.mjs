@@ -7,7 +7,7 @@ import { loadTestModule } from './helpers/loadTestModule.mjs';
 const require = createRequire(import.meta.url);
 const leafComponents = new Set(['GameBoard', 'PassConfirmationModal', 'AnalysisPanel', 'CoachAssistant', 'CoachMarkers',
   'AchievementNotification', 'StartScreen', 'AppModals', 'RenderStoneIcon', 'LearningCenter']);
-const { AppView, GameControls, GamePlayControls, ScoreBoard, TopBar, GameBoard, CoachAssistant, CoachMarkers, RenderStoneIcon, LearningCenter, CoachReviewTools, StartScreen, Button } = await loadTestModule({
+const { AppView, GameControls, GamePlayControls, ScoreBoard, TopBar, GameBoard, PassConfirmationModal, CoachAssistant, CoachMarkers, RenderStoneIcon, LearningCenter, CoachReviewTools, StartScreen, Button } = await loadTestModule({
   define: { 'process.env.NODE_ENV': '"production"' },
   plugins: [{ name: 'chrome-test-host', setup(build) {
     build.onResolve({ filter: /jsx-runtime$/ }, () => ({ path: require.resolve('react/jsx-runtime') }));
@@ -24,6 +24,7 @@ const { AppView, GameControls, GamePlayControls, ScoreBoard, TopBar, GameBoard, 
     export { ScoreBoard } from './components/ScoreBoard';
     export { TopBar } from './components/common/TopBar';
     export { GameBoard } from './components/GameBoard';
+    export { PassConfirmationModal } from './components/PassConfirmationModal';
     export { CoachAssistant } from './components/CoachAssistant';
     export { CoachMarkers } from './components/board/CoachMarkers';
     export { LearningCenter } from './components/coach/LearningCenter';
@@ -93,12 +94,13 @@ test('teaching is a separate page even when companion state and the start screen
   assert.equal(tree.props.appearance.stoneSkin, vm.settings.stoneSkin);
 });
 
-test('home routes deeper teaching without exposing beginner onboarding', () => {
+test('home routes ordinary courses without exposing a beginner tutorial callback', () => {
   const vm = model(false);
   vm.showStartScreen = true;
   vm.handleOpenLearning = () => vm.calls.push('learning');
+  vm.setShowTutorial = show => vm.calls.push(['tutorial', show]);
   const start = component(AppView({ vm }), StartScreen);
-  assert.equal(Object.hasOwn(start.props, 'onOpenTutorial'), false);
+  assert.equal(start.props.onOpenTutorial, undefined);
   start.props.onOpenLearning();
   assert.deepEqual(vm.calls, ['learning']);
 });
@@ -179,30 +181,22 @@ test('ordinary play has no review entry or reserved sidebar space', () => {
   }
 });
 
-test('companion retains the icon review action and the original route without a sidebar entry', () => {
-  const vm = model(true), tree = AppView({ vm });
-  const sidebar = elements(tree).find(node => node.props.className?.startsWith('game-sidebar '));
-  assert.equal(elements(sidebar).some(node => node.props['aria-label'] === '回看棋谱'), false);
-  const entry = component(tree, CoachAssistant).props.reviewAction;
-  assert.equal(entry.props['aria-label'], '回看棋谱');
-  assert.equal(entry.props.title, '回看棋谱');
-  assert.equal(entry.props.appearance, 'retro');
-  assert.equal(entry.props.variant, 'secondary');
-  assert.equal(text(entry), '', 'the companion entry uses an icon without visible text');
-  assert.match(entry.props.className, /\bh-11\b/);
-  assert.match(entry.props.className, /\bw-11\b/);
-  assert.ok(elements(entry.props.children).some(node => node.props['aria-hidden'] === 'true'));
-  entry.props.onClick();
-  assert.deepEqual(vm.calls, ['review']);
+test('companion has no permanent review icon or sidebar entry in any game state', () => {
   for (const modify of [
+    () => {},
+    candidate => { candidate.gameState.gameOver = true; },
     candidate => { candidate.gameState.history = []; },
     candidate => { candidate.onlineStatus = 'connected'; },
     candidate => { candidate.gameState.appMode = 'setup'; },
     candidate => { candidate.settings.gameType = 'Gomoku'; },
   ]) {
-    const unavailable = model(true);
-    modify(unavailable);
-    assert.equal(component(AppView({ vm: unavailable }), CoachAssistant).props.reviewAction, undefined);
+    const vm = model(true);
+    modify(vm);
+    const tree = AppView({ vm });
+    assert.equal(Object.hasOwn(component(tree, CoachAssistant).props, 'reviewAction'), false);
+    assert.equal(elements(tree).some(node => node.props['aria-label'] === '回看棋谱'
+      || text(node).trim() === '回看棋谱'), false);
+    assert.deepEqual(vm.calls, [], 'rendering never enters review');
   }
 });
 
@@ -216,7 +210,7 @@ for (const coachMode of [false, true]) {
     const assistant = component(tree, CoachAssistant);
     assert.ok(tree.props.children.includes(assistant), 'review reuses the same independent bottom module as live coaching');
     assert.equal(assistant.props.review, vm.review);
-    assert.equal(assistant.props.reviewAction, undefined, 'there is no second entry into the review already being viewed');
+    assert.equal(Object.hasOwn(assistant.props, 'reviewAction'), false, 'there is no second entry into the review already being viewed');
     assert.equal(elements(sidebar).some(node => node.type === CoachAssistant || node.type === CoachReviewTools), false);
     assert.equal(elements(tree).some(node => node.type === CoachReviewTools), false, 'review actions are composed inside the bottom assistant');
     const originalControls = GameControls(component(tree, GameControls).props);
@@ -340,6 +334,23 @@ test('both modes invoke the original navigation and game callbacks directly', ()
   const calls = [];
   button(GameControls(controls({ onlineStatus: 'connected', resetGame: keepOnline => calls.push(keepOnline) })), '重开').props.onClick();
   assert.deepEqual(calls, [true], 'connected reset preserves the existing session policy');
+});
+
+test('pass notification continues by dismissing and unlocking, or routes settlement to the pass callback', () => {
+  const vm = model(false);
+  vm.consecutivePasses = 1;
+  vm.aiTurnLock = { current: true };
+  vm.gameState.passNotificationDismissed = false;
+  vm.gameState.setPassNotificationDismissed = value => { vm.gameState.passNotificationDismissed = value; };
+  vm.stopWebThinking = () => vm.calls.push('stop');
+  const overlay = component(AppView({ vm }), PassConfirmationModal);
+  assert.equal(overlay.props.consecutivePasses, 1);
+  assert.equal(overlay.props.passNotificationDismissed, false);
+  overlay.props.onDismiss();
+  assert.equal(vm.gameState.passNotificationDismissed, true);
+  assert.equal(vm.aiTurnLock.current, false);
+  overlay.props.onPass();
+  assert.deepEqual(vm.calls, ['stop', ['pass', false]]);
 });
 
 for (const gameOver of [false, true]) {

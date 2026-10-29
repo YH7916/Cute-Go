@@ -2,7 +2,7 @@ import type { MutableRefObject } from 'react';
 import type { GameType, HistoryItem, Player, Point } from '../../types';
 import type { useAppSettings } from '../useAppSettings';
 import type { useGameState } from '../useGameState';
-import type { AppProfile, AppSession, PlatformOpponentSummary } from '../../services/platform';
+import type { AppProfile, AppSession } from '../../services/platform';
 import type { ScoringRequest } from '../../domains/game/scoringResult';
 import type { GamePosition } from '../../domains/game/positionState';
 
@@ -31,13 +31,11 @@ export interface UseGameActionsOptions {
     moveNumber: number;
     boardSize: number;
   }) => void;
-  cleanupOnline: (isManual?: boolean) => void;
-  clearInitialStones: () => void;
+  cleanupOnline: () => void;
   displayTerritory: Float32Array | null;
   fetchProfile: (userId: string) => Promise<void>;
   gameState: GameStateReturn;
   gameTypeRef: MutableRefObject<GameType>;
-  isThinking: boolean;
   isWebThinking: boolean;
   isWorkerReady: boolean;
   myColor: Player | null;
@@ -45,7 +43,6 @@ export interface UseGameActionsOptions {
   onlineStatus: 'disconnected' | 'connecting' | 'connected';
   onlineStatusRef: MutableRefObject<'disconnected' | 'connecting' | 'connected'>;
   onIllegalMove?: (point: Point, position: GamePosition) => void;
-  opponentProfile: PlatformOpponentSummary | null;
   pendingEndGameRef: MutableRefObject<ScoringRequest | null>;
   playSfx: (type: 'move' | 'capture' | 'error' | 'win' | 'lose') => void;
   requestAnalysis: (
@@ -59,10 +56,8 @@ export interface UseGameActionsOptions {
   session: AppSession | null;
   setEloDiffStyle: (style: 'gold' | 'normal' | 'negative' | null) => void;
   setEloDiffText: (text: string | null) => void;
-  setIsThinking: (isThinking: boolean) => void;
   setMyColor: (color: Player | null) => void;
   setShowMenu: (show: boolean) => void;
-  setShowPassModal: (show: boolean) => void;
   settings: AppSettingsReturn;
   stopWebThinking: () => void;
   userProfile: AppProfile | null;

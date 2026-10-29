@@ -3,9 +3,9 @@ import { exercisePosition } from './exercise';
 
 export const tacticsLessons = [
   lesson('E', 'tactics.escape-atari', '救棋不只向外逃',
-    '被打吃时，接长不一定脱险。先比较接长、连接和反提，看看原来的棋能得到几气。',
+    '被打吃后，接长未必能救。比较接长、连接和反提，再数原来那块棋的气。',
     '眼前的出口很窄，硬逃可能继续被吃。换个方向，提掉堵路的棋也能给自己腾出气。',
-    '附近多一颗接应子，正确的救法就可能改变。每次都看整块棋，别背上一次的坐标。', [
+    '附近多一颗接应子，救法就可能不同。要看整块棋，别记上次的坐标。', [
       { kind: 'point', familyId: 'go.tactics.escape-atari.countercapture-1',
         position: exercisePosition(['..X....', '.XO....', '.OXO...', '.O.O...', '.......', '.......', '.......']),
         rubric: { kind: 'escape', anchor: { x: 2, y: 2 }, minimumLiberties: 2 },
@@ -25,9 +25,9 @@ export const tacticsLessons = [
         { point: { x: 3, y: 1 }, text: '黑先反提白子，让原黑棋多出一个出口。救棋不必总沿着原来的气逃。' },
       ] }, [teacherSources.escape]),
   lesson('E', 'tactics.double-atari', '打吃两边，抓住救不了的一边',
-    '一手让两块独立的对方棋都只剩一气，对方可能只能救一边。关键是看它救了哪边，再兑现另一边。',
+    '一手同时打吃对方两块独立的棋，对方可能只能救一块。看清它救哪块，再提另一块。',
     '先在两块白棋之间找同时紧气的一手，等白应手后重新数气，不抢着按原计划落子。',
-    '两次威胁要分清：若对方能一手连接或反提，同时救两边，就不能照搬双打吃的结果。', [
+    '如果对方能靠连接或反提一手救两块，双打吃就未必吃得到棋。', [
       { kind: 'sequence', position: exercisePosition(['.X.X.', 'XO.OX', '.....', '.....', '.....']), minimumCaptures: 1,
         prompt: '轮黑。一手同时威胁两块白棋；白救棋后，提掉另一块。',
         hints: ['看看两块白棋是否共用同一个外气。', '在两块白棋之间下，让它们各剩一气；然后看白选择救哪边。'],

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 export function useAppUiState(skipStartScreen: boolean) {
   const [showMenu, setShowMenu] = useState(false);
   const [showUserPage, setShowUserPage] = useState(false);
-  const [showPassModal, setShowPassModal] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showStartScreen, setShowStartScreen] = useState(!skipStartScreen);
   const [showSkinShop, setShowSkinShop] = useState(false);
@@ -20,7 +19,7 @@ export function useAppUiState(skipStartScreen: boolean) {
     return () => clearTimeout(timer);
   }, [toastMsg]);
   return {
-    showMenu, setShowMenu, showUserPage, setShowUserPage, showPassModal, setShowPassModal,
+    showMenu, setShowMenu, showUserPage, setShowUserPage,
     showStartScreen, setShowStartScreen, showTutorial, setShowTutorial,
     showSkinShop, setShowSkinShop, showTerritory, setShowTerritory, showAboutModal, setShowAboutModal,
     toastMsg, setToastMsg,

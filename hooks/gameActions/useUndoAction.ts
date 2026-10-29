@@ -6,17 +6,15 @@ export const useUndoAction = ({
   aiTimerRef,
   aiTurnLock,
   gameState,
-  isThinking,
   isWebThinking,
   onlineStatus,
   pendingEndGameRef,
-  setIsThinking,
   settings,
   stopWebThinking,
   vibrate,
 }: UseGameActionsOptions) => useCallback(() => {
   const position = gameState.readPosition();
-  if (position.history.length === 0 || isThinking || gameState.gameOver || onlineStatus === 'connected') return;
+  if (position.history.length === 0 || gameState.gameOver || onlineStatus === 'connected') return;
   vibrate(10);
   let stepsToUndo = 1;
 
@@ -30,7 +28,6 @@ export const useUndoAction = ({
   if (isWebThinking) stopWebThinking();
   pendingEndGameRef.current = null;
   aiTurnLock.current = false;
-  setIsThinking(false);
   if (aiTimerRef.current) {
     clearTimeout(aiTimerRef.current);
     aiTimerRef.current = null;
@@ -39,11 +36,9 @@ export const useUndoAction = ({
   aiTimerRef,
   aiTurnLock,
   gameState,
-  isThinking,
   isWebThinking,
   onlineStatus,
   pendingEndGameRef,
-  setIsThinking,
   settings,
   stopWebThinking,
   vibrate,

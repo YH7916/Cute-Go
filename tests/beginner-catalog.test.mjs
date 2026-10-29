@@ -11,30 +11,33 @@ const { beginnerLessons, curriculumLessons, curriculumExercises, curriculumSecti
   export { sourceLessons, sourceSections } from './domains/coach/sourceCurriculum';
 ` });
 
-const advancedIds = ['ogs-real-false-eye', 'ogs-make-alive', 'ogs-atari-correct-side',
-  'ogs-play_double_atari', 'ogs-ladder', 'ogs-snapback', 'ogs-net', 'ogs-count-territory',
-  'ogs-close_territory', 'ogs-capturing_race', 'ogs-ko', 'ggg-short-reading', 'ggg-connect-live',
-  'ggg-capturing-race', 'ggg-snapback-cut'];
+const courseIds = ['ogs-count-liberties', 'ogs-in_atari', 'go.rules.capture',
+  'ogs-capture_chain', 'ogs-self-capture', 'go.tactics.escape-atari', 'ogs-connect', 'ogs-cut',
+  'ogs-eyes', 'ogs-real-false-eye', 'ogs-make-alive', 'ogs-atari-correct-side',
+  'ogs-play_double_atari', 'ogs-ladder', 'ogs-net', 'ogs-snapback', 'ogs-capturing_race', 'ogs-ko',
+  'ogs-territory', 'ogs-close_territory', 'ogs-count-territory', 'ogs-ending-the-game',
+  'ggg-short-reading', 'ggg-connect-live', 'ggg-capturing-race', 'ggg-snapback-cut'];
 const migratedIds = ['ogs-rules-intro', 'ogs-self-capture', 'ogs-eyes', 'ogs-ko', 'ogs-territory',
   'ogs-ending-the-game', 'ogs-the-board', 'ogs-count-liberties', 'ogs-count_chains', 'ogs-in_atari',
   'go.rules.capture', 'ogs-capture_chain', 'go.tactics.escape-atari', 'ogs-connect', 'ogs-cut'];
 
-test('advanced lessons omit the migrated beginner topics while retaining original practice identities', () => {
-  assert.deepEqual(curriculumLessons.map(lesson => lesson.id), advancedIds);
+test('ordinary courses keep foundation practice and original source identities', () => {
+  assert.deepEqual(curriculumLessons.map(lesson => lesson.id), courseIds);
   assert.deepEqual([...beginnerSourceLessonIds].sort(), [...migratedIds].sort());
-  assert.equal(curriculumLessons.length, 15);
-  assert.equal(curriculumExercises.length, 58);
-  assert.equal(new Set(curriculumExercises.map(exercise => exercise.id)).size, 58);
+  assert.equal(curriculumLessons.length, 26);
+  assert.equal(curriculumExercises.length, 100);
+  assert.equal(new Set(curriculumExercises.map(exercise => exercise.id)).size, 100);
   for (const id of migratedIds) {
     assert.ok(sourceLessons.some(lesson => lesson.id === id), `${id}: source lesson must remain available`);
-    assert.equal(curriculumLessons.some(lesson => lesson.id === id), id === 'ogs-ko', `${id}: only advanced ko applications remain`);
-    assert.equal(curriculumExercises.some(exercise => exercise.skillId === id), id === 'ogs-ko', `${id}: only advanced ko applications remain`);
+    const retained = !['ogs-rules-intro', 'ogs-the-board', 'ogs-count_chains'].includes(id);
+    assert.equal(curriculumLessons.some(lesson => lesson.id === id), retained, `${id}: respect the active course selection`);
+    assert.equal(curriculumExercises.some(exercise => exercise.skillId === id), retained, `${id}: respect the active course selection`);
   }
   assert.equal(curriculumExercises.some(exercise => exercise.id === 'ogs-ko-page01'), false,
     'the introductory ko capture must not repeat in the advanced path');
   for (const lesson of curriculumLessons) {
     const source = sourceLessons.find(item => item.id === lesson.id);
-    if (lesson.id !== 'ogs-ko') assert.equal(lesson.exercises, source.exercises, `${lesson.id}: preserve original exercise lists`);
+    if (!['ogs-eyes', 'ogs-ko'].includes(lesson.id)) assert.equal(lesson.exercises, source.exercises, `${lesson.id}: preserve original exercise lists`);
     for (const exercise of lesson.exercises) assert.equal(exercise, source.exercises.find(item => item.id === exercise.id),
       `${exercise.id}: preserve source IDs, revisions and answer trees`);
     assert.equal(lesson.contentRevision, source.contentRevision);
@@ -72,34 +75,37 @@ test('beginner migration leaves the full source archive at 29 lessons and 114 pa
     'advanced prerequisite repair must not mutate the archived source lesson');
 });
 
-test('advanced sections and prerequisites contain only the remaining course path', () => {
+test('course sections and prerequisites follow the complete progression', () => {
   assert.deepEqual(curriculumSections, [
-    { id: 'ogs-stage-2', title: '棋形与死活' },
-    { id: 'ogs-stage-3', title: '攻防与收官' },
+    { id: 'ogs-stage-1', title: '数气与提子' },
+    { id: 'ogs-stage-2', title: '解围与连接' },
+    { id: 'ogs-life', title: '眼形与做活' },
+    { id: 'ogs-stage-3', title: '吃子与对杀' },
+    { id: 'ogs-endgame', title: '围地与终局' },
     { id: 'ggg-practice', title: '综合练习' },
   ]);
   for (const [index, lesson] of curriculumLessons.entries()) {
-    assert.deepEqual(lesson.prerequisites, index ? [advancedIds[index - 1]] : [], lesson.id);
+    assert.deepEqual(lesson.prerequisites, index ? [courseIds[index - 1]] : [], lesson.id);
     assert.ok(curriculumSections.some(section => section.id === lesson.section));
   }
 });
 
-test('beginner catalog metadata comes from the same 14 steps displayed by the original tutorial', t => {
+test('beginner catalog metadata comes from the same 11 steps displayed by the original tutorial', t => {
   assert.equal(beginnerLessons, tutorialContent.TUTORIAL_STEPS);
-  assert.equal(beginnerLessons.length, 14);
-  assert.equal(new Set(beginnerLessons.map(lesson => lesson.id)).size, 14);
+  assert.equal(beginnerLessons.length, 11);
+  assert.equal(new Set(beginnerLessons.map(lesson => lesson.id)).size, 11);
   const host = setup(t);
   const view = host.render().view;
-  assert.deepEqual(view.beginnerLessons, beginnerLessons.map(({ id, title }) => ({ id, title })));
-  assert.deepEqual(view.lessons.map(lesson => lesson.id), advancedIds,
+  assert.equal(Object.hasOwn(view, 'beginnerLessons'), false, 'onboarding is an independent entry');
+  assert.deepEqual(view.lessons.map(lesson => lesson.id), courseIds,
     'beginner replay entries must not become graded advanced lessons');
 });
 
-test('the real advanced entry starts with real and false eyes instead of repeating basic rules', t => {
+test('the course entry directly starts liberty practice without recording an answer', t => {
   const host = setup(t);
   host.render().open();
   const view = host.render().view;
-  assert.equal(view.activeLessonId, 'ogs-real-false-eye');
+  assert.equal(view.activeLessonId, 'ogs-count-liberties');
   assert.equal(view.active.kind, 'choice');
   assert.equal(view.active.phase, 'practice');
   assert.equal(view.active.independent, true);
@@ -107,31 +113,23 @@ test('the real advanced entry starts with real and false eyes instead of repeati
   assert.equal(host.record.exposures.length, 0);
 });
 
-test('course replay opens the chosen beginner step and excludes replay entries from advanced progress', t => {
+test('course directory counts ordinary lessons and does not embed beginner replay', t => {
   const learning = setup(t);
   learning.render().open();
   const view = learning.render().view;
-  const host = render(t, { ...view, tutorialContent }, LearningCenter);
+  const host = render(t, view, LearningCenter);
   const top = elements(host.render()).find(node => node.props.leftButtons);
   elements(top.props.leftButtons).find(node => node.props['aria-label'] === '打开课程').props.onClick();
   const menu = elements(host.render()).find(node => node.type === Modal);
   const progressComponent = elements(menu).find(node => node.type === ProgressBar);
   const progress = ProgressBar(progressComponent.props);
-  assert.equal(progress.props['aria-valuemax'], 15);
+  assert.equal(progress.props['aria-valuemax'], 26);
   assert.equal(progress.props['aria-valuenow'], 0);
-  assert.match(text(menu), /已完成 0 \/ 15 课/);
-  const beginnerSection = elements(menu).find(node => node.props['aria-labelledby'] === 'course-section-beginner');
-  assert.ok(beginnerSection);
-  const entries = elements(beginnerSection).filter(node => typeof node.props.onClick === 'function');
-  assert.equal(entries.length, 14);
-  const chosenIndex = 3;
-  entries[chosenIndex].props.onClick();
-  const replay = elements(host.render()).find(node => node.props.initialStepId);
-  assert.ok(replay, 'the beginner entry must use the existing tutorial modal');
-  assert.equal(replay.props.initialStepId, beginnerLessons[chosenIndex].id);
-  assert.equal(replay.props.tutorialContent, tutorialContent);
-  replay.props.onClose();
-  assert.equal(elements(host.render()).find(node => node.type === Modal).props.isOpen, true);
-  assert.equal(learning.render().view.activeLessonId, 'ogs-real-false-eye');
-  assert.equal(learning.record.attempts.length, 0, 'opening beginner replay must not fabricate graded progress');
+  assert.match(text(menu), /已完成 0 \/ 26 课/);
+  assert.equal(elements(menu).some(node => node.props['aria-labelledby'] === 'course-section-beginner'), false);
+  assert.equal(elements(menu).some(node => node.props.initialStepId), false);
+  assert.equal(learning.render().view.activeLessonId, 'ogs-count-liberties');
+  assert.equal(learning.render().view.active.board, view.active.board, 'opening the directory preserves the current position');
+  assert.equal(learning.record.attempts.length, 0);
+  assert.equal(learning.record.exposures.length, 0);
 });

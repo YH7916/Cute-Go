@@ -4,7 +4,7 @@ import { loadTestModule } from './helpers/loadTestModule.mjs';
 
 // Compose the real start/reset/end hooks. The lightweight host verifies state
 // ownership and callback routing; browser rendering remains separate acceptance.
-const { useStartGameFlow, useResetGameAction, useEndGameAction, useGameState,
+const { useStartGameFlow, useResetGameAction, useEndGameAction, useGameState, useGameAiSession,
   createInitialPosition, recordMove, deferAiMove, platform, renderHook } = await loadTestModule({
   reactHost: true,
   contents: `
@@ -12,6 +12,7 @@ const { useStartGameFlow, useResetGameAction, useEndGameAction, useGameState,
     export { useResetGameAction } from './hooks/gameActions/useResetGameAction';
     export { useEndGameAction } from './hooks/gameActions/useEndGameAction';
     export { useGameState } from './hooks/useGameState';
+    export { useGameAiSession } from './hooks/useGameAiSession';
     export { createInitialPosition, recordMove } from './domains/game/positionState';
     export { deferAiMove } from './domains/game/deferredAiMove';
     export { platform } from './services/platform';
@@ -42,7 +43,7 @@ function setup(t) {
   const webAiEngine = {
     isWorkerReady: false, isInitializing: false,
     initializeAI: value => events.push(['initialize', value]),
-    terminateAI: () => events.push(['terminate']), resetAI: () => events.push(['reset-ai']),
+    terminateAI: () => events.push(['terminate']),
   };
   const options = {
     settings, webAiEngine,
@@ -54,15 +55,22 @@ function setup(t) {
     displayTerritory: null, checkEndGameAchievements: value => achievements.push(value),
     fetchProfile: async id => { fetched.push(id); },
     stopWebThinking: () => events.push(['stop-thinking']),
-    cleanupOnline: value => events.push(['cleanup-online', value]),
+    cleanupOnline: () => events.push(['cleanup-online']),
     sendData: async value => { events.push(['send', value]); return true; },
     setEloDiffText: value => eloTexts.push(value), setEloDiffStyle: value => eloStyles.push(value),
-    clearInitialStones: noop, setShowMenu: noop, setShowPassModal: noop, setIsThinking: noop,
+    setShowMenu: noop,
     setMyColor: noop, playSfx: noop, vibrate: noop,
   };
   const host = renderHook(() => {
     const state = useGameState(15);
-    const input = { ...options, gameState: state };
+    const ai = useGameAiSession({ boardSize: settings.boardSize, gameState: state,
+      executeMoveRef: { current: noop }, handlePassRef: { current: noop },
+      endGameRef: { current: noop }, setToastMsg: noop });
+    Object.assign(options, { aiTimerRef: ai.aiTimerRef, aiTurnLock: ai.aiTurnLock,
+      pendingEndGameRef: ai.pendingEndGameRef });
+    const input = { ...options, gameState: state, webAiEngine: {
+      resetAI: () => { ai.webAiEngine.resetAI(); events.push(['reset-ai']); },
+    } };
     const resetGame = useResetGameAction(input);
     return { state, end: useEndGameAction(input), ...useStartGameFlow({
       settings, showStartScreen, setShowStartScreen: value => { showStartScreen = value; },
@@ -75,11 +83,12 @@ function setup(t) {
     if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument);
     else Reflect.deleteProperty(globalThis, 'document');
   });
+  host.render();
   return { ...host, settings, options, events, achievements, fetched, eloTexts, eloStyles,
     updateElo, applyOnline, get showStartScreen() { return showStartScreen; } };
 }
 
-test('coach start makes a fresh black-first 9x9 game and cancels the previous game', t => {
+test('coach start preserves the selected board, difficulty and color while cancelling the previous game', t => {
   const s = setup(t);
   const api = s.render();
   const previous = api.state.readPosition();
@@ -102,10 +111,10 @@ test('coach start makes a fresh black-first 9x9 game and cancels the previous ga
   assert.deepEqual({ gameType: s.settings.gameType, gameMode: s.settings.gameMode,
     difficulty: s.settings.difficulty, userColor: s.settings.userColor,
     boardSize: s.settings.boardSize, coachMode: s.settings.coachMode },
-  { gameType: 'Go', gameMode: 'PvAI', difficulty: 'Fun', userColor: 'black', boardSize: 9, coachMode: true });
+  { gameType: 'Go', gameMode: 'PvAI', difficulty: 'Hard', userColor: 'white', boardSize: 15, coachMode: true });
   assert.equal(s.options.gameTypeRef.current, 'Go');
-  assert.equal(s.options.boardSizeRef.current, 9);
-  assert.deepEqual(current.state.readPosition(), createInitialPosition(9));
+  assert.equal(s.options.boardSizeRef.current, 15);
+  assert.deepEqual(current.state.readPosition(), createInitialPosition(15));
   assert.notEqual(current.state.readPosition().board, board);
   assert.equal(current.state.gameOver, false);
   assert.equal(current.state.finalScore, null);
@@ -113,13 +122,14 @@ test('coach start makes a fresh black-first 9x9 game and cancels the previous ga
   assert.equal(s.options.aiTimerRef.current, null);
   assert.equal(s.options.aiTurnLock.current, false);
   assert.equal(s.showStartScreen, false);
-  assert.deepEqual(s.events, [['reset-ai'], ['cleanup-online', true], ['terminate']]);
+  assert.deepEqual(s.events, [['reset-ai'], ['cleanup-online'], ['terminate'], ['initialize', { needModel: true }]]);
   t.mock.timers.tick(500);
   assert.equal(staleMoves, 0);
 });
 
 test('ordinary AI start leaves coach mode and promotes its Fun difficulty to Easy', t => {
   const s = setup(t);
+  s.settings.difficulty = 'Fun';
   s.render().handleStartCoach();
   const api = s.render();
   s.events.length = 0;
@@ -185,15 +195,18 @@ test('ordinary AI victory still records the settled achievement and updates the 
   assert.equal(s.render().state.winReason, '数目结束 (积分 +8)');
 });
 
-test('online games retain competitive settlement even if a stale coach flag is present', async t => {
+test('online games retain achievements without rating changes even if a stale coach flag is present', async t => {
   const s = setup(t);
   Object.assign(s.settings, { gameType: 'Go', gameMode: 'PvAI', coachMode: true });
   Object.assign(s.options, { onlineStatus: 'connected', myColor: 'black', opponentProfile: { id: 'player-2', elo: 800 } });
   await s.render().end('black', '联机结束', { black: 42, white: 39 });
-  assert.equal(s.achievements.length, 1);
+  assert.deepEqual(s.achievements, [{ winner: 'black', myColor: 'black',
+    score: { black: 42, white: 39 }, captures: { black: 0, white: 0 } }]);
   assert.equal(s.updateElo.mock.callCount(), 0);
-  assert.equal(s.applyOnline.mock.callCount(), 1);
-  assert.equal(s.applyOnline.mock.calls[0].arguments[0].winnerId, 'player-1');
-  assert.equal(s.applyOnline.mock.calls[0].arguments[0].loserId, 'player-2');
-  assert.deepEqual(s.fetched, ['player-1']);
+  assert.equal(s.applyOnline.mock.callCount(), 0);
+  assert.deepEqual(s.eloTexts, [null]);
+  assert.deepEqual(s.eloStyles, [null]);
+  assert.equal(s.render().state.winReason, '联机结束');
+  t.mock.timers.tick(5000);
+  assert.deepEqual(s.fetched, []);
 });

@@ -4,7 +4,8 @@ import { createRequire } from 'node:module';
 import { createBoard } from '../core/board';
 import { getBeginnerAIMove } from '../core/go/ai';
 import { attemptMove } from '../core/go/rules';
-import type { AnalysisResult } from '../core/inference/engine';
+import type { AnalysisResult, OnnxEngine as Engine } from '../core/inference/engine';
+import { extractPolicyMoves } from '../core/inference/policy';
 import type { WorkerInMessage, WorkerOutMessage } from '../core/inference/protocol';
 import type { BoardState, Difficulty, HistoryItem, Player } from '../types';
 import { getAIConfig } from '../utils/aiConfig';
@@ -35,15 +36,18 @@ function centerOpening(): { board: BoardState; history: HistoryItem[] } {
 
 async function compute(t: TestContext, {
   board, history, moves, difficulty = 'Easy', color = 'white', simulations = 1,
+  temperature = getAIConfig(difficulty).temperature, analyze,
 }: {
   board: BoardState; history: HistoryItem[]; moves: AnalysisResult['moves'];
   difficulty?: Difficulty; color?: Player; simulations?: number;
+  temperature?: number; analyze?: Engine['analyze'];
 }) {
   let calls = 0;
   t.mock.method(OnnxEngine.prototype, 'initialize', async () => {});
   t.mock.method(OnnxEngine.prototype, 'dispose', async () => {});
-  t.mock.method(OnnxEngine.prototype, 'analyze', async () => {
+  t.mock.method(OnnxEngine.prototype, 'analyze', async (...args: Parameters<Engine['analyze']>) => {
     calls++;
+    if (analyze) return analyze(...args);
     return { rootInfo: { winrate: 50, lead: 0, scoreStdev: 1, ownership: null }, moves };
   });
   const before = structuredClone({ board, history });
@@ -53,7 +57,7 @@ async function compute(t: TestContext, {
   try {
     await send({ type: 'compute', generation, requestId: id, data: {
       board, history, size: board.length, color, gameType: 'Go', difficulty, simulations, komi: 3.5,
-      temperature: getAIConfig(difficulty).temperature,
+      temperature,
     } });
     const responses = replies.filter(reply => reply.type === 'ai-response');
     assert.equal(responses.length, 1, JSON.stringify(replies));
@@ -112,12 +116,60 @@ test('Medium Worker: configured visits do not change its existing single-inferen
 });
 
 for (const simulations of [10, 25]) {
-  test(`Hard Worker: retains its ${simulations}-visit search budget`, async t => {
+  test(`Hard Worker: legacy ${simulations}-visit requests still use one deterministic policy inference`, async t => {
+    t.mock.method(Math, 'random', () => { throw new Error('Hard must never sample'); });
     const result = await compute(t, {
       ...centerOpening(), moves: [modelMove(0, 0), modelMove(0, 1, 0.8)], difficulty: 'Hard', simulations,
     });
-    assert.equal(result.calls, simulations);
-    assert.ok(result.move);
-    assert.ok(result.move.x === 0 && (result.move.y === 0 || result.move.y === 1));
+    assert.equal(result.calls, 1);
+    assert.deepEqual(result.move, { x: 0, y: 0 });
   });
 }
+
+for (const color of ['black', 'white'] as const) {
+  test(`Hard ${color}: shallow value estimates cannot replace the model's top policy`, async t => {
+    const pla = color === 'black' ? 1 : -1;
+    t.mock.method(Math, 'random', () => { throw new Error('Hard must never sample'); });
+    const result = await compute(t, {
+      board: createBoard(9), history: [], moves: [], color, difficulty: 'Hard', simulations: 25,
+      analyze: async (board, toPlay, options) => {
+        assert.equal(toPlay, pla, 'evaluate the supplied player at the root only');
+        assert.equal(options?.komi, 3.5);
+        assert.equal(options?.temperature, 0);
+        const logits = new Float32Array(82).fill(-100);
+        logits[0] = 1;
+        logits[1] = 0.9;
+        // A synthetic value head favors the second move during search. The Hard
+        // contract is policy-only, irrespective of that head or ownership.
+        const favored = board.get(1, 0) === pla;
+        return { rootInfo: { winrate: toPlay === pla ? (favored ? 99 : 1) : (favored ? 1 : 99),
+          lead: 0, scoreStdev: 1, ownership: new Float32Array(81).fill(-pla) },
+          moves: extractPolicyMoves(logits, 9, board, toPlay, 0) };
+      },
+    });
+    assert.equal(result.calls, 1);
+    assert.deepEqual(result.move, { x: 0, y: 0 });
+  });
+
+  test(`Hard ${color}: a policy-first pass is respected before the old half-board cutoff`, async t => {
+    const result = await compute(t, { board: createBoard(9), history: [], color,
+      difficulty: 'Hard', moves: [modelMove(-1, -1), modelMove(0, 0, 0.1)] });
+    assert.equal(result.calls, 1);
+    assert.equal(result.move, null, 'do not force a low-prior placement over a legal model pass');
+  });
+}
+
+test('Hard ignores a stale nonzero temperature and still validates model coordinates', async t => {
+  t.mock.method(Math, 'random', () => { throw new Error('Hard must never sample'); });
+  const result = await compute(t, {
+    ...centerOpening(), difficulty: 'Hard', temperature: 2.1, simulations: 25,
+    moves: [modelMove(4, 4), modelMove(2, 2, 0.5), modelMove(2, 3, 0.1)],
+    analyze: async (_board, _color, options) => {
+      assert.equal(options?.temperature, 0);
+      return { rootInfo: { winrate: 50, lead: 0, scoreStdev: 1, ownership: null },
+        moves: [modelMove(4, 4), modelMove(2, 2, 0.5), modelMove(2, 3, 0.1)] };
+    },
+  });
+  assert.equal(result.calls, 1);
+  assert.deepEqual(result.move, { x: 2, y: 2 }, 'occupied policy point is skipped without randomizing the rest');
+});

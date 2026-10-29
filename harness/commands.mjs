@@ -4,7 +4,7 @@ export const checks = {
   lint: { description: '依赖边界、类型逃逸、循环与文件大小', package: 'eslint', bin: 'eslint', args: ['--max-warnings', '0'] },
   typecheck: { description: 'TypeScript 全量类型检查', package: 'typescript', bin: 'tsc', args: ['--noEmit'] },
   test: { description: 'Node 回归和 harness 负向测试', script: 'scripts/run-tests.mjs' },
-  build: { description: 'Vite 生产构建', package: 'vite', bin: 'vite', args: ['build'] },
+  build: { description: 'Vite 前端与独立 Node Pi 后台生产构建', script: 'harness/build.mjs' },
 };
 export const checkOrder = ['contracts', 'lint', 'typecheck', 'test', 'build'];
 export const flowTestPaths = ['tests/flows'];

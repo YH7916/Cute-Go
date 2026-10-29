@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCcw, SkipForward, Undo2 } from 'lucide-react';
+import { RotateCw, SkipForward, Undo2 } from 'lucide-react';
 
 interface GameAction {
   label: string;
@@ -7,6 +7,7 @@ interface GameAction {
   disabled?: boolean;
   icon?: React.ReactNode;
   pulse?: boolean;
+  title?: string;
 }
 
 // Match and teaching share the same undo / main action / restart presentation.
@@ -16,15 +17,15 @@ export function GamePlayControls({ undo, primary, reset }: {
 }) {
   const actionClass = 'flex min-w-0 flex-col items-center justify-center gap-1 p-3 rounded-2xl font-bold disabled:opacity-50';
   return <div className={`game-play-controls grid gap-3 ${primary ? 'grid-cols-3' : 'grid-cols-2'}`}>
-    <button type="button" onClick={undo.onClick} disabled={undo.disabled} className={`btn-retro btn-sand ${actionClass}`}>
-      {undo.icon ?? <Undo2 size={20} />}<span className="text-xs">{undo.label}</span>
+    <button type="button" onClick={undo.onClick} disabled={undo.disabled} title={undo.title} className={`btn-retro btn-sand ${actionClass}`}>
+      {undo.icon ?? <Undo2 size={20} aria-hidden="true" />}<span className="text-xs">{undo.label}</span>
     </button>
-    {primary && <button type="button" onClick={primary.onClick} disabled={primary.disabled}
+    {primary && <button type="button" onClick={primary.onClick} disabled={primary.disabled} aria-label={primary.label} title={primary.title}
       className={`btn-retro btn-coffee ${actionClass} ${primary.pulse ? 'animate-pulse' : ''}`}>
-      {primary.icon ?? <SkipForward size={20} />}<span className="text-xs">{primary.label}</span>
+      {primary.icon ?? <SkipForward size={20} aria-hidden="true" />}<span className="text-xs">{primary.label}</span>
     </button>}
-    <button type="button" onClick={reset.onClick} disabled={reset.disabled} className={`btn-retro btn-beige ${actionClass}`}>
-      {reset.icon ?? <RotateCcw size={20} />}<span className="text-xs">{reset.label}</span>
+    <button type="button" onClick={reset.onClick} disabled={reset.disabled} title={reset.title} className={`btn-retro btn-beige ${actionClass}`}>
+      {reset.icon ?? <RotateCw size={20} aria-hidden="true" />}<span className="text-xs">{reset.label}</span>
     </button>
   </div>;
 }

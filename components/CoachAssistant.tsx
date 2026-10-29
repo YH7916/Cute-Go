@@ -12,20 +12,19 @@ interface CoachAssistantProps {
   gameOver: boolean;
   coachSkin?: CoachSkinId;
   onInspectPosition?: AppViewModel['review']['inspectPosition'];
-  reviewAction?: React.ReactNode;
   review?: AppViewModel['review'];
 }
 
-export function CoachAssistant({ coach, gameOver, coachSkin = 'chuying', onInspectPosition, reviewAction, review }: CoachAssistantProps) {
+export function CoachAssistant({ coach, gameOver, coachSkin = 'chuying', onInspectPosition, review }: CoachAssistantProps) {
   const message = useRef<HTMLDivElement>(null);
   const placement = useCoachPlacement();
   const text = review ? review.error || (coach.error ? '讲解暂时不可用，可以重试。' : coach.text)
-    || (review.inVariation ? '在棋盘上试下，点“原谱”回到这手。' : '用上方按钮选一手，点讲解看原因。') : coach.text;
+    || (review.inVariation ? '在棋盘上试下，点“原谱”返回。' : '选一手棋，点“讲解”看原因。') : coach.text;
   const loading = coach.loading && !review?.error;
   const speechVisible = Boolean(text || coach.error || loading);
   useEffect(() => {
     if (message.current) message.current.scrollTop = 0;
-  }, [speechVisible, text, loading]);
+  }, [speechVisible, text]);
 
   return <aside {...placement.container} aria-label={review ? '围棋复盘助手' : '围棋陪练助手'} className={`coach-assistant ${coach.configured && !review ? 'coach-configured' : ''} flex items-start min-w-0`}>
     <button {...placement.character} type="button" className="coach-character shrink-0" aria-label="移动讲解助手"
@@ -44,7 +43,7 @@ export function CoachAssistant({ coach, gameOver, coachSkin = 'chuying', onInspe
       {speechVisible && <CoachBubble text={text} loading={loading}
         error={review ? undefined : coach.error} source={coach.source} bodyRef={message} coachSkin={coachSkin} />}
       <div id="coach-assistant-panel" className="coach-tools w-full shrink-0">
-        <CoachPanel coach={coach} gameOver={gameOver} reviewAction={reviewAction} review={review} />
+        <CoachPanel coach={coach} gameOver={gameOver} review={review} />
       </div>
     </Panel>
   </aside>;

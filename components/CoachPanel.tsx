@@ -7,11 +7,10 @@ import { CoachReviewTools } from './coach/CoachReviewTools';
 interface CoachPanelProps {
   coach: AppViewModel['coach'];
   gameOver: boolean;
-  reviewAction?: React.ReactNode;
   review?: AppViewModel['review'];
 }
 
-export function CoachPanel({ coach, gameOver, reviewAction, review }: CoachPanelProps) {
+export function CoachPanel({ coach, gameOver, review }: CoachPanelProps) {
   const [question, setQuestion] = useState('');
   return (
     <div role="region" aria-label={review ? 'AI 复盘讲解' : 'AI 陪练讲解'} className="coach-controls flex flex-col">
@@ -19,10 +18,9 @@ export function CoachPanel({ coach, gameOver, reviewAction, review }: CoachPanel
         {coach.loading
           ? <Button appearance="retro" size="sm" variant="primary" className="h-11 min-w-11 flex-1 flex items-center justify-center gap-1 whitespace-nowrap" aria-label="停止讲解" onClick={coach.cancel}><Square className="coach-action-icon" size={14} aria-hidden="true" />停止</Button>
           : <Button appearance="retro" size="sm" variant="primary" className="h-11 min-w-11 flex-1 flex items-center justify-center gap-1 whitespace-nowrap" aria-label={review ? '讲解这手' : '讲解当前局面'} title={review ? '讲解这手' : '讲解当前局面'} onClick={() => void coach.ask('explain-position')}><MessageCircle className="coach-action-icon" size={14} aria-hidden="true" />讲解</Button>}
-        {review ? <CoachReviewTools review={review} /> : <>
+        {review ? <CoachReviewTools review={review} /> :
           <Button appearance="retro" size="sm" variant="secondary" className="h-11 min-w-11 flex-1 flex items-center justify-center gap-1 whitespace-nowrap" aria-label="给点提示" title="下一步看哪里" onClick={() => void coach.ask('hint')}><Lightbulb className="coach-action-icon" size={14} aria-hidden="true" />提示</Button>
-          {reviewAction}
-        </>}
+        }
       </div>
       {coach.configured && !review && <form className="coach-composer flex min-w-0 gap-1" onSubmit={event => {
         event.preventDefault();

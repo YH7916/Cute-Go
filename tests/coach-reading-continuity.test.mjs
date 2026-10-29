@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createInitialPosition, setAgentInterceptor, settle, setup, move } from './helpers/coachSession.mjs';
 
-const offline = { endpoint: '', model: '', apiKey: '' };
+const offline = { endpoint: '', provider: 'deepseek', model: 'deepseek-flash', apiKey: '' };
 
-function playHumanSelfAtari(s) {
+function playHumanMove(s, selfAtari = false) {
   const position = createInitialPosition(9);
-  for (const [x, y] of [[0, 1], [1, 0], [2, 1]]) {
+  for (const [x, y] of selfAtari ? [[0, 1], [1, 0], [2, 1]] : [[0, 1]]) {
     position.board[y][x] = { color: 'white', x, y, id: `white-${x}-${y}` };
   }
   s.api.state.writePosition(position);
@@ -15,15 +15,19 @@ function playHumanSelfAtari(s) {
   s.render();
 }
 
-test('a completed warning after the human move stays readable through an ordinary AI reply', async t => {
+async function explainHumanMove(s, selfAtari = false) {
+  playHumanMove(s, selfAtari);
+  await s.api.coach.ask('explain-last-move');
+}
+
+test('a completed manual explanation after the human move stays readable through an ordinary AI reply', async t => {
   const s = await setup(t, offline);
-  playHumanSelfAtari(s);
-  await settle();
+  await explainHumanMove(s);
   const warning = s.render().coach.text;
   const explainedPosition = s.api.state.readPosition();
-  assert.match(warning, /一口气|1口气/, 'the real rules must detect the human self-atari');
+  assert.match(warning, /气变少/, 'the manual explanation must describe the verified pressure');
   assert.equal(s.api.coach.loading, false);
-  assert.ok(s.api.coach.hintPoints.length > 0, 'the original warning refers to an actual liberty');
+  assert.ok(s.api.coach.hintPoints.length > 0, 'the manual explanation refers to the actual pressured group');
 
   move(s, 6, 6);
   assert.equal(s.api.state.readPosition().currentPlayer, 'black');
@@ -39,18 +43,20 @@ test('a completed warning after the human move stays readable through an ordinar
   assert.equal(s.requests.length, 0, 'reading continuity must not start a cloud request');
 });
 
-test('an unfinished warning from the human position cannot publish after the AI reply', async t => {
+test('an unfinished manual explanation from the human position cannot publish after the AI reply', async t => {
   const s = await setup(t, offline);
   let release;
   let pendingSignal;
   setAgentInterceptor((input, signal, run) => input.kind === 'inspect' && input.position.currentPlayer === 'white'
     ? new Promise(resolve => { release = () => resolve(run()); pendingSignal = signal; }) : run());
-  playHumanSelfAtari(s);
+  playHumanMove(s);
+  const pending = s.api.coach.ask('explain-last-move');
   assert.equal(typeof release, 'function');
   assert.equal(s.api.coach.text, '');
   move(s, 6, 6);
   assert.equal(pendingSignal.aborted, false, 'the synchronous write precedes effect cleanup');
   release();
+  await pending;
   await settle();
   s.render();
   await settle();
@@ -59,10 +65,9 @@ test('an unfinished warning from the human position cannot publish after the AI 
   assert.equal(s.requests.length, 0);
 });
 
-test('resetting the game clears a previously completed warning', async t => {
+test('resetting the game clears a previously completed manual explanation', async t => {
   const s = await setup(t, offline);
-  playHumanSelfAtari(s);
-  await settle();
+  await explainHumanMove(s);
   assert.ok(s.render().coach.text.length > 0);
   s.api.state.writePosition(createInitialPosition(9));
   assert.equal(s.render().coach.text, '');
@@ -71,10 +76,9 @@ test('resetting the game clears a previously completed warning', async t => {
   assert.deepEqual(s.api.coach.hintPoints, []);
 });
 
-test('the next human move clears the previous-turn warning', async t => {
+test('the next human move clears the previous-turn manual explanation', async t => {
   const s = await setup(t, offline);
-  playHumanSelfAtari(s);
-  await settle();
+  await explainHumanMove(s);
   const warning = s.render().coach.text;
   assert.ok(warning.length > 0);
   move(s, 6, 6);
@@ -92,10 +96,9 @@ test('the next human move clears the previous-turn warning', async t => {
 });
 
 for (const change of ['owner', 'exit']) {
-  test(`${change} clears an already published warning retained after the AI reply`, async t => {
+  test(`${change} clears an already published manual explanation retained after the AI reply`, async t => {
     const s = await setup(t, offline);
-    playHumanSelfAtari(s);
-    await settle();
+    await explainHumanMove(s);
     const warning = s.render().coach.text;
     assert.ok(warning.length > 0);
     move(s, 6, 6);
@@ -114,10 +117,9 @@ for (const change of ['owner', 'exit']) {
   });
 }
 
-test('an AI capture retains the historical warning without marking the removed stone on the live board', async t => {
+test('an AI capture retains the manual historical warning without marking the removed stone on the live board', async t => {
   const s = await setup(t, offline);
-  playHumanSelfAtari(s);
-  await settle();
+  await explainHumanMove(s, true);
   const warning = s.render().coach.text;
   const explainedPosition = s.api.state.readPosition();
   assert.ok(warning.length > 0);
@@ -136,10 +138,10 @@ test('an AI capture retains the historical warning without marking the removed s
 
 test('returning to the explained snapshot preserves its completed cloud answer', async t => {
   const s = await setup(t);
-  playHumanSelfAtari(s);
+  playHumanMove(s);
   await settle();
   const explainedPosition = s.api.state.readPosition();
-  const pending = s.render().coach.ask('explain-last-move');
+  const pending = s.render().coach.ask('explain-last-move', '什么叫打吃，怎样解围？');
   await settle();
   const completed = s.respondChoice(0, 'concept.atari');
   await pending;
@@ -150,7 +152,7 @@ test('returning to the explained snapshot preserves its completed cloud answer',
   assert.equal(s.render().coach.text, completed);
   s.api.state.writePosition(explainedPosition);
   s.options.playing = false;
-  const summary = '只剩一口气叫打吃；可以检查接长、连接或吃子能否解围；多出气不等于做活，一口气也不一定能被合法吃掉。';
+  const summary = '只剩一口气就叫打吃。先检查能否接长或吃子解围。';
   assert.equal(s.render().coach.text, summary);
   await settle();
   assert.equal(s.render().coach.text, summary, 'reinspection must not replace the explanation the user chose to review');
@@ -158,10 +160,9 @@ test('returning to the explained snapshot preserves its completed cloud answer',
   assert.equal(s.api.coach.source, 'cloud');
 });
 
-test('a failed inspection after an AI reply does not erase completed guidance', async t => {
+test('a failed inspection after an AI reply does not erase completed manual guidance', async t => {
   const s = await setup(t, offline);
-  playHumanSelfAtari(s);
-  await settle();
+  await explainHumanMove(s);
   const warning = s.render().coach.text;
   const explainedPosition = s.api.state.readPosition();
   setAgentInterceptor(() => Promise.reject(new Error('inspection failed')));

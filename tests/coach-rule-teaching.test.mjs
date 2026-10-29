@@ -10,7 +10,7 @@ const { executeCoachAgent, coachPositionKey, getDefaultKomi, attemptMove, record
     export { attemptMove } from './core/go/rules';
     export { recordMove } from './domains/game/positionState';`,
 });
-const offline = { endpoint: '', model: '', apiKey: '' };
+const offline = { endpoint: '', provider: 'deepseek', model: 'deepseek-flash', apiKey: '' };
 function stone(position, color, x, y) {
   position.board[y][x] = { color, x, y, id: `${color}-${x}-${y}` };
 }
@@ -57,15 +57,16 @@ test('an occupied point explains occupancy without suggesting a new move or chan
 
 test('suicide and ko explanations mark only the rejected empty point and explain the actual rule', async () => {
   const suicide = await executeCoachAgent({ ...input(suicidePosition()), attemptedPoint: { x: 1, y: 1 } });
-  assert.match(suicide.text, /圈出的这里.*(没有气|无气|一口气也没有)/);
-  assert.doesNotMatch(suicide.text, /[①②③]|B4/);
-  assert.match(suicide.text, /提|吃/);
+  assert.match(suicide.text, /^在这里落子后，整块棋没有气/);
+  assert.doesNotMatch(suicide.text, /[①②③]|B4|圈出的这里|\s/);
+  assert.match(suicide.text, /也吃不到对方的棋来腾出气.*不能下/);
   assert.deepEqual(suicide.hintPoints, [{ x: 1, y: 1, label: 'B4' }]);
   const ko = await executeCoachAgent({ ...input(koPosition()), attemptedPoint: { x: 1, y: 1 } });
   assert.match(ko.text, /劫/);
-  assert.match(ko.text, /圈出的这里/);
-  assert.doesNotMatch(ko.text, /[①②③]|B4/);
-  assert.match(ko.text, /重复|还原|回到/);
+  assert.match(ko.text, /^在这里马上提回/);
+  assert.doesNotMatch(ko.text, /[①②③]|B4|圈出的这里|\s/);
+  assert.match(ko.text, /回到上一手之前/);
+  assert.match(ko.text, /先在别处下一手，等对方回应后再看/);
   assert.deepEqual(ko.hintPoints, [{ x: 1, y: 1, label: 'B4' }]);
 });
 
@@ -85,8 +86,8 @@ test('missing, invalid and legal attempted points never produce a false illegal-
 test('illegal-move teaching remains local even if a configured caller requests cloud execution', async t => {
   const fetch = t.mock.method(globalThis, 'fetch', async () => { throw new Error('unexpected provider request'); });
   const result = await executeCoachAgent({ ...input(suicidePosition()), kind: 'ask', attemptedPoint: { x: 1, y: 1 },
-    config: { endpoint: 'https://coach.example/v1', model: 'test', apiKey: 'test-secret' } });
-  assert.match(result.text, /圈出的这里/);
+    config: { endpoint: 'https://coach.example/v1', provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test-secret' } });
+  assert.match(result.text, /^在这里落子后，整块棋没有气/);
   assert.equal(result.source, 'local');
   assert.equal(fetch.mock.callCount(), 0);
 });
@@ -102,7 +103,7 @@ test('the hook teaches a rejected move without engine calls, provider calls or p
   const snapshot = structuredClone(position);
   await s.render().coach.explainIllegalMove({ x: 1, y: 1 }, position);
   const { coach, state } = s.render();
-  assert.match(coach.text, /圈出的这里/);
+  assert.match(coach.text, /^在这里落子后，整块棋没有气/);
   assert.equal(coach.loading, false);
   assert.equal(state.readPosition(), position);
   assert.deepEqual(position, snapshot);
@@ -161,14 +162,14 @@ test('a rejected-move lesson cancels a pending cloud answer and keeps its own ex
   s.api.state.writePosition(position);
   s.render();
   await settle();
-  const paid = s.render().coach.ask('hint');
+  const paid = s.render().coach.ask('hint', '气是什么？');
   await settle();
   assert.equal(s.requests.length, 1);
   await s.api.coach.explainIllegalMove({ x: 1, y: 1 }, position);
   assert.equal(s.requests[0].init.signal.aborted, true);
-  const staleAnswer = s.respondChoice(0, 'concept.capture');
+  const staleAnswer = s.respondChoice(0, 'concept.liberties');
   await paid;
-  assert.match(s.render().coach.text, /圈出的这里/);
+  assert.match(s.render().coach.text, /^在这里落子后，整块棋没有气/);
   assert.notEqual(s.api.coach.text, staleAnswer);
 });
 
@@ -193,9 +194,8 @@ test('position lessons describe black-perspective estimates from either player v
   const position = developedPosition();
   for (const [lead, userColor, color, relationship] of [[8, 'black', '黑棋', '你'], [-8, 'black', '白棋', '对手'], [8, 'white', '黑棋', '对手'], [-8, 'white', '白棋', '你']]) {
     const result = await executeCoachAgent({ ...input(position, 'explain-position'), userColor, engineEvidence: estimate(position, lead) });
-    assert.match(result.text, new RegExp(`${color}.*${relationship}`));
-    assert.match(result.text, /粗略|估计|粗看/);
-    assert.match(result.text, /不是终局|不代表终局|还没结束|局势还会变/);
+    assert.match(result.text, new RegExp(`^粗看${color}（${relationship}）稍占先`));
+    assert.match(result.text, /还能围空/);
     assert.doesNotMatch(result.text, /8\s*目|胜率|稳胜|必胜/);
     assert.ok(result.text.length <= 60, 'a local position lesson focuses on one compact teaching point');
   }
@@ -203,9 +203,13 @@ test('position lessons describe black-perspective estimates from either player v
 
 test('position lessons avoid inventing a leader when engine evidence is absent, stale or nearly level', async () => {
   const position = developedPosition();
-  for (const engineEvidence of [undefined, { ...estimate(position, 20), positionKey: 'stale' }, estimate(position, 0.5)]) {
+  for (const [engineEvidence, expected] of [
+    [undefined, /^比较双方围住了哪些空点/],
+    [{ ...estimate(position, 20), positionKey: 'stale' }, /^比较双方围住了哪些空点/],
+    [estimate(position, 0.5), /^粗看双方接近/],
+  ]) {
     const result = await executeCoachAgent({ ...input(position, 'explain-position'), engineEvidence });
-    assert.match(result.text, /弱棋|一口气/);
+    assert.match(result.text, expected);
     assert.match(result.text, /围|空点/);
     assert.doesNotMatch(result.text, /领先|占先|得分暂时较多|20\s*目|0\.5\s*目/);
     assert.ok(result.text.length <= 60);
@@ -218,8 +222,9 @@ test('position teaching prioritizes the endangered group and keeps its player pe
   for (const [x, y] of [[0, 1], [1, 0], [2, 1]]) stone(position, 'white', x, y);
   for (const [userColor, relationship] of [['black', '你'], ['white', '对手']]) {
     const result = await executeCoachAgent({ ...input(position, 'explain-position'), userColor });
-    assert.match(result.text, new RegExp(`${relationship}有一块棋只剩一口气`));
-    assert.match(result.text, /再.*(围|空点)/);
+    assert.match(result.text, new RegExp(`^${relationship}在①的棋只剩一口气（②）`));
+    assert.match(result.text, userColor === 'black' ? /先看能否接长或吃子解围/ : /先检查能否合法占住这口气提子/);
+    assert.deepEqual(result.hintPoints, [{ x: 1, y: 1, label: 'B4' }, { x: 1, y: 2, label: 'B3' }]);
     assert.doesNotMatch(result.text, /领先|必死|必胜/);
   }
 });
@@ -244,8 +249,9 @@ test('an opening atari takes priority over development advice and speculative sc
   stone(position, 'black', 1, 1);
   for (const [x, y] of [[0, 1], [1, 0], [2, 1]]) stone(position, 'white', x, y);
   const result = await executeCoachAgent({ ...input(position, 'explain-position'), engineEvidence: estimate(position, 30) });
-  assert.match(result.text, /^你有一块棋只剩一口气/);
-  assert.match(result.text, /连接|逃出/);
+  assert.match(result.text, /^你在①的棋只剩一口气（②）/);
+  assert.match(result.text, /先看能否接长或吃子解围/);
+  assert.deepEqual(result.hintPoints, [{ x: 1, y: 1, label: 'B8' }, { x: 1, y: 2, label: 'B7' }]);
   assert.doesNotMatch(result.text, /刚开局|占先|较多/);
   assert.ok(result.text.length <= 60);
 });

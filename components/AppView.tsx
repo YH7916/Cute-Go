@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, User as UserIcon, Home, History } from 'lucide-react';
+import { Settings, User as UserIcon, Home } from 'lucide-react';
 import { GameBoard } from './GameBoard';
 import { ScoreBoard } from './ScoreBoard';
 import { GameControls } from './GameControls';
@@ -11,7 +11,7 @@ import { LearningCenter } from './coach/LearningCenter';
 import { AchievementNotification } from './AchievementNotification';
 import { StartScreen } from './StartScreen';
 import { TopBar } from './common/TopBar';
-import { Button, Toast } from '../ui/common';
+import { Toast } from '../ui/common';
 import { AppModals } from './app/AppModals';
 import type { AppViewModel } from './app/AppViewModel';
 
@@ -38,7 +38,6 @@ export const AppView: React.FC<AppViewProps> = ({ vm }) => {
     newUnlocked,
     onlineStatus,
     resetGame,
-    setIsThinking,
     setShowAboutModal,
     setShowImportModal,
     setShowMenu,
@@ -57,7 +56,6 @@ export const AppView: React.FC<AppViewProps> = ({ vm }) => {
     webInitStatus,
   } = vm;
   if (vm.teaching.view.isOpen) return <LearningCenter {...vm.teaching.view} onClose={vm.handleReturnHome} onPractice={vm.handleStartCoach}
-    tutorialContent={vm.teaching.tutorialContent}
     coachSkin={settings.coachSkin} appearance={{ stoneSkin: settings.stoneSkin, boardSkin: settings.boardSkin,
       stoneAnimationEnabled: settings.stoneAnimationEnabled, separatePieces: settings.separatePieces, vibrate }} />;
   const isFunGoMode = settings.gameType === 'Go' && settings.gameMode === 'PvAI' && settings.difficulty === 'Fun';
@@ -84,7 +82,6 @@ export const AppView: React.FC<AppViewProps> = ({ vm }) => {
       gameState.setAppMode('playing');
       gameState.writePosition(position => ({ ...position, history: [], consecutivePasses: 0 }));
       aiTurnLock.current = false;
-      setIsThinking(false);
     }}
     reviewIndex={gameState.reviewIndex}
     history={gameState.history}
@@ -136,16 +133,9 @@ export const AppView: React.FC<AppViewProps> = ({ vm }) => {
     onToggleTerritory={() => setShowTerritory((prev: boolean) => !prev)}
     userColor={settings.userColor}
   /> : null;
-  const reviewEntry = vm.coach.active && gameState.appMode === 'playing' && settings.gameType === 'Go'
-      && onlineStatus === 'disconnected' && gameState.history.length > 0
-    ? <Button appearance="retro" variant="secondary" size="sm"
-      className="h-11 w-11 shrink-0 px-0 flex items-center justify-center"
-      aria-label="回看棋谱" title="回看棋谱" onClick={vm.handleEnterReview}>
-      <History size={18} aria-hidden="true" />
-    </Button> : undefined;
 
   return (
-    <div className={`${themeClass} ${vm.coach.active ? 'coach-layout' : ''} h-full w-full bg-[#f7e7ce] flex flex-col landscape:flex-row items-center relative select-none overflow-y-auto landscape:overflow-hidden text-[#5c4033] pb-safe`}>
+    <div className={`game-layout ${themeClass} ${vm.coach.active ? 'coach-layout' : ''} h-full w-full bg-[#f7e7ce] flex flex-col landscape:flex-row items-center relative select-none overflow-y-auto landscape:overflow-hidden text-[#5c4033] pb-safe`}>
       <Toast message={toastMsg} />
 
       {showStartScreen && (
@@ -214,7 +204,6 @@ export const AppView: React.FC<AppViewProps> = ({ vm }) => {
           passNotificationDismissed={gameState.passNotificationDismissed}
           onDismiss={() => {
             gameState.setPassNotificationDismissed(true);
-            setIsThinking(false);
             stopWebThinking();
             aiTurnLock.current = false;
           }}
@@ -225,8 +214,8 @@ export const AppView: React.FC<AppViewProps> = ({ vm }) => {
       <div className="game-sidebar w-full landscape:w-96 flex flex-col gap-4 pb-4 z-20 shrink-0 bg-[#f7e7ce] landscape:bg-[#f2e6d6] landscape:h-full landscape:overflow-y-auto landscape:border-l-4 landscape:border-[#e3c086] order-1 landscape:order-2 shadow-xl landscape:shadow-none">
         {topBar}
 
-        <div className="game-actions flex flex-col gap-4 px-4">
-          <div className="flex items-center gap-2">
+        <div className="game-actions flex flex-col gap-4 px-4" data-has-analysis={Boolean(analysisPanel)}>
+          <div className="game-score flex items-center gap-2">
             <div className="flex-1 min-w-0">
               {scoreBoard}
             </div>
@@ -240,8 +229,7 @@ export const AppView: React.FC<AppViewProps> = ({ vm }) => {
 
       {vm.coach.active && <CoachAssistant coach={vm.coach} coachSkin={settings.coachSkin} gameOver={gameState.gameOver}
         onInspectPosition={vm.handleInspectReview}
-        review={gameState.appMode === 'review' ? vm.review : undefined}
-        reviewAction={reviewEntry} />}
+        review={gameState.appMode === 'review' ? vm.review : undefined} />}
       <AppModals vm={vm} />
     </div>
   );

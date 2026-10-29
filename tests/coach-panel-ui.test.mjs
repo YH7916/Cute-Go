@@ -93,15 +93,16 @@ test('incoming guidance and request cancellation preserve the unsent question', 
   assert.deepEqual(s.calls, []);
 });
 
-test('loading replaces explanation with stop while preserving the hint and review action', t => {
+test('loading replaces explanation with stop while preserving the two-action row', t => {
   const s = setup(t, true);
-  const review = { type: 'review-action', props: { children: '回看棋谱' } };
-  s.props.reviewAction = review;
   s.props.coach.loading = true;
   let tree = s.render();
   assert.equal(elements(tree).some(element => element.props['aria-label'] === '讲解当前局面'), false);
   assert.ok(control(tree, '给点提示'));
-  assert.ok(elements(tree).includes(review));
+  const row = elements(tree).find(element => /\bcoach-actions\b/.test(element.props.className ?? ''));
+  assert.deepEqual(elements(row).filter(element => element.props['aria-label']).map(element => element.props['aria-label']),
+    ['停止讲解', '给点提示']);
+  assert.equal(elements(tree).some(element => element.props['aria-label'] === '回看棋谱'), false);
   control(tree, '停止讲解').props.onClick();
   assert.equal(s.cancelled, 1);
   assert.deepEqual(s.calls, [], 'stopping never issues a replacement request');
@@ -145,19 +146,15 @@ test('primary actions retain retro buttons and leave the complete reply in its s
   assert.equal(control(tree, '发送问题').props.variant, 'secondary');
 });
 
-test('the review action is immediately available alongside explanation and hint', t => {
+test('the main action row contains only explanation and hint without a review icon', t => {
   const s = setup(t);
-  let reviews = 0;
-  const action = { type: 'review-action', props: { 'aria-label': '回看棋谱', onClick: () => reviews++ } };
-  s.props.reviewAction = action;
   const tree = s.render();
   const row = elements(tree).find(element => /\bcoach-actions\b/.test(element.props.className ?? ''));
   assert.ok(row);
   assert.deepEqual(elements(row).filter(element => element.props['aria-label']).map(element => element.props['aria-label']),
-    ['讲解当前局面', '给点提示', '回看棋谱']);
-  assert.ok(elements(row).includes(action));
-  control(tree, '回看棋谱').props.onClick();
-  assert.equal(reviews, 1);
+    ['讲解当前局面', '给点提示']);
+  assert.equal(elements(row).filter(element => element.props.appearance === 'retro').length, 2);
+  assert.equal(elements(tree).some(element => element.props['aria-label'] === '回看棋谱'), false);
   assert.equal(elements(tree).some(element => element.props.type === 'checkbox'), false);
 });
 
@@ -165,9 +162,7 @@ test('review replaces live hint, navigation and composer with one explanation an
   const s = setup(t, true);
   control(s.render(), '向陪练提问').props.onChange({ target: { value: '尚未发送的实战问题' } });
   const review = { inVariation: false, variationMoves: 0 };
-  const reviewAction = { type: 'review-action', props: { 'aria-label': '回看棋谱' } };
   s.props.review = review;
-  s.props.reviewAction = reviewAction;
   s.props.gameOver = true;
   let tree = s.render();
   assert.equal(tree.props['aria-label'], 'AI 复盘讲解');
@@ -180,7 +175,6 @@ test('review replaces live hint, navigation and composer with one explanation an
   const trial = elements(tree).filter(element => element.type === CoachReviewTools);
   assert.equal(trial.length, 1);
   assert.equal(trial[0].props.review, review);
-  assert.equal(elements(tree).includes(reviewAction), false);
   assert.equal(elements(tree).some(element => element.type === 'input' || element.type === 'form' || element.type === 'details'), false);
   for (const label of ['给点提示', '讲解当前局面', '回看棋谱', '向陪练提问', '发送问题', '最近问答', '个人局面', '本局教学重点']) {
     assert.equal(elements(tree).some(element => element.props['aria-label'] === label), false);
@@ -191,7 +185,8 @@ test('review replaces live hint, navigation and composer with one explanation an
   assert.equal(tree.props['aria-label'], 'AI 陪练讲解');
   assert.equal(control(tree, '向陪练提问').props.value, '尚未发送的实战问题', 'temporary review does not erase a live-coaching draft');
   assert.ok(control(tree, '给点提示'));
-  assert.ok(elements(tree).includes(reviewAction));
+  assert.ok(control(tree, '讲解当前局面'));
+  assert.equal(elements(tree).some(element => element.props['aria-label'] === '回看棋谱'), false);
 });
 
 test('review loading offers cancellation without removing the trial controls', t => {

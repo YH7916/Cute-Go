@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Eraser, Map, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Eraser, Map, ChevronLeft, ChevronRight, Calculator } from 'lucide-react';
 import { GamePlayControls } from './GamePlayControls';
 import { AppMode, HistoryItem, Player } from '../types';
 import { getSliderBackground } from '../utils/helpers';
@@ -25,8 +25,6 @@ interface GameControlsProps {
     showTerritory?: boolean;
     onToggleTerritory?: () => void;
     playClick?: () => void;
-    gameMode?: string;
-    gameType?: string;
 }
 
 export const GameControls: React.FC<GameControlsProps> = ({
@@ -48,16 +46,14 @@ export const GameControls: React.FC<GameControlsProps> = ({
     consecutivePasses,
     showTerritory,
     onToggleTerritory,
-    gameMode,
-    gameType,
 }) => {
     const undoDisabled = history.length === 0 || isThinking || gameOver || onlineStatus === 'connected';
     const passDisabled = gameOver || isThinking || (onlineStatus === 'connected' && currentPlayer !== myColor);
-    const passLabel = gameMode === 'PvAI' && gameType === 'Go' ? '结算' : (consecutivePasses === 1 ? '结算' : '停着');
+    const passLabel = consecutivePasses === 1 ? '结算' : '停着';
     const pass = () => handlePass(false);
 
     return (
-        <div className="mt-auto">
+        <div className="game-controls mt-auto">
             {/* SETUP MODE CONTROLS */}
             {appMode === 'setup' && (
                 <div className="grid grid-cols-4 gap-2 mb-2">
@@ -144,7 +140,8 @@ export const GameControls: React.FC<GameControlsProps> = ({
             {/* PLAYING MODE CONTROLS */}
             {appMode === 'playing' && (
                 <GamePlayControls undo={{ label: '悔棋', onClick: handleUndo, disabled: undoDisabled }}
-                    primary={{ label: passLabel, onClick: pass, disabled: passDisabled, pulse: consecutivePasses === 1 }}
+                    primary={{ label: passLabel, onClick: pass, disabled: passDisabled, pulse: consecutivePasses === 1,
+                        icon: consecutivePasses === 1 ? <Calculator size={20} aria-hidden="true" /> : undefined }}
                     reset={{ label: '重开', onClick: () => resetGame(onlineStatus === 'connected') }} />
             )}
         </div>

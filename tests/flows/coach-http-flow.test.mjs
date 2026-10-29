@@ -13,7 +13,7 @@ const { executeCoachAgent, createInitialPosition, recordMove, attemptMove } = aw
 });
 
 // Run the actual agent, JSON encoder, fetch, HTTP and response parser. Only the
-// provider is a local fixture: no browser, external service or saved key is used.
+// backend is a local fixture: no browser, external service or saved token is used.
 test('讲解接口完整流程：真实 HTTP 成功 → 鉴权失败 → 格式错误 → 取消 → 恢复', { timeout: 15000 }, async t => {
   const requests = [];
   const serverErrors = [];
@@ -32,9 +32,9 @@ test('讲解接口完整流程：真实 HTTP 成功 → 鉴权失败 → 格式�
       } else if (responseMode === 'malformed') {
         response.end('{not-json');
       } else {
-        response.end(JSON.stringify({ choices: [{ message: {
-          content: JSON.stringify({ kind: 'explain', parts: [{ id: 'concept.opening', variant: 0 }] }),
-        }, finish_reason: 'stop' }] }));
+        response.end(JSON.stringify({
+          text: JSON.stringify({ kind: 'explain', text: '可以从空旷角部开始，借两条边围空。', refs: ['concept.opening'] }),
+        }));
       }
     } catch (error) {
       serverErrors.push(String(error));
@@ -49,14 +49,14 @@ test('讲解接口完整流程：真实 HTTP 成功 → 鉴权失败 → 格式�
   await once(server, 'listening');
   const address = server.address();
   assert.ok(address && typeof address === 'object');
-  const config = { endpoint: `http://127.0.0.1:${address.port}/v1`, model: 'flow-test', apiKey: 'synthetic-flow-key' };
+  const config = { endpoint: `http://127.0.0.1:${address.port}/api/coach`, provider: 'deepseek', model: 'deepseek-flash', apiKey: 'synthetic-flow-token' };
   let position = createInitialPosition(9);
   for (const [x, y] of [[2, 2], [6, 6]]) {
     const move = attemptMove(position.board, x, y, position.currentPlayer);
     assert.ok(move);
     position = recordMove(position, move.newBoard, { x, y }, move.captured, false);
   }
-  const input = { kind: 'ask', position, config, userColor: 'black', intent: 'hint' };
+  const input = { kind: 'ask', position, config, userColor: 'black', intent: 'hint', question: '为什么可以从空旷角部开局？' };
   const originalPosition = structuredClone(position);
 
   await t.test('局面证据经真实 HTTP 发出，收到简洁正文', async () => {
@@ -64,18 +64,20 @@ test('讲解接口完整流程：真实 HTTP 成功 → 鉴权失败 → 格式�
     assert.equal(result.source, 'cloud');
     assert.equal(result.error, undefined);
     assert.match(result.text, /角部.*两条边/);
-    assert.ok(result.text.length <= 80);
+    assert.ok(result.text.length <= 50);
     assert.equal(requests.length, 1);
     const request = requests[0];
-    assert.equal(request.url, '/v1/chat/completions');
+    assert.equal(request.url, '/api/coach');
     assert.equal(request.method, 'POST');
     assert.equal(request.headers.authorization, `Bearer ${config.apiKey}`);
-    assert.equal(request.body.model, config.model);
-    assert.equal(request.body.stream, false);
-    const evidence = JSON.parse(request.body.messages[1].content.split('\n')[1]);
+    assert.deepEqual(Object.keys(request.body).sort(), ['evidence', 'model', 'provider', 'question']);
+    assert.equal(request.body.question, input.question);
+    const evidence = request.body.evidence;
     assert.equal(evidence.boardSize, 9);
     assert.equal(evidence.moveNumber, 2);
-    assert.equal(evidence.stones.length, 2);
+    assert.equal(evidence.boardRows.join('').replaceAll('.', '').length, 2);
+    assert.equal(evidence.boardRows[2][2], 'B');
+    assert.equal(evidence.boardRows[6][6], 'W');
     assert.deepEqual(evidence.boardGuide.lastMove.point, { x: 6, y: 6, label: 'G3' });
     assert.ok(!JSON.stringify(request.body).includes(config.apiKey));
     assert.ok(!JSON.stringify(request.body).includes('positionKey'));

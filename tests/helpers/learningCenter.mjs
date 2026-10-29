@@ -9,7 +9,7 @@ const { useLearningCenter, renderHook, projectLearning, curriculumLessons, curri
   export { inspectMove } from './core/go/rules';
 ` });
 
-export { curriculumLessons, curriculumExercises, exercisePosition, inspectMove };
+export { curriculumLessons, curriculumExercises, exercisePosition, inspectMove, projectLearning };
 export const capture = { id: 'personal-capture', familyId: 'capture-fixture', skillId: 'go.rules.capture', contentRevision: 'test.1',
   kind: 'point', position: exercisePosition(['.X...', 'XOX..', '.....', '.....', '.....']), rubric: { kind: 'capture', minimum: 1 },
   prompt: '黑先，提走白棋。', hints: ['找白棋相邻空点。', '白棋下面是最后一气。'], explanation: '填住最后一气后，白棋被提走。' };
@@ -17,19 +17,25 @@ export const sequence = { ...capture, id: 'personal-sequence', familyId: 'sequen
   position: exercisePosition(['.X.X.', 'XOXOX', '.....', '.....', '.....']),
   solution: [{ point: { x: 1, y: 2 }, reply: { x: 4, y: 4 }, text: '白走后，继续提另一颗白子。', next: [{ point: { x: 3, y: 2 } }] }] };
 
-export function setup(t, personal = [capture, sequence]) {
-  let record = { version: 1, attempts: [], exposures: [], savedPositions: [] };
+export function setup(t, personal = [capture, sequence], initialRecord) {
+  let record = structuredClone(initialRecord ?? { version: 1, attempts: [], exposures: [], savedPositions: [] });
   let loaded = true;
   const events = [], imports = [];
   const learning = () => ({ ...record, ...projectLearning(record, Date.now()), loaded, saving: false, storageError: '',
     recordAttempt: item => {
       if (!loaded || record.attempts.some(old => old.attemptId === item.attemptId)) return false;
-      events.push('attempt'); record.attempts.push({ ...item, sequence: events.length }); return true;
+      events.push('attempt'); record.attempts.push({ ...item, sequence: events.length });
+      if (item.source === 'course' && record.courseCursor?.exerciseId === item.exerciseId
+        && record.courseCursor.contentRevision === item.contentRevision) {
+        record.courseCursor = { ...record.courseCursor, completed: item.outcome === 'success', updatedAt: item.occurredAt };
+      }
+      return true;
     },
     recordExposure: item => {
       if (!loaded) return false;
       events.push('exposure'); record.exposures.push({ ...item, sequence: events.length }); return true;
     },
+    setCourseCursor: cursor => { if (!loaded) return false; record.courseCursor = { ...cursor }; return true; },
     savePosition: () => true, removePosition: () => {}, exportBackup: () => JSON.stringify(record),
     importBackup: json => { imports.push(json); }, deleteProgress: () => { record = { version: 1, attempts: [], exposures: [], savedPositions: [] }; },
   });

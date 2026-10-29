@@ -3,21 +3,15 @@ import { createInitialPosition } from '../../domains/game/positionState';
 import type { UseGameActionsOptions } from './types';
 
 export const useResetGameAction = ({
-  aiTimerRef,
-  aiTurnLock,
   boardSizeRef,
   cleanupOnline,
-  clearInitialStones,
   gameState,
   onlineStatusRef,
-  pendingEndGameRef,
   sendData,
   setEloDiffStyle,
   setEloDiffText,
-  setIsThinking,
   setMyColor,
   setShowMenu,
-  setShowPassModal,
   settings,
   webAiEngine,
 }: UseGameActionsOptions) => {
@@ -39,47 +33,33 @@ export const useResetGameAction = ({
         boardSizeRef.current = sizeToUse;
       }
 
-      if (aiTimerRef.current !== null) clearTimeout(aiTimerRef.current);
-      aiTimerRef.current = null;
-      pendingEndGameRef.current = null;
+      webAiEngine.resetAI();
       gameState.writePosition(createInitialPosition(sizeToUse));
       gameState.setGameOver(false);
       gameState.setWinner(null);
       gameState.setWinReason('');
       gameState.setPassNotificationDismissed(false);
       gameState.setFinalScore(null);
-      clearInitialStones();
       setShowMenu(false);
-      setShowPassModal(false);
-      setIsThinking(false);
-      aiTurnLock.current = false;
       gameState.setAppMode('playing');
       setEloDiffText(null);
       setEloDiffStyle(null);
 
-      webAiEngine.resetAI();
-
       if (!keepOnline) {
-        cleanupOnline(true);
+        cleanupOnline();
         setMyColor(null);
       }
     },
     [
-      aiTimerRef,
-      aiTurnLock,
       boardSizeRef,
       cleanupOnline,
-      clearInitialStones,
       gameState,
       onlineStatusRef,
-      pendingEndGameRef,
       sendData,
       setEloDiffStyle,
       setEloDiffText,
-      setIsThinking,
       setMyColor,
       setShowMenu,
-      setShowPassModal,
       settings,
       webAiEngine,
     ]

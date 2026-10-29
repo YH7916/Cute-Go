@@ -73,12 +73,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     vibrate,
     boardPixelSize,
   });
-  const connections = useMemo(() => getBoardConnections(board, gameType), [board, gameType]);
+  const connections = useMemo(
+    () => gameType === 'Go' && !separatePieces ? getBoardConnections(board, gameType) : [],
+    [board, gameType, separatePieces]
+  );
   const stones = useMemo(
     () => board.flatMap((row) => row.filter((stone) => stone !== null)),
     [board]
   );
-  const groups = useMemo(() => getAllGroups(board), [board, gameType]);
+  const groups = useMemo(() => gameType === 'Go' ? getAllGroups(board) : [], [board, gameType]);
   const markedIntersections = useMemo(
     () => new Set(markedPoints?.map(point => `${point.x},${point.y}`)), [markedPoints]
   );

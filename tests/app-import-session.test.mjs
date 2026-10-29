@@ -95,6 +95,33 @@ function cuteGoCode() {
 }
 const computes = worker => worker.messages.filter(message => message.type === 'compute');
 
+test('AI second pass keeps endgame analysis locked until settlement and cannot schedule another move', t => {
+  const s = setup(t);
+  let vm = s.render();
+  const worker = s.ready();
+  vm.gameState.writePosition(position => ({ ...position, currentPlayer: 'white', consecutivePasses: 1 }));
+  vm = s.render();
+  const play = computes(worker).at(-1);
+  assert.equal(play.data.mode, 'play');
+  s.reply(worker, play, null);
+  vm = s.render();
+  const scoring = computes(worker).at(-1);
+  assert.equal(scoring.data.mode, 'analyze');
+  assert.equal(vm.gameState.consecutivePasses, 2);
+  assert.equal(vm.gameState.gameOver, false);
+  assert.equal(vm.aiTurnLock.current, true);
+  assert.equal(vm.showThinkingStatus, true);
+  s.render(); s.render();
+  assert.deepEqual(computes(worker).map(request => request.data.mode), ['play', 'analyze']);
+  s.reply(worker, scoring);
+  vm = s.render();
+  assert.equal(vm.gameState.gameOver, true);
+  assert.ok(vm.gameState.finalScore);
+  assert.equal(vm.aiTurnLock.current, false);
+  assert.equal(vm.showThinkingStatus, false);
+  assert.equal(computes(worker).length, 2, 'settlement ends scheduling without a replacement move');
+});
+
 test('teaching from home is independent of the formal game and does not initialize a playing AI', async t => {
   const s = setup(t, 'PvAI', true);
   let vm = s.render();
@@ -105,6 +132,7 @@ test('teaching from home is independent of the formal game and does not initiali
   s.render(); vm = s.render();
   assert.equal(vm.teaching.isOpen, true);
   assert.equal(vm.coach.active, false);
+  assert.equal(vm.teaching.view.activeLessonId, 'ogs-count-liberties');
   assert.equal(vm.teaching.view.active.phase, 'practice');
   assert.equal(vm.gameState.readPosition(), game);
   assert.equal(s.workers.length, 0);
@@ -254,7 +282,7 @@ test('controller import aborts the old coach request before the next render', as
   });
   let vm = s.render();
   const worker = s.ready();
-  vm.coachSettings.saveConfig({ endpoint: 'http://localhost:1234/v1', model: 'local', apiKey: '' }, false);
+  vm.coachSettings.saveConfig({ endpoint: 'http://localhost:1234/v1', provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test-model-key' }, false);
   s.settings.coachMode = true;
   vm = s.render();
   const asking = vm.coach.ask('hint');

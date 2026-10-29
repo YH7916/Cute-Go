@@ -34,17 +34,17 @@ export function replaySourceVariation(exercise: Variation, points: readonly Poin
     const next = play(position, node ?? { point: points[index], color: position.currentPlayer });
     if (!next) return done('failure', '这手不能落在这里，检查一下气与劫。');
     position = next;
-    if (!node) return done('unverified', '我们顺着这手继续看看，也可以退一步换个下法。');
+    if (!node) return done('unverified', '本题未收录这手的后续，暂不能判定。请重开或悔棋。');
     boardMarks = node.boardMarks ?? boardMarks;
     explanation = node.text || (node.correct ? exercise.explanation : node.wrong
-      ? '再看看对方怎样应手。可以退一步，换个下法。' : '轮到你了，继续完成这一段变化。');
+      ? '看看对方的应手，再悔棋换个下法。' : '轮到你了，继续下完这段变化。');
     choices = node.children;
     if (node.correct) return done(index === points.length - 1 ? 'success' : 'unverified', explanation);
     let wrong = !!node.wrong;
     if (choices.length && position.currentPlayer !== exercise.position.currentPlayer) {
       const reply = chooseReply(choices);
       const replied = play(position, reply);
-      if (!replied) return done('unverified', '先退一步，重新看看这个局面。');
+      if (!replied) return done('unverified', '本题应手无法重放，请悔棋或换题。');
       position = replied;
       boardMarks = reply.boardMarks ?? boardMarks;
       choices = reply.children;
@@ -53,7 +53,7 @@ export function replaySourceVariation(exercise: Variation, points: readonly Poin
       if (reply.correct && !wrong) return done(index === points.length - 1 ? 'success' : 'unverified', explanation);
     }
     if (wrong) return done('failure', explanation);
-    if (!choices.length) return done('unverified', explanation || '继续看看这手的后续。');
+    if (!choices.length) return done('unverified', explanation || '本题未收录后续，暂不能判定。');
   }
   return done('continue', points.length ? explanation : exercise.prompt);
 }
@@ -102,7 +102,7 @@ export function gradeSourceAction(exercise: Extract<Exercise, { kind: 'action' }
   const expected = exercise.expectedPoints ?? [];
   const unique = new Set(points.map(point => `${point.x},${point.y}`));
   if (unique.size !== points.length || points.length !== expected.length || !expected.every(point => points.some(item => same(item, point)))) {
-    return { outcome: 'failure', explanation: '再看看哪些棋没有办法做出两只眼。点一下棋块，可以重新选择。' };
+    return { outcome: 'failure', explanation: '检查哪些棋做不出两眼，再点棋块重新选择。' };
   }
   const board = exercise.position.board.map(row => [...row]);
   let { blackCaptures, whiteCaptures } = exercise.position;

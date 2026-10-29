@@ -7,11 +7,9 @@ const { runCoachAgent, createInitialPosition } = await loadTestModule({ contents
   export { createInitialPosition } from './domains/game/positionState';
 ` });
 const input = (kind = 'ask') => ({ kind, position: createInitialPosition(9), userColor: 'black',
-  intent: 'hint', config: { endpoint: 'https://api.deepseek.com', model: 'deepseek-flash', apiKey: 'test-private-key' } });
+  intent: 'hint', config: { endpoint: 'https://api.deepseek.com', provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test-private-key' } });
 const result = text => ({ text, source: 'cloud', configured: true, hintPoints: [], moveNumber: 0 });
-const response = () => new Response(JSON.stringify({ choices: [{ message: {
-  content: JSON.stringify({ kind: 'explain', parts: [{ id: 'current', variant: 0 }] }),
-}, finish_reason: 'stop' }] }));
+const response = () => new Response(JSON.stringify({ text: JSON.stringify({ kind: 'explain', parts: [{ id: 'current', variant: 0 }] }) }));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
 function host(t, WorkerClass) {

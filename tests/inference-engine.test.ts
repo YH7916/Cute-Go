@@ -99,17 +99,30 @@ test('dispose waits for active inference before releasing its session', async t 
 
 test('dispose completes only after asynchronous session release finishes', async t => {
   const pending = deferred<void>();
-  const release = t.mock.fn(() => pending.promise);
+  const started = deferred<void>();
+  const events: string[] = [];
+  const release = t.mock.fn(async () => {
+    events.push('release-start');
+    started.resolve();
+    await pending.promise;
+    events.push('release-finished');
+  });
   t.mock.method(ort.InferenceSession, 'create', async () => session(undefined, release));
   const engine = new OnnxEngine({ modelPath: '/model.onnx' });
   await engine.initialize();
   let completed = false;
-  const disposal = Promise.resolve(engine.dispose()).then(() => { completed = true; });
-  await Promise.resolve();
-  assert.equal(completed, false);
-  pending.resolve();
-  await disposal;
+  const disposal = engine.dispose().then(() => { completed = true; events.push('disposed'); });
+  await started.promise;
+  try {
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(completed, false, 'dispose must remain pending while session.release is blocked');
+    assert.deepEqual(events, ['release-start']);
+  } finally {
+    pending.resolve();
+    await disposal;
+  }
   assert.equal(release.mock.callCount(), 1);
+  assert.deepEqual(events, ['release-start', 'release-finished', 'disposed']);
 });
 
 test('large finite value logits produce a finite normalized win rate', async t => {
@@ -232,19 +245,36 @@ test('a failed model-part download cancels siblings and can be retried', async t
 
 test('reinitialization waits for old release, while repeated dispose releases only once', async t => {
   const pending = deferred<void>();
-  const release = t.mock.fn(() => pending.promise);
-  const create = t.mock.method(ort.InferenceSession, 'create', async () => session(undefined, release));
+  const started = deferred<void>();
+  const events: string[] = [];
+  const release = t.mock.fn(async () => {
+    events.push('release-start');
+    started.resolve();
+    await pending.promise;
+    events.push('release-finished');
+  });
+  const create = t.mock.method(ort.InferenceSession, 'create', async () => {
+    events.push('create');
+    return session(undefined, release);
+  });
   const engine = new OnnxEngine({ modelPath: '/model.onnx' });
   await engine.initialize();
   const firstDispose = engine.dispose();
   const secondDispose = engine.dispose();
   const reinitialization = engine.initialize();
-  await Promise.resolve();
-  assert.equal(create.mock.callCount(), 1);
-  pending.resolve();
-  await Promise.all([firstDispose, secondDispose, reinitialization]);
+  await started.promise;
+  try {
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(create.mock.callCount(), 1, 'reinitialization must not create a session while old release is blocked');
+    assert.equal(release.mock.callCount(), 1);
+    assert.deepEqual(events, ['create', 'release-start']);
+  } finally {
+    pending.resolve();
+    await Promise.all([firstDispose, secondDispose, reinitialization]);
+  }
   assert.equal(release.mock.callCount(), 1);
   assert.equal(create.mock.callCount(), 2);
+  assert.deepEqual(events, ['create', 'release-start', 'release-finished', 'create']);
   await engine.dispose();
 });
 

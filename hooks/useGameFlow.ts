@@ -47,10 +47,7 @@ interface GameFlowWebAi {
 interface UseGameFlowOptions {
   settings: GameFlowSettings;
   gameState: GameFlowGameState;
-  isThinking: boolean;
-  setIsThinking: (thinking: boolean) => void;
   showStartScreen: boolean;
-  showPassModal: boolean;
   aiTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   aiTurnLock: MutableRefObject<boolean>;
   webAi: GameFlowWebAi;
@@ -59,10 +56,7 @@ interface UseGameFlowOptions {
 export const useGameFlow = ({
   settings,
   gameState,
-  isThinking,
-  setIsThinking,
   showStartScreen,
-  showPassModal,
   aiTimerRef,
   aiTurnLock,
   webAi,
@@ -82,7 +76,7 @@ export const useGameFlow = ({
   const [isFirstRun] = useState(() => !localStorage.getItem('has_run_ai_before'));
   const [hideOfflineLoading, setHideOfflineLoading] = useState(false);
   const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
-  const showThinkingStatus = isThinking || isWebThinking;
+  const showThinkingStatus = isWebThinking;
 
   useEffect(() => {
     if (isWebInitializing) setHideOfflineLoading(false);
@@ -96,7 +90,6 @@ export const useGameFlow = ({
         if (aiTurnLock.current) {
           console.log("[App] App hidden, resetting AI lock");
           aiTurnLock.current = false;
-          setIsThinking(false);
           stopWebThinking();
         }
         if (aiTimerRef.current) {
@@ -107,7 +100,7 @@ export const useGameFlow = ({
     };
     document.addEventListener("visibilitychange", handleAppVisibility);
     return () => document.removeEventListener("visibilitychange", handleAppVisibility);
-  }, [aiTimerRef, aiTurnLock, setIsThinking, stopWebThinking]);
+  }, [aiTimerRef, aiTurnLock, stopWebThinking]);
 
   useEffect(() => {
     return () => {
@@ -159,7 +152,7 @@ export const useGameFlow = ({
 
   useEffect(() => {
     if (!isPageVisible || showStartScreen) return;
-    if (gameState.appMode !== 'playing' || gameState.gameOver || showPassModal || settings.gameMode !== 'PvAI') return;
+    if (gameState.appMode !== 'playing' || gameState.gameOver || settings.gameMode !== 'PvAI') return;
     const aiColor = settings.userColor === 'black' ? 'white' : 'black';
 
     if (gameState.currentPlayer === aiColor) {
@@ -215,7 +208,6 @@ export const useGameFlow = ({
     settings.gameMode,
     settings.gameType,
     settings.userColor,
-    showPassModal,
     showStartScreen,
   ]);
 

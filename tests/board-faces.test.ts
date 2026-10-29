@@ -35,15 +35,15 @@ for (const color of ['black', 'white'] as const) {
     ['square', [[1, 1], [2, 1], [1, 2], [2, 2]]],
     ['line', [[1, 1], [2, 1], [3, 1]]],
   ] as const) {
-    test(`Go/${color}/${shape}: independent pieces each have their own normally sized face`, () => {
+    test(`Go/${color}/${shape}: independent pieces each have their own face identity and anchor`, () => {
       const board = createBoard(9);
       for (const [x, y] of points) put(board, x, y, color);
       const faces = facesOf(board, true);
       assert.equal(faces.length, points.length);
       assert.deepEqual(
-        faces.map(({ id, x, y, color: faceColor, scale }) => ({ id, x, y, color: faceColor, scale }))
+        faces.map(({ id, x, y, color: faceColor }) => ({ id, x, y, color: faceColor }))
           .sort((a, b) => a.id.localeCompare(b.id)),
-        stonesOf(board).map(stone => ({ ...stone, scale: 1 })).sort((a, b) => a.id.localeCompare(b.id))
+        stonesOf(board).sort((a, b) => a.id.localeCompare(b.id))
       );
       assert.equal(facesOf(board, false).length, 1, 'connected Go retains one face per group');
     });
@@ -109,14 +109,14 @@ test('Gomoku keeps one happy forward-looking face per stone under either setting
   const connected = facesOf(board, false, 'Gomoku');
   assert.deepEqual(facesOf(board, true, 'Gomoku'), connected);
   assert.deepEqual(connected, stonesOf(board).map(stone => ({
-    ...stone, mood: 'happy', scale: 1, lookOffset: { x: 0, y: 0 },
+    ...stone, mood: 'happy', lookOffset: { x: 0, y: 0 },
   })));
 });
 
 for (const stoneSkin of ['classic', 'skeuomorphic']) {
   for (const gameType of ['Go', 'Gomoku'] as const) {
     for (const separatePieces of [false, true]) {
-      test(`${stoneSkin}/${gameType}/${separatePieces}: GameBoard renders all requested faces`, () => {
+      test(`${stoneSkin}/${gameType}/${separatePieces}: GameBoard renders all requested faces at the fixed cell size`, () => {
         const board = mixedBoard();
         const markup = renderToStaticMarkup(React.createElement(GameBoard, {
           board, currentPlayer: 'black', lastMove: null, showQi: false,
@@ -124,6 +124,12 @@ for (const stoneSkin of ['classic', 'skeuomorphic']) {
         }));
         const expected = gameType === 'Gomoku' || separatePieces ? 9 : 4;
         assert.equal([...markup.matchAll(/class="face-enter\b/g)].length, expected);
+        const transforms = [...markup.matchAll(/transform="translate\(20, 20\) scale\(([^)]+)\) rotate\(/g)];
+        assert.equal(transforms.length, expected, 'every face retains the 40px cell center');
+        for (const transform of transforms) {
+          assert.ok(Math.abs(Number(transform[1]) - 11 / 12) < 1e-12,
+            '24-unit face artwork remains 22px wide regardless of group size or separation');
+        }
       });
     }
   }

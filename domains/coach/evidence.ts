@@ -2,6 +2,7 @@ import { getAllGroups, getBoardHash, getGroup } from '../../core/board';
 import { attemptMove } from '../../core/go/rules';
 import type { BoardState, Player, Point } from '../../types';
 import type { GamePosition } from '../game/positionState';
+export type { AnalysisCandidate as CoachEngineCandidate, AnalysisMoveEvaluation as CoachEngineMoveEvaluation } from '../../core/inference/protocol';
 
 export type CoachIntent = 'explain-last-move' | 'hint' | 'explain-position' | 'explain-illegal-move';
 export interface CoachPoint extends Point { label: string }
@@ -53,6 +54,18 @@ const pointTuple = (point: Point | null) => point ? [point.x, point.y] : null;
 export const labelCoachPoint = (point: Point, size: number): CoachPoint => ({
   x: point.x, y: point.y, label: `${columns[point.x]}${size - point.y}`,
 });
+
+/** Explicit question coordinates guide local analysis before the single cloud call. */
+export function coachQuestionPoints(question: string | undefined, size: number): Point[] {
+  const points: Point[] = [];
+  for (const match of (question ?? '').toUpperCase().matchAll(/\b([A-HJ-Z])([1-9]\d?)\b/g)) {
+    const x = columns.indexOf(match[1]), y = size - Number(match[2]);
+    if (x >= size || y < 0 || y >= size || points.some(point => point.x === x && point.y === y)) continue;
+    points.push({ x, y });
+    if (points.length === 2) break;
+  }
+  return points;
+}
 
 function describeLocation(point: Point, size: number): string {
   const middle = (size - 1) / 2;
@@ -213,67 +226,67 @@ function explainMove(evidence: CoachEvidence, action: Extract<CoachLastAction, {
     const group = evidence.atariGroups.find(item => item.color === otherColor
       && item.stones.some(stone => stone.x === atari.point.x && stone.y === atari.point.y));
     const liberty = group?.liberties[0]?.label;
-    const danger = `（${atari.point.label}）被打吃了，只剩一口气${liberty ? `（${liberty}）` : ''}。`;
+    const danger = `在 ${atari.point.label} 的棋被打吃了，只剩一口气${liberty ? `（${liberty}）` : ''}。`;
     return otherColor === evidence.userColor
-      ? `你的棋${danger}先看能否接长或吃子解围。`
-      : `对手的棋${danger}观察它能否接长，打吃还不等于吃到。`;
+      ? `你${danger}先看能否接长或吃子解围。`
+      : `对手${danger}先检查能否合法提子。`;
   }
   if (action.libertiesAfter === 1) {
     const group = evidence.atariGroups.find(item => item.color === action.color
       && item.stones.some(stone => stone.x === action.point.x && stone.y === action.point.y));
     const warning = `红点这块${name}只剩一口气${group ? `（${group.liberties[0].label}）` : ''}`;
     return action.color === evidence.userColor
-      ? `${warning}。对手下一手若能合法占住，就会提走你的棋。`
-      : `${warning}。这是对手的棋，先检查能否合法吃掉。`;
+      ? `${warning}。对手下一手若能合法占住，就能提走它。`
+      : `${warning}。先检查能否合法吃掉对手这块棋。`;
   }
-  if (action.captured.length) return `这手占住了 ${action.captured[0].label} 那块棋的最后一口气，所以能整块提走。`;
-  if (effects.savedStones) return `这手多出了出口，红点这块现在有${action.libertiesAfter}口气，暂时解了打吃；不等于已经做活。`;
-  if (effects.connectedGroups > 1) return `${effects.connectedGroups}块棋连成一块，共用${action.libertiesAfter}口气；重复的空点只算一次，不能把原来的气数直接相加。`;
+  if (action.captured.length) return `这手填住最后一口气，提走了 ${action.captured[0].label} 的整块棋。`;
+  if (effects.savedStones) return '这手增加了气，解除了打吃。';
+  if (effects.connectedGroups > 1) return `这手把${effects.connectedGroups}块棋连成一块。它们现在共用周围的气。`;
   if (effects.previousLiberties !== null && action.libertiesAfter < effects.previousLiberties) {
-    return `这手填了自己的气，整块棋的出口少了（${effects.previousLiberties}→${action.libertiesAfter}口）；新棋子没有补回足够的出口。`;
+    return '这手填了自己的气，整块棋旁的空点反而少了。';
   }
   const pressure = effects.pressuredGroups.find(group => group.libertiesAfter < group.libertiesBefore);
-  if (pressure) return `${otherColor === evidence.userColor ? '你的' : '对手的'} ${pressure.point.label} 那块气变少了（${pressure.libertiesBefore}→${pressure.libertiesAfter}口），但不等于能吃到；还要看它从哪里接出新出口。`;
-  if (effects.connectedGroups) return `接长后，红点这块一共有${action.libertiesAfter}口气；要数整块棋旁的空点，重复的只算一次。`;
+  if (pressure) return `${otherColor === evidence.userColor ? '你' : '对手'}在 ${pressure.point.label} 的棋气变少了。留意它向外接长的方向。`;
+  if (effects.connectedGroups) return '这手接长了原来的棋，新子和它共用周围的气。';
   const edge = action.point.x === 0 || action.point.y === 0 || action.point.x === evidence.boardSize - 1 || action.point.y === evidence.boardSize - 1;
-  if (edge) return `红点这颗棋有${action.libertiesAfter}口气：边线外没有气，要给它留着向棋盘内接出的出口。`;
+  if (edge) return '边线外没有气，这颗棋要留出向棋盘内接长的空间。';
   const diagonal = evidence.stones.find(stone => stone.color === action.color
     && Math.abs(stone.point.x - action.point.x) === 1 && Math.abs(stone.point.y - action.point.y) === 1);
-  return diagonal ? `红点和 ${diagonal.point.label} 斜对角挨着，不算连接；只有上下左右连在一起，才会共用气。`
-    : '这手没有直接的吃子或打吃，可以继续下。';
+  return diagonal ? `红点和 ${diagonal.point.label} 斜对角挨着，不算连接。上下左右相连的棋才共用气。`
+    : '这手没有直接吃子或打吃，接下来可以看看空旷的角边。';
 }
 
 export function getLocalCoachMessage(evidence: CoachEvidence, intent: CoachIntent): string {
   if (intent === 'explain-last-move') {
     const action = evidence.lastAction;
-    if (action.kind === 'none') return '还没有上一手；点“提示”，看看从哪里开始。';
-    if (action.kind === 'unverified') return '记录对不上这盘棋，暂时讲不了上一手；点选棋子可以看当前的气。';
-    if (action.kind === 'pass') return '停了一手是放弃这次落子，不等于认输；双方连续停着，才结束落子并数目。';
+    if (action.kind === 'none') return '还没有上一手。点“提示”，看看从哪里开始。';
+    if (action.kind === 'unverified') return '棋谱记录和当前局面对不上，暂时无法讲上一手。点选棋子可以看当前的气。';
+    if (action.kind === 'pass') return '停着就是放弃这次落子，不等于认输。双方连续停着，才结束落子并数目。';
     return explainMove(evidence, action);
   }
-  const whose = evidence.toPlay === evidence.userColor ? '你的棋' : '对手的棋';
+  const whose = evidence.toPlay === evidence.userColor ? '你' : '对手';
   const candidate = evidence.candidates[0];
   if (candidate?.savedStones) {
-    const move = candidate.capturedStones ? '吃子腾出出口' : '接长，多出出口';
-    return `看 ${candidate.point.label}：${whose}可在这里${move}，解除打吃；新落下这块${candidate.libertiesAfter === 1 ? '也只剩一口气，要留意反提' : `有${candidate.libertiesAfter}口气，不等于做活`}。`;
+    const move = candidate.capturedStones ? '提子' : '接长';
+    return `${whose}可以在 ${candidate.point.label} ${move}，解除打吃。${candidate.libertiesAfter === 1 ? '但新落子所在的棋块也只剩一口气，要留意反提。' : ''}`;
   }
   if (candidate?.capturedStones) {
-    return `看 ${candidate.point.label}，这是${colorName(opposite(evidence.toPlay))}的最后一口气。${evidence.toPlay === evidence.userColor ? '你' : '对手'}占住就能提子，${candidate.libertiesAfter === 1 ? '但新落下这块也只剩一口气，要留意反提' : `新落下这块还有${candidate.libertiesAfter}口气`}。`;
+    return `${candidate.point.label} 是${colorName(opposite(evidence.toPlay))}的最后一口气，${whose}占住就能提子。${candidate.libertiesAfter === 1 ? '但新落子所在的棋块也只剩一口气，要留意反提。' : ''}`;
   }
   const own = evidence.atariGroups.find(group => group.color === evidence.toPlay);
-  if (own) return `${whose}（${own.stones[0].label}）只剩 ${own.liberties[0].label} 这一口气，直接接长也没能解围；这不等于完全无法救，还可留意别处的吃子。`;
+  if (own) return `${whose}在 ${own.stones[0].label} 的棋只剩 ${own.liberties[0].label} 这一口气，直接接长没能解围。再看看能否在别处吃子解围。`;
   const target = evidence.atariGroups[0];
-  if (target) return `${colorName(target.color)}在 ${target.stones[0].label} 的棋只剩 ${target.liberties[0].label} 一口气，但现在不能合法占住；一口气不一定就能吃。`;
+  if (target) return `${target.stones[0].label} 的${colorName(target.color)}只剩 ${target.liberties[0].label} 这一口气。但这口气现在不能合法落子。`;
   if (!evidence.stones.some(stone => stone.color === evidence.userColor)) {
     return evidence.toPlay === evidence.userColor
-      ? '可以在空旷角部附近试着落子：借两条边较容易围空，别紧贴边线，留些发展空间。'
-      : '先等对手落子；下次可以从空旷角部开始，借两条边围空，别紧贴边线。';
+      ? '可以在空旷角部附近试着落子，借两条边围空。别紧贴边线。'
+      : '先等对手落子。下次可以从空旷角部开始，别紧贴边线。';
   }
   const focus = evidence.groups.filter(group => group.color === evidence.userColor)
     .sort((a, b) => a.liberties.length - b.liberties.length || b.stones.length - a.stones.length)[0];
   const anchor = focus.stones[0].label;
   if (focus.liberties.length <= 2) {
-    return `先看你的 ${anchor} 这块，只剩${focus.liberties.length}口气（${focus.liberties.map(point => point.label).join('、')}）；比较从哪边接长能多留出口。`;
+    return `你在 ${anchor} 的棋只剩${focus.liberties.length}口气（${focus.liberties.map(point => point.label).join('、')}）。先比较从哪边接长。`;
   }
-  return `你的 ${anchor} 这块有${focus.liberties.length}口气，暂未被打吃；可以看看空旷的角边，给下一块棋留发展空间。`;
+  return '先从空旷的角边发展，借边更容易围空。';
 }

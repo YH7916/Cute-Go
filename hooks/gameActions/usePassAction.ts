@@ -10,7 +10,6 @@ export const usePassAction = (
     myColorRef,
     onlineStatusRef,
     sendData,
-    setIsThinking,
     settings,
     stopWebThinking,
     vibrate,
@@ -53,7 +52,6 @@ export const usePassAction = (
       if (isRemote) {
         console.log('[App] AI Passed. Unlocking...');
         aiTurnLock.current = false;
-        setIsThinking(false);
       }
 
       const position = gameState.readPosition();
@@ -73,7 +71,6 @@ export const usePassAction = (
 
       if (isUserPassInPvAI || isAIPassInPvAI) {
         if (isWebThinking) stopWebThinking();
-        setIsThinking(false);
         aiTurnLock.current = false;
       }
 
@@ -93,7 +90,6 @@ export const usePassAction = (
       myColorRef,
       onlineStatusRef,
       sendData,
-      setIsThinking,
       settings,
       stopWebThinking,
       triggerGoScoring,

@@ -27,7 +27,7 @@ function compact(message: string) {
 for (const color of ['black', 'white'] as const) {
   const opponent = color === 'black' ? 'white' : 'black';
 
-  test(`${color}: connecting teaches the resulting group's exact liberties and shared counting`, () => {
+  test(`${color}: connecting teaches shared liberties without reciting the group's count`, () => {
     const before = createInitialPosition(5);
     before.currentPlayer = color;
     put(before, color, 1, 2);
@@ -36,12 +36,12 @@ for (const color of ['black', 'white'] as const) {
     assert.equal(getGroup(position.board, { x: 2, y: 2 })?.liberties, 8);
     const message = getLocalCoachMessage(buildCoachEvidence(position, color, 7.5), 'explain-last-move');
     compact(message);
-    assert.match(message, /8\s*口气/);
-    assert.match(message, /共用|同一.*空点|重复.*一次/);
-    assert.match(message, /不能.*相加|不.*直接相加/);
+    assert.match(message, /2块棋连成一块/);
+    assert.match(message, /共用.*气/);
+    assert.doesNotMatch(message, /8\s*口气/);
   });
 
-  test(`${color}: filling an own liberty identifies the actual before-and-after count`, () => {
+  test(`${color}: filling an own liberty explains why the group has fewer exits`, () => {
     const before = createInitialPosition(5);
     before.currentPlayer = color;
     for (const [x, y] of [[1, 1], [2, 1], [3, 1], [1, 2], [3, 2], [1, 3], [2, 3], [3, 3]]) put(before, color, x, y);
@@ -50,7 +50,7 @@ for (const color of ['black', 'white'] as const) {
     assert.equal(getGroup(position.board, { x: 2, y: 2 })?.liberties, 12);
     const message = getLocalCoachMessage(buildCoachEvidence(position, color, 7.5), 'explain-last-move');
     compact(message);
-    assert.match(message, /13.*12/);
+    assert.match(message, /整块棋.*空点.*少了/);
     assert.match(message, /填.*气|占.*气/);
   });
 
@@ -65,7 +65,7 @@ for (const color of ['black', 'white'] as const) {
     const message = getLocalCoachMessage(buildCoachEvidence(position, color, 7.5), 'explain-last-move');
     compact(message);
     assert.match(message, /B4/);
-    assert.match(message, /3.*2/);
+    assert.match(message, /气变少.*向外接长/);
     assert.doesNotMatch(message, /打吃|只剩一口气/);
   });
 
@@ -78,9 +78,9 @@ for (const color of ['black', 'white'] as const) {
     for (const userColor of [color, opponent] as const) {
       const message = getLocalCoachMessage(buildCoachEvidence(position, userColor, 7.5), 'explain-last-move');
       compact(message);
-      assert.match(message, /B4.*3.*2/);
-      assert.match(message, userColor === opponent ? /你的\s*B4/ : /对手的\s*B4/);
-      assert.doesNotMatch(message, userColor === opponent ? /对手的\s*B4|对方\s*B4/ : /你的\s*B4/);
+      assert.match(message, /B4.*气变少/);
+      assert.match(message, userColor === opponent ? /你在 B4 的棋/ : /对手在 B4 的棋/);
+      assert.doesNotMatch(message, userColor === opponent ? /对手在 B4|对方在 B4/ : /你在 B4/);
     }
   });
 
@@ -101,16 +101,18 @@ for (const color of ['black', 'white'] as const) {
     assert.doesNotMatch(message, /你[^。；]*(提子|吃掉)/);
   });
 
-  test(`${color}: an escape hint names the point and the verified extra liberties`, () => {
+  test(`${color}: an escape hint names the point and its verified purpose`, () => {
     const position = createInitialPosition(5);
     position.currentPlayer = color;
     put(position, color, 1, 1);
     for (const [x, y] of [[0, 1], [1, 0], [2, 1]]) put(position, opponent, x, y);
     const original = structuredClone(position);
-    const message = getLocalCoachMessage(buildCoachEvidence(position, color, 7.5), 'hint');
+    const evidence = buildCoachEvidence(position, color, 7.5);
+    assert.equal(evidence.candidates[0].libertiesAfter, 3);
+    const message = getLocalCoachMessage(evidence, 'hint');
     compact(message);
     assert.match(message, /B3/);
-    assert.match(message, /3\s*口气/);
+    assert.match(message, /在 B3 接长/);
     assert.match(message, /解除打吃|解.*打吃/);
     assert.deepEqual(position, original);
   });
@@ -161,13 +163,13 @@ test('offline runtime teaches the concrete escape without a provider request or 
   const original = structuredClone(position);
   const fetch = t.mock.method(globalThis, 'fetch', async () => { throw new Error('offline teaching must not request a provider'); });
   const result = await executeCoachAgent({ kind: 'ask', position, userColor: 'black', intent: 'hint',
-    config: { endpoint: 'https://coach.example/v1', model: 'coach', apiKey: '' } });
+    config: { endpoint: '', provider: 'deepseek' as const, model: 'deepseek-flash', apiKey: '' } });
   assert.equal(result.source, 'local');
   assert.equal(result.configured, false);
   assert.equal(fetch.mock.callCount(), 0);
   assert.deepEqual(result.hintPoints, [{ x: 1, y: 2, label: 'B3' }]);
-  assert.match(result.text, /圈出的这里/);
-  assert.match(result.text, /3\s*口气/);
+  assert.match(result.text, /在.*这里.*接长/);
+  assert.match(result.text, /解除打吃/);
   compact(result.text);
   assert.deepEqual(position, original);
 });

@@ -3,9 +3,9 @@ import { exercisePosition } from './exercise';
 
 export const sequenceLessons = [
   lesson('E', 'tactics.capture-direction', '先断接应，再决定追的方向',
-    '同样是打吃，方向可能决定对方能否逃走。先找接应的棋，别把对方赶回自己的队伍。',
+    '打吃方向可能决定对方能否逃走；先找接应的棋，别把目标赶回它的队伍。',
     '切断白棋与援兵的联系，才能把它赶向狭窄的角。白接长后，再找最后一气。',
-    '只让对方少一气还不够；如果这一手帮它接上外面的棋，追击就落空了。', [
+    '打吃若让对方连上外面的棋，就可能追不到了。', [
       { kind: 'sequence', familyId: 'go.tactics.capture-direction.with-support',
         position: exercisePosition(['.O.OO', '.X.O.', '.....', '.....', '.....']), minimumCaptures: 2,
         prompt: '轮黑。设法吃住上边靠左的白子，并把后续变化下完。',
@@ -31,9 +31,9 @@ export const sequenceLessons = [
         { point: { x: 0, y: 1 }, text: '黑填最后一气。决定吃不吃得到的，是第一手有没有先切断援兵。' },
       ] }, [teacherSources.attack], true),
   lesson('F', 'tactics.snapback', '倒扑：被提之后再提回',
-    '有时送进去的一颗子被吃，反而让对方整块棋只剩一气；接着可以从原点提回更多棋。',
+    '有时投入一子让对方提走，会使对方整块棋只剩一气；这时可从原点提回更多棋，叫倒扑。',
     '你先投入一子。若对手选择提它，看看连起来的整块棋还剩几气，再找提回的点。',
-    '不能把倒扑当作劫：这里回提拿走多颗棋，整张棋盘没有立即恢复原状。', [
+    '倒扑回提后的棋盘没有恢复原状，因此不是劫。', [
       { kind: 'sequence', position: exercisePosition(['.OX..', '.OX..', 'XX...', '.....', '.....']), minimumCaptures: 3,
         prompt: '轮黑，练习倒扑。先投入一子；白提子后，请把变化下完。',
         hints: ['找一手能让对方先提子，却使整块白棋只剩一气的位置。', '先在左上角投一子；白若在下面提子，再数整块白棋的气。'],

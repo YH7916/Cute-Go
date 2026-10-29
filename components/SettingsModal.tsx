@@ -30,11 +30,8 @@ interface SettingsModalProps {
     setSkipStartScreen: (val: boolean) => void;
     separatePieces: boolean;
     setSeparatePieces: (val: boolean) => void;
-    onStartSetup: () => void;
     onOpenImport: () => void;
     onOpenTutorial: () => void;
-    onOpenOnline: () => void;
-    onOpenAbout: () => void;
     onOpenSkinShop: () => void;
 }
 
@@ -88,11 +85,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         currentGameSettings.difficulty !== 'Fun';
     const title = isGomokuSettings
         ? '五子棋设置'
-        : isFunGoSettings
-            ? (coachMode ? '陪练设置' : '围棋启蒙设置')
-            : isChallengeGoSettings
-                ? '挑战 AI 设置'
-                : '围棋设置';
+        : coachMode
+            ? '陪练设置'
+            : isFunGoSettings
+                ? '围棋启蒙设置'
+                : isChallengeGoSettings
+                    ? '挑战 AI 设置'
+                    : '围棋设置';
     const showAiDifficulty = isAiSettings && (!isFunGoSettings || coachMode);
     const showWinRateSetting = isChallengeGoSettings;
     const showGoOnlyAssist = currentGameSettings.gameType === 'Go';

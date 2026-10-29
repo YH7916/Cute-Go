@@ -95,7 +95,6 @@ for (const pass of [false, true]) {
     const api = s.render();
     const position = api.state.readPosition();
     api.aiTurnLock.current = true;
-    api.setIsThinking(true);
     api.webAiEngine.requestWebAiMove(position.board, position.currentPlayer, position.history);
     const worker = s.ready();
     const old = worker.messages.at(-1);
@@ -107,7 +106,6 @@ for (const pass of [false, true]) {
     assert.deepEqual(s.moves, []);
     assert.equal(api.state.readPosition(), position, 'returning home does not reset the saved board');
     assert.equal(api.aiTurnLock.current, false);
-    assert.equal(s.render().isThinking, false);
     assert.equal(s.render().webAiEngine.isThinking, false);
     assert.equal(s.render().webAiEngine.isWorkerReady, true, 'keep the already loaded model ready');
     assert.equal(worker.messages.at(-1).type, 'stop');
@@ -151,7 +149,6 @@ test('canceling a game session clears an already queued deferred move synchronou
   const api = s.render();
   const position = api.state.readPosition();
   api.aiTurnLock.current = true;
-  api.setIsThinking(true);
   api.webAiEngine.requestWebAiMove(position.board, position.currentPlayer, position.history);
   const worker = s.ready();
   s.reply(worker, worker.messages.at(-1));
@@ -161,7 +158,7 @@ test('canceling a game session clears an already queued deferred move synchronou
   assert.deepEqual(s.moves, []);
   assert.equal(api.aiTimerRef.current, null);
   assert.equal(api.aiTurnLock.current, false);
-  assert.equal(s.render().isThinking, false);
+  assert.equal(s.render().webAiEngine.isThinking, false);
   assert.equal(api.state.readPosition(), position);
 });
 

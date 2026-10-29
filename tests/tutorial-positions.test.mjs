@@ -11,8 +11,23 @@ const { TUTORIAL_STEPS, initTutorialStep, getTutorialHighlight, playTutorialPoin
   export { calculateTerritory } from './core/go/scoring';
 ` });
 
-const start = type => initTutorialStep(TUTORIAL_STEPS.findIndex(item => item.puzzleType === type));
+const start = type => {
+  const index = TUTORIAL_STEPS.findIndex(item => item.puzzleType === type);
+  assert.notEqual(index, -1, `Missing tutorial type ${type}`);
+  return initTutorialStep(index);
+};
 const playTarget = session => playTutorialPoint(session, getTutorialHighlight(session)).session;
+
+test('beginner onboarding restores the original nine lessons followed by zoom and mode selection', () => {
+  assert.deepEqual(TUTORIAL_STEPS.map(step => [step.puzzleType, step.boardSize]), [
+    ['qi', 5], ['capture', 7], ['connection', 5], ['forbidden', 7], ['ko', 9],
+    ['eyes', 9], ['endgame', 9], ['territory', 9], ['final_shape', 9], ['zoom', 13], ['explore', 9],
+  ]);
+  assert.equal(TUTORIAL_STEPS[1].title, '提子');
+  assert.equal(TUTORIAL_STEPS[2].title, '同生共死');
+  assert.match(TUTORIAL_STEPS[1].content, /打吃/);
+  assert.match(TUTORIAL_STEPS.at(-2).content, /双指缩放/);
+});
 
 test('the tutorial forbidden point is actually suicide for the black player shown on its board', () => {
   const session = start('forbidden');
@@ -32,8 +47,8 @@ test('the tutorial eye move leaves two independent eyes enclosed by one connecte
   const { position: { board } } = session;
   const before = JSON.stringify(board);
   const target = getTutorialHighlight(session);
-  assert.deepEqual({ x: target.x, y: target.y }, { x: 3, y: 3 });
-  assert.equal(inspectMove(board, 3, 2, 'white').legal, true, 'the initial connected eye space is still open to a white play');
+  assert.deepEqual({ x: target.x, y: target.y }, { x: 4, y: 4 });
+  assert.equal(inspectMove(board, 4, 3, 'white').legal, true, 'the initial connected eye space is still open to a white play');
   const move = inspectMove(board, target.x, target.y, 'black');
   assert.equal(move.legal, true);
   assert.equal(move.result.captured, 0);
@@ -41,7 +56,7 @@ test('the tutorial eye move leaves two independent eyes enclosed by one connecte
   const group = getGroup(after, target);
   assert.equal(group.stones.length, after.flat().filter(stone => stone?.color === 'black').length,
     'all parts of the eye boundary must belong to the same black chain');
-  const eyes = [{ x: 3, y: 2 }, { x: 3, y: 4 }];
+  const eyes = [{ x: 4, y: 3 }, { x: 4, y: 5 }];
   for (const eye of eyes) {
     assert.equal(after[eye.y][eye.x], null);
     assert.ok(getNeighbors(eye, after.length).every(point => group.stones.some(stone => stone.x === point.x && stone.y === point.y)));
@@ -66,8 +81,8 @@ test('all beginner starting chains have liberties and matching board coordinates
   }
 });
 
-test('single and whole-chain captures preserve real capture counts and predecessor history', () => {
-  for (const [type, expected] of [['capture', 1], ['capture_group', 2]]) {
+test('the original capture lesson preserves real capture counts and predecessor history', () => {
+  for (const [type, expected] of [['capture', 1]]) {
     const session = start(type);
     const before = structuredClone(session.position);
     const result = playTarget(session);
@@ -82,21 +97,16 @@ test('single and whole-chain captures preserve real capture counts and predecess
   }
 });
 
-test('escape increases actual liberties and connecting joins both original stones', () => {
-  const escape = start('atari_escape');
-  assert.equal(getGroup(escape.position.board, { x: 2, y: 2 }).liberties, 1);
-  const escaped = playTarget(escape);
-  assert.equal(getGroup(escaped.position.board, { x: 2, y: 2 }).liberties, 3);
-  assert.match(escaped.feedback, /3 口气/);
-  const connection = start('connect_cut');
-  assert.equal(getAllGroups(connection.position.board).length, 2);
-  const connected = playTarget(connection);
-  assert.equal(getAllGroups(connected.position.board).length, 1);
-  assert.equal(getGroup(connected.position.board, { x: 2, y: 2 }).stones.length, 3);
-  const cut = inspectMove(connection.position.board, 2, 2, 'white');
-  assert.equal(cut.legal, true);
-  assert.equal(getGroup(cut.result.newBoard, { x: 1, y: 2 }).stones.length, 1);
-  assert.equal(getGroup(cut.result.newBoard, { x: 3, y: 2 }).stones.length, 1);
+test('the original connection lesson shows one chain sharing six liberties and leaves inspection optional', () => {
+  const session = start('connection');
+  const groups = getAllGroups(session.position.board);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].stones.length, 2);
+  assert.equal(groups[0].liberties, 6);
+  assert.equal(session.showQiOverride, true);
+  assert.equal(session.isCompleted, true);
+  assert.equal(session.position.history.length, 0);
+  assert.equal(playTutorialPoint(session, { x: 2, y: 2 }).session, session);
 });
 
 test('ko captures then rejects White immediate recapture using its actual predecessor', () => {

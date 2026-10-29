@@ -97,7 +97,7 @@ test('callbacks from the old room cannot reset or disconnect the new room', asyn
   const s = setup(t);
   const first = s.api.createRoom(); await flush();
   s.requests[0].resolve(room('old')); await first;
-  await s.api.cleanupOnline(true);
+  await s.api.cleanupOnline();
   const second = s.api.joinRoom('new'); await flush();
   s.requests[1].resolve(room('new', { isHost: false })); await second;
   s.requests[0].handlers.onMessage({ type: 'RESTART' });
@@ -257,7 +257,7 @@ test('SDK rejection and leave rejection never poison a later request', async t =
   const current = room('rejecting-leave');
   current.leave = async () => { throw new Error('network'); };
   s.requests[1].resolve(current); await second;
-  await s.api.cleanupOnline(true);
+  await s.api.cleanupOnline();
   const third = s.api.joinRoom('third'); await flush();
   s.requests[2].resolve(room('third', { isHost: false })); await third;
   assert.equal(s.render().roomId, 'third');
@@ -303,7 +303,7 @@ test('a new request waits for cleanup even when cleanup was started by a separat
   const first = s.api.createRoom(); await flush();
   const leaving = deferred(), current = room('old'); current.leave = () => leaving.promise;
   s.requests[0].resolve(current); await first;
-  const cleaning = s.api.cleanupOnline(true);
+  const cleaning = s.api.cleanupOnline();
   const second = s.api.joinRoom('new'); await flush();
   assert.equal(s.requests.length, 1);
   leaving.resolve(); await cleaning; await flush();

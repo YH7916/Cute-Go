@@ -1,4 +1,4 @@
-import { calculateModelScore, calculateScore, cleanBoardWithTerritory } from '../../core/go/scoring';
+import { calculateModelScore, calculateScore } from '../../core/go/scoring';
 import { isSamePosition, type PositionSnapshot } from './positionSnapshot';
 
 export interface ScoringRequest extends PositionSnapshot {
@@ -16,9 +16,8 @@ export function takeScoringRequest(
 }
 
 export function evaluateScoring(request: ScoringRequest, ownership?: Float32Array | null) {
-  const board = ownership ? cleanBoardWithTerritory(request.board, ownership) : request.board;
   const score = ownership
     ? calculateModelScore(request.board, ownership, request.komi, request.captures)
-    : calculateScore(board, undefined, request.komi, request.captures);
-  return { board, score, lead: score.black - score.white };
+    : calculateScore(request.board, undefined, request.komi, request.captures);
+  return { score, lead: score.black - score.white };
 }

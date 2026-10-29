@@ -30,7 +30,7 @@ test('only an explicit explanation requests engine analysis and passes its resul
   assert.equal(s.requests.length, 1);
   const answer = s.respondChoice(0, 'group.C7');
   await pending;
-  assert.equal(s.render().coach.text, answer.replace('C7', '圈出的这里'));
+  assert.equal(s.render().coach.text, answer.replace('C7', '这里'));
   assert.deepEqual(s.api.coach.hintPoints, [{ x: 2, y: 2, label: 'C7' }]);
   assert.equal(s.api.coach.loading, false);
 });
@@ -49,7 +49,7 @@ for (const change of ['cancel', 'position-before-render', 'same-size-reset', 'co
     if (change === 'cancel') s.api.coach.cancel();
     if (change === 'position-before-render') move(s, 2, 2);
     if (change === 'same-size-reset') { s.api.state.writePosition(createInitialPosition(9)); s.render(); }
-    if (change === 'config') { s.options.config = { ...s.options.config, model: 'new-model' }; s.render(); }
+    if (change === 'config') { s.options.config = { ...s.options.config, endpoint: 'https://other-coach.example/api/coach' }; s.render(); }
     assert.equal(signal.aborted, change !== 'position-before-render');
     // Deliberately ignore abort in this adapter: ownership must still reject it.
     finishAnalysis(undefined);
@@ -65,7 +65,7 @@ for (const change of ['cancel', 'position-before-render', 'same-size-reset', 'co
 test('unavailable engine analysis still allows the agent to explain verified rules', async t => {
   const s = await setup(t);
   s.options.analyze = async () => { throw new Error('model unavailable'); };
-  const pending = s.render().coach.ask('explain-last-move');
+  const pending = s.render().coach.ask('explain-last-move', '气是什么？');
   await settle();
   assert.equal(s.requests.length, 1);
   assert.equal(s.render().coach.source, 'local');
@@ -76,12 +76,12 @@ test('unavailable engine analysis still allows the agent to explain verified rul
   assert.equal(s.api.coach.error, undefined);
 });
 
-test('unconfigured local guidance does not start engine analysis', async t => {
-  const s = await setup(t, { endpoint: '', model: '', apiKey: '' });
+test('unconfigured local hints can use optional analysis without a paid request', async t => {
+  const s = await setup(t, { endpoint: '', provider: 'deepseek', model: 'deepseek-flash', apiKey: '' });
   let analyses = 0;
   s.options.analyze = async () => { analyses++; return undefined; };
   await s.render().coach.ask('hint');
-  assert.equal(analyses, 0);
+  assert.equal(analyses, 1);
   assert.equal(s.requests.length, 0);
   assert.equal(s.render().coach.configured, false);
   assert.ok(s.api.coach.text.length > 0);

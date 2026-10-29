@@ -14,7 +14,7 @@ const ACHIEVEMENTS_LIST: AchievementDef[] = [
   { code: 'COMPANION_30', name: '不离不弃', description: '连续登录 30 天，长情告白', icon: 'Crown', category: 'social', target_value: 30 },
 ];
 
-export const useAchievements = (userId: string | undefined) => {
+export const useAchievements = (userId: string | undefined, onUnlocked: () => void) => {
   const [userAchievements, setUserAchievements] = useState<Record<string, UserAchievement>>({});
   const [newUnlocked, setNewUnlocked] = useState<DisplayAchievement | null>(null);
   const platform = getPlatform();
@@ -75,10 +75,9 @@ export const useAchievements = (userId: string | undefined) => {
     if (!error && unlocked) {
       setNewUnlocked({ ...def, progress: { ...current, is_unlocked: true } });
 
-      const audio = new Audio('/achievement.mp3');
-      audio.play().catch(() => {});
+      onUnlocked();
     }
-  }, [userId, userAchievements, platform]);
+  }, [userId, userAchievements, platform, onUnlocked]);
 
   // [新增] 连续登录逻辑 (支持多档位)
   const checkLoginStreak = async (uid: string, currentAchievementsMap: Record<string, UserAchievement>) => {
@@ -154,8 +153,7 @@ export const useAchievements = (userId: string | undefined) => {
         if (isNewUnlock) {
             setNewUnlocked({ ...def, progress: { current_value: newStreak, is_unlocked: true, achievement_code: code, unlocked_at: new Date().toISOString() } });
 
-            const audio = new Audio('/achievement.mp3');
-            audio.play().catch(() => {});
+            onUnlocked();
         }
     }
   };

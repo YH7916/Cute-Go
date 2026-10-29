@@ -33,13 +33,13 @@ function setupActions(t) {
     aiTimerRef: { current: null }, aiTurnLock: { current: false }, boardSizeRef: { current: 9 },
     gameTypeRef: { current: 'Go' }, pendingEndGameRef: { current: null },
     myColorRef: { current: null }, onlineStatusRef: { current: 'disconnected' },
-    onlineStatus: 'disconnected', myColor: null, isThinking: false, isWebThinking: false,
+    onlineStatus: 'disconnected', myColor: null, isWebThinking: false,
     session: null, isWorkerReady: false, displayTerritory: null, userProfile: null,
     settings: { gameMode: 'PvAI', coachMode: true, gameType: 'Go', boardSize: 9, userColor: 'black', setBoardSize: noop },
     sendData: async () => true, webAiEngine: { resetAI: noop }, requestAnalysis: () => true,
-    checkEndGameAchievements: noop, checkMoveAchievements: noop, vibrate: noop, setIsThinking: noop,
-    stopWebThinking: noop, cleanupOnline: noop, clearInitialStones: noop,
-    setEloDiffStyle: noop, setEloDiffText: noop, setMyColor: noop, setShowMenu: noop, setShowPassModal: noop,
+    checkEndGameAchievements: noop, checkMoveAchievements: noop, vibrate: noop,
+    stopWebThinking: noop, cleanupOnline: noop,
+    setEloDiffStyle: noop, setEloDiffText: noop, setMyColor: noop, setShowMenu: noop,
     playSfx: sound => sounds.push(sound), onIllegalMove: (point, position) => rejected.push({ point, position }),
   };
   const host = renderHook(() => {

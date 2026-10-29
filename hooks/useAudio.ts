@@ -12,6 +12,8 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const bgmSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const bgmGainNodeRef = useRef<GainNode | null>(null);
+  const musicVolumeRef = useRef(musicVolume);
+  musicVolumeRef.current = musicVolume;
   const hapticStateRef = useRef({ enabled: hapticEnabled, mounted: true, generation: 0 });
   const webVibrationActiveRef = useRef(false);
   // Retained callbacks read the current preference. Changing it also invalidates
@@ -107,7 +109,9 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
 
   // Play Sound Effect
   const playSfx = useCallback((type: 'move' | 'capture' | 'error' | 'win' | 'lose') => {
-    if (musicVolume === 0) return;
+    // Async callers can retain this callback while preferences change.
+    const volume = musicVolumeRef.current;
+    if (volume === 0) return;
     const ctx = audioContextRef.current;
     if (!ctx || !buffers.current[type]) return;
 
@@ -120,7 +124,7 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
       
       // Simple volume control for SFX (using input volume + boost)
       const gainNode = ctx.createGain();
-      gainNode.gain.value = Math.min(1, Math.max(0, musicVolume + 0.2));
+      gainNode.gain.value = Math.min(1, Math.max(0, volume + 0.2));
       
       source.connect(gainNode);
       gainNode.connect(ctx.destination);
@@ -128,7 +132,7 @@ export const useAudio = (musicVolume: number, hapticEnabled: boolean) => {
     } catch (e) {
       console.error("Error playing sfx", e);
     }
-  }, [musicVolume]);
+  }, []);
 
   // Handle BGM
   useEffect(() => {

@@ -21,9 +21,9 @@ function play(position: GamePosition, point: Point) {
     : { reason: move.reason };
 }
 
-function rejectedMove(reason?: MoveRejectionReason) {
+export function explainExerciseMoveRejection(reason?: MoveRejectionReason) {
   return reason === 'occupied' ? '这里已有棋子，请换一个交叉点。'
-    : reason === 'ko' ? '这里是劫，不能马上提回。请换一手。'
+    : reason === 'ko' ? '立即提回会还原上一局面，劫规则不允许。请换一手。'
       : reason === 'suicide' ? '这手落下后没有气，也没有提走对方棋子。请换一手。'
         : '落点不在棋盘内，请换一个交叉点。';
 }
@@ -67,7 +67,7 @@ export function createExerciseDemonstration(exercise: Exercise): readonly Exerci
       if (!played.position) continue;
       let nextPosition = played.position;
       const nextFrames = [...frames, { position: nextPosition, points: [step.point], text: step.reply
-        ? `${position.currentPlayer === 'black' ? '黑' : '白'}棋落子。接着看看对方怎样应手。` : grade.explanation }];
+        ? `${position.currentPlayer === 'black' ? '黑' : '白'}棋已落子，看看对方怎样应手。` : grade.explanation }];
       if (step.reply) {
         const reply = play(nextPosition, step.reply);
         if (!reply.position) continue;
@@ -88,7 +88,7 @@ export function createExerciseDemonstration(exercise: Exercise): readonly Exerci
 /** Hints follow the current verified branch, never the demonstration's preferred path. */
 export function getExerciseGuidance(exercise: Exercise, moves: readonly Point[], position: GamePosition | undefined,
   hintCount: number): { hint: string; points: readonly Point[]; focusPoint?: Point } {
-  const unknown = { hint: hintCount > 0 ? '当前是自由试下局面。请重新数各块棋的气，或撤回到题目变化后再看提示。' : '', points: [] };
+  const unknown = { hint: hintCount > 0 ? '这段变化没有提示，请悔棋回到题目变化。' : '', points: [] };
   if (!position || !exercise.position) return unknown;
   let expected = exercise.position;
   const source = exercise.kind === 'variation' ? replaySourceVariation(exercise, moves) : null;
@@ -123,13 +123,13 @@ export function getExerciseGuidance(exercise: Exercise, moves: readonly Point[],
   if (exercise.kind === 'sequence') {
     if (!hintCount) return { hint: '', points: [] };
     if (hintCount === 1) return { hint: moves.length
-      ? '观察对方刚才应手后的局面，重新数目标棋块的气，再比较它的各个出口。' : exercise.hints[0], points: [] };
+      ? '对方已应手，重新数目标棋块的气，比较各个出口。' : exercise.hints[0], points: [] };
     const next = choices.find(step => {
       const grade = gradeExercise(exercise, { kind: 'sequence', points: [...moves, step.point] });
       return grade.outcome === 'continue' || grade.outcome === 'success';
     });
     return next ? { hint: moves.length
-      ? '圈出的点是当前变化的一种可行下一手。落子后再检查提子和剩余的气。' : exercise.hints[1],
+      ? '可以下在圈出的点，再看提子后还剩几气。' : exercise.hints[1],
     points: [next.point], focusPoint: next.point } : { hint: '', points: [] };
   }
   const rubric = exercise.kind === 'point' || exercise.kind === 'number' ? exercise.rubric : null;
@@ -154,6 +154,6 @@ export function playExerciseExploration(position: GamePosition, point: Point, le
 } {
   if (position.currentPlayer !== learner) return { position, explanation: '现在轮到对方应手，请稍后再落子。', accepted: false };
   const played = play(position, point);
-  if (!played.position) return { position, explanation: rejectedMove(played.reason), accepted: false };
+  if (!played.position) return { position, explanation: explainExerciseMoveRejection(played.reason), accepted: false };
   return { ...replyToExerciseDeviation(played.position, learner), accepted: true };
 }

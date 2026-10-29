@@ -1,5 +1,7 @@
 import { MicroBoard, type Sign } from '../../utils/micro-board';
 import type { OnnxEngine, AnalysisResult } from './engine';
+import type { Point } from '../../types';
+import type { AnalysisMoveEvaluation } from './protocol';
 type SearchHistoryMove = { color: Sign; x: number; y: number };
 
 type SearchNode = {
@@ -54,7 +56,8 @@ const selectSearchChild = (node: SearchNode) => {
 
 const expandSearchNode = (
     node: SearchNode,
-    analysis: AnalysisResult
+    analysis: AnalysisResult,
+    focusPoints: readonly Point[] = []
 ) => {
     node.expanded = true;
     node.analysis = analysis;
@@ -64,6 +67,10 @@ const expandSearchNode = (
         .sort((a, b) => b.prior - a.prior);
 
     const limitedMoves = sortedMoves.slice(0, MAX_ANALYSIS_BRANCH);
+    for (const point of focusPoints) {
+        const move = sortedMoves.find(item => item.x === point.x && item.y === point.y);
+        if (move && !limitedMoves.includes(move)) limitedMoves.push(move);
+    }
     const passMove = analysis.moves.find((move) => move.x === -1 && move.y === -1);
     if (passMove) limitedMoves.push(passMove);
 
@@ -101,6 +108,22 @@ const expandSearchNode = (
     }
 };
 
+// Only visited nodes justify a searched continuation. Replay from the root so
+// every reported move keeps its color, captures and ko; pass ends this preview.
+function coachVariation(root: SearchNode, child: SearchNode): Point[] {
+    const board = root.board.clone();
+    const variation: Point[] = [];
+    let node: SearchNode | undefined = child;
+    let toPlay = root.toPlay;
+    while (node?.move && node.visits > 0 && variation.length < 4) {
+        if (!board.play(node.move.x, node.move.y, toPlay)) break;
+        variation.push({ ...node.move });
+        toPlay = toPlay === 1 ? -1 : 1;
+        node = [...node.children].sort((a, b) => b.visits - a.visits)[0];
+    }
+    return variation;
+}
+
 export const runOwnershipSearch = async (
     engine: Pick<OnnxEngine, 'analyze'>,
     rootBoard: MicroBoard,
@@ -110,7 +133,8 @@ export const runOwnershipSearch = async (
     komi: number,
     difficulty: 'Fun' | 'Easy' | 'Medium' | 'Hard' | undefined,
     temperature: number | undefined,
-    requestedVisits: number | undefined
+    requestedVisits: number | undefined,
+    coachFocusPoints: readonly Point[] = []
 ) => {
     if (!engine) throw new Error('AI Engine unavailable for ownership search.');
 
@@ -128,6 +152,11 @@ export const runOwnershipSearch = async (
         expanded: false,
         analysis: null
     };
+    const focusPoints = coachFocusPoints.filter((point, index, points) =>
+        Number.isInteger(point.x) && Number.isInteger(point.y)
+        && point.x >= 0 && point.y >= 0 && point.x < boardSize && point.y < boardSize
+        && points.findIndex(other => other.x === point.x && other.y === point.y) === index
+        && rootBoard.isLegal(point.x, point.y, rootToPlay)).slice(0, 3);
 
     let ownershipSum: Float32Array | null = null;
     let ownershipCount = 0;
@@ -138,7 +167,11 @@ export const runOwnershipSearch = async (
         let node = root;
 
         while (node.expanded && node.children.length > 0) {
-            const next = selectSearchChild(node);
+            // A coach comparison must actually evaluate requested candidates,
+            // including legal low-prior points outside the ordinary search beam.
+            const focused = node === root ? node.children.find(child => child.visits < 2
+                && focusPoints.some(point => child.move?.x === point.x && child.move.y === point.y)) : undefined;
+            const next = focused ?? selectSearchChild(node);
             if (!next) break;
             node = next;
         }
@@ -150,7 +183,7 @@ export const runOwnershipSearch = async (
             temperature
         });
 
-        expandSearchNode(node, analysis);
+        expandSearchNode(node, analysis, node === root ? focusPoints : []);
 
         const ownership = cloneOwnership(analysis.rootInfo.ownership);
         if (ownership) {
@@ -182,6 +215,16 @@ export const runOwnershipSearch = async (
         temperature
     });
 
+    const evaluateChild = (child: SearchNode) => {
+        const probability = child.visits > 0 ? child.valueSum / child.visits : undefined;
+        const policyMove = fallbackAnalysis.moves.find(move => child.move
+            ? move.x === child.move.x && move.y === child.move.y : move.x === -1 && move.y === -1);
+        return { visits: child.visits, prior: policyMove?.prior ?? 0,
+            ...(probability !== undefined ? { winRateBlack: 100 * (child.toPlay === 1 ? probability : 1 - probability) } : {}),
+        } satisfies AnalysisMoveEvaluation;
+    };
+    const passChild = rootChildren.find(child => child.move === null);
+
     return {
         move: bestChild?.move ?? null,
         winRate: root.visits > 0 ? (root.valueSum / root.visits) * 100 : fallbackAnalysis.rootInfo.winrate,
@@ -190,6 +233,13 @@ export const runOwnershipSearch = async (
         ownership: averagedOwnership,
         visits: root.visits,
         rootAnalysis: fallbackAnalysis,
+        ...(passChild ? { coachPass: evaluateChild(passChild) } : {}),
+        coachCandidates: rootChildren.filter(child => child.move !== null).map(child => {
+            return {
+                point: { ...child.move! }, ...evaluateChild(child),
+                variation: coachVariation(root, child),
+            };
+        }),
         rankedMoves: rootChildren.map(child => ({
             ...fallbackAnalysis.moves.find(m => child.move ? m.x === child.move.x && m.y === child.move.y : m.x === -1)!,
             vists: child.visits

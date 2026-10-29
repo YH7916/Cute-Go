@@ -6,7 +6,6 @@ export const useBoardInputAction = (
     aiTurnLock,
     gameState,
     gameTypeRef,
-    isThinking,
     myColor,
     onlineStatus,
     onIllegalMove,
@@ -22,7 +21,7 @@ export const useBoardInputAction = (
   return useCallback(
     async (x: number, y: number) => {
       console.log(
-        `[Click] (${x}, ${y}) Mode: ${gameState.appMode}, Current: ${gameState.currentPlayer}, User: ${settings.userColor}, Lock: ${aiTurnLock.current}, Thinking: ${isThinking}`
+        `[Click] (${x}, ${y}) Mode: ${gameState.appMode}, Current: ${gameState.currentPlayer}, User: ${settings.userColor}, Lock: ${aiTurnLock.current}`
       );
 
       const position = gameState.readPosition();
@@ -64,11 +63,6 @@ export const useBoardInputAction = (
         console.log('Click ignored: Game Over');
         return;
       }
-      if (isThinking) {
-        console.log('Click ignored: AI Thinking');
-        return;
-      }
-
       const aiColor = settings.userColor === 'black' ? 'white' : 'black';
 
       const activePlayer = position.currentPlayer;
@@ -106,7 +100,6 @@ export const useBoardInputAction = (
       executeMove,
       gameState,
       gameTypeRef,
-      isThinking,
       myColor,
       onlineStatus,
       onIllegalMove,

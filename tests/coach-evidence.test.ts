@@ -139,7 +139,8 @@ test('a legal extension that remains in atari is not described as a rescue', () 
   assert.equal(evidence.candidates.some(item => item.point.x === 1 && item.point.y === 2), false);
   const message = getLocalCoachMessage(evidence, 'hint');
   concise(message);
-  assert.match(message, /不能.*无解|不等于.*无法救/);
+  assert.match(message, /直接接长没能解围.*别处.*吃子/);
+  assert.doesNotMatch(message, /无法救|无解|必死/);
   assert.equal(shouldExplainCoachPosition(buildCoachEvidence(play(position, 1, 2), 'black', 7.5)), false,
     'an extension that remains in an existing atari must not repeat the warning');
 });
@@ -149,8 +150,8 @@ for (const color of ['black', 'white'] as const) {
     const position = play(threatened(color), 1, 2);
     const message = getLocalCoachMessage(buildCoachEvidence(position, color, 7.5), 'explain-last-move');
     concise(message);
-    assert.match(message, /多.*出口/);
-    assert.match(message, /不等于.*活|不代表.*活/);
+    assert.match(message, /增加了气/);
+    assert.match(message, /解除了打吃/);
     assert.doesNotMatch(message, /已经安全|救活了|全局第|左起第/);
   });
 
@@ -193,12 +194,12 @@ for (const userColor of ['black', 'white'] as const) {
       assert.match(message, /只剩一口气.*B3/);
       assert.equal(shouldExplainCoachPosition(evidence), true);
       if (mover === userColor) {
-        assert.match(message, /你的棋/);
+        assert.match(message, new RegExp(`红点这块${userColor === 'black' ? '黑棋' : '白棋'}`));
         assert.match(message, /对手.*合法.*提走|对手.*合法.*吃掉/);
         assert.doesNotMatch(message, /先检查.*接长|先.*解围/);
         assert.doesNotMatch(message, /对手的棋/);
       } else {
-        assert.match(message, /对手的棋.*合法吃掉/);
+        assert.match(message, /合法吃掉对手这块棋/);
         assert.doesNotMatch(message, /检查能否接长|你的棋.*解围/);
       }
     }
@@ -218,10 +219,10 @@ for (const userColor of ['black', 'white'] as const) {
       assert.match(message, /打吃.*B3/);
       assert.equal(shouldExplainCoachPosition(evidence), true);
       if (target === userColor) {
-        assert.match(message, /你的棋.*接长.*解围/);
+        assert.match(message, /你在 B4 的棋.*接长.*解围/);
         assert.doesNotMatch(message, /对方可能从这里|对手的棋/);
       } else {
-        assert.match(message, /对手的棋.*观察它/);
+        assert.match(message, /对手在 B4 的棋.*合法提子/);
         assert.doesNotMatch(message, /你的棋|检查能否接长/);
       }
     }
@@ -277,7 +278,7 @@ test('pass events are distinguished from previous stones, including a second pas
   const second = recordPass(first);
   assert.deepEqual(buildCoachEvidence(first, 'black', 3.5).lastAction, { kind: 'pass', color: 'white', globalMoveNumber: 2 });
   assert.deepEqual(buildCoachEvidence(second, 'black', 3.5).lastAction, { kind: 'pass', color: 'black', globalMoveNumber: 3 });
-  assert.match(getLocalCoachMessage(buildCoachEvidence(first, 'black', 3.5), 'explain-last-move'), /停了一手/);
+  assert.match(getLocalCoachMessage(buildCoachEvidence(first, 'black', 3.5), 'explain-last-move'), /停着.*放弃这次落子/);
   assert.equal(buildCoachEvidence(createInitialPosition(9), 'black', 3.5).lastAction.kind, 'none');
 });
 
@@ -381,8 +382,9 @@ test('pressure short of atari and losing one safe own liberty do not trigger cha
   assert.equal(shouldExplainCoachPosition(pressure), false);
   const message = getLocalCoachMessage(pressure, 'explain-last-move');
   concise(message);
-  assert.match(message, /出口|延伸/);
-  assert.match(message, /气少.*不等于|气.*变少.*不等于/);
+  assert.match(message, /向外接长/);
+  assert.match(message, /气变少/);
+  assert.doesNotMatch(message, /打吃|已经吃掉/);
   const ring = createInitialPosition(5);
   for (const [x, y] of [[1, 1], [2, 1], [3, 1], [1, 2], [3, 2], [1, 3], [2, 3], [3, 3]]) put(ring, 'black', x, y);
   assert.equal(shouldExplainCoachPosition(buildCoachEvidence(play(ring, 2, 2), 'black', 7.5)), false);
@@ -393,8 +395,9 @@ test('manual hints teach one next observation without counts or turn recaps', ()
     const escape = buildCoachEvidence(threatened(color), color, 7.5);
     const saved = getLocalCoachMessage(escape, 'hint');
     concise(saved);
-    assert.match(saved, /B3.*出口/);
-    assert.match(saved, /不等于.*活|不代表.*活/);
+    assert.match(saved, /B3.*接长/);
+    assert.match(saved, /解除打吃/);
+    assert.doesNotMatch(saved, /已经安全|已经做活|救活/);
     const capture = threatened(color === 'black' ? 'white' : 'black');
     capture.currentPlayer = color;
     const message = getLocalCoachMessage(buildCoachEvidence(capture, color, 7.5), 'hint');
@@ -416,7 +419,7 @@ test('a capture must not hide the new atari on the learner in either color', () 
     assert.equal(shouldExplainCoachPosition(evidence), true);
     const message = getLocalCoachMessage(evidence, 'explain-last-move');
     concise(message);
-    assert.match(message, /你的棋.*打吃.*D3/);
+    assert.match(message, /你在 D4 的棋.*打吃.*D3/);
     assert.match(message, /接长|解围/);
     assert.doesNotMatch(message, /提走.*颗/);
   }

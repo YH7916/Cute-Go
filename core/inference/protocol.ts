@@ -3,11 +3,20 @@ import type { BoardState, Difficulty, GameType, HistoryItem, Player, Point } fro
 // Worker message protocol types — shared between main thread and ai.worker.ts
 
 export interface RequestIdentity { requestId: number; generation: number }
-export interface AnalysisCandidate { point: Point; visits: number }
+export interface AnalysisMoveEvaluation {
+  visits: number;
+  prior?: number;
+  winRateBlack?: number;
+}
+export interface AnalysisCandidate extends AnalysisMoveEvaluation {
+  point: Point;
+  variation?: Point[];
+}
 export interface CoachAnalysisDetails {
   purpose?: 'coach';
   visits?: number;
   candidates?: AnalysisCandidate[];
+  pass?: AnalysisMoveEvaluation;
   estimatedBlackLead?: number;
 }
 export interface AnalysisResponse extends CoachAnalysisDetails {
@@ -42,6 +51,7 @@ export type WorkerInMessage = { generation: number } & (
         temperature?: number;
         mode?: 'play' | 'analyze';
         purpose?: 'coach';
+        coachFocusPoints?: Point[];
       };
     }
   | { type: 'stop' }

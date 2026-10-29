@@ -10,12 +10,12 @@ export function explainRejectedMove(position: GamePosition, attemptedPoint?: Poi
   const result = inspectMove(position.board, attemptedPoint.x, attemptedPoint.y, position.currentPlayer, 'Go',
     previous ? getBoardHash(previous.board) : null);
   if (result.legal) return { text: '这里符合落子规则，等到自己的回合就可以下。', hintPoints: [] };
-  if (result.reason === 'out-of-bounds') return { text: '点偏啦，要落在棋盘内横线和竖线的交叉点上。', hintPoints: [] };
-  if (result.reason === 'occupied') return { text: '这里已有棋子，不能叠放；换个空的交叉点。', hintPoints: [] };
+  if (result.reason === 'out-of-bounds') return { text: '请点棋盘内横线和竖线的交叉点。', hintPoints: [] };
+  if (result.reason === 'occupied') return { text: '这里已有棋子，不能叠放。换个空的交叉点。', hintPoints: [] };
   return {
     text: result.reason === 'suicide'
-      ? '在圈出的这里落子后，整块棋没有气，也吃不到对方来腾出气，所以不能下；能先提子获得气时才例外。'
-      : '在圈出的这里马上提回，会让棋盘回到上一手之前，这叫“劫”；先在别处下一手，等对方回应后再看。',
+      ? '在这里落子后，整块棋没有气，也吃不到对方的棋来腾出气。按禁入点规则，这里不能下。'
+      : '在这里马上提回，会让棋盘回到上一手之前，劫规则不允许这样下。先在别处下一手，等对方回应后再看。',
     hintPoints: [labelCoachPoint(attemptedPoint, position.board.length)],
   };
 }
@@ -25,8 +25,8 @@ export function explainPosition(evidence: CoachEvidence, estimatedBlackLead?: nu
   const otherDanger = evidence.atariGroups.find(group => group.color !== evidence.userColor);
   const danger = ownDanger ?? otherDanger;
   if (danger) {
-    const next = ownDanger ? '先看能否连接或逃出，再比围空。' : '先检查能否合法提子，再比围空；打吃不等于一定能吃到。';
-    return `${ownDanger ? '你' : '对手'}有一块棋只剩一口气：${danger.stones[0].label} 这块的出口在 ${danger.liberties[0].label}；${next}`;
+    const next = ownDanger ? '先看能否接长或吃子解围。' : '先检查能否合法占住这口气提子。';
+    return `${ownDanger ? '你' : '对手'}在 ${danger.stones[0].label} 的棋只剩一口气（${danger.liberties[0].label}）。${next}`;
   }
   const action = evidence.lastAction;
   if (action.kind === 'pass' || (action.kind === 'move'
@@ -34,11 +34,11 @@ export function explainPosition(evidence: CoachEvidence, estimatedBlackLead?: nu
     return getLocalCoachMessage(evidence, 'explain-last-move');
   }
   // Sparse positions contain too little settled territory for a useful lead lesson.
-  if (evidence.stones.length < evidence.boardSize) return '刚开局，地还没围实。先让自己的棋互相照应，留出向外发展的空间。';
+  if (evidence.stones.length < evidence.boardSize) return '刚开局，可以从空旷的角边发展，让自己的棋互相照应。';
   if (estimatedBlackLead === undefined || !Number.isFinite(estimatedBlackLead)) {
-    return '先照顾容易被吃的弱棋，再比较双方围住的空点；地没围实，先不急着判胜负。';
+    return '比较双方围住了哪些空点，再找还能扩大的地方。';
   }
-  if (Math.abs(estimatedBlackLead) < 2) return '粗看双方还接近；先照顾弱棋，再看谁围住的空点更多，局势还会变。';
+  if (Math.abs(estimatedBlackLead) < 2) return '粗看双方接近。比较各自围住的空点，找还能扩大的地方。';
   const ahead = estimatedBlackLead > 0 ? 'black' : 'white';
-  return `粗看${ahead === 'black' ? '黑棋' : '白棋'}（${ahead === evidence.userColor ? '你' : '对手'}）稍占先；先照顾弱棋，再比较双方围空，局势还会变。`;
+  return `粗看${ahead === 'black' ? '黑棋' : '白棋'}（${ahead === evidence.userColor ? '你' : '对手'}）稍占先。看看哪里还能围空。`;
 }

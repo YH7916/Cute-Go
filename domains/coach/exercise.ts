@@ -35,7 +35,7 @@ function gradeSequence(exercise: Extract<Exercise, { kind: 'sequence' }>, points
     if (!step) {
       const rebuttal = refute(position, point, refutations);
       return rebuttal ? { outcome: 'failure', ...rebuttal } : {
-        outcome: 'unverified', nextPosition: position, explanation: '我们顺着这手继续看看，也可以退一步换个下法。',
+        outcome: 'unverified', nextPosition: position, explanation: '本题未收录这手的后续，暂不能判定。请重开或悔棋。',
       };
     }
     explanation = step.text ?? exercise.explanation;
@@ -89,9 +89,11 @@ export function gradeExercise(exercise: Exercise, answer: ExerciseAnswer): Exerc
   if (exercise.kind === 'action' && answer.kind === 'action') return gradeSourceAction(exercise, answer.action, answer.points);
   if (exercise.kind === 'sequence' && answer.kind === 'sequence') return gradeSequence(exercise, answer.points);
   if (exercise.kind === 'choice' && answer.kind === 'choice') {
-    if (!exercise.choices.some(choice => choice.id === answer.choiceId)) return { outcome: 'unverified', explanation: '这个选项不属于当前题目。' };
-    return (exercise.correctChoiceIds ?? [exercise.correctChoiceId]).includes(answer.choiceId)
-      ? result(true) : { outcome: 'failure', explanation: `${exercise.prompt}\n再观察一下棋盘，换个答案试试。` };
+    const selected = exercise.choices.find(choice => choice.id === answer.choiceId);
+    if (!selected) return { outcome: 'unverified', explanation: '这个选项不属于当前题目。' };
+    const correctIds = exercise.correctChoiceIds ?? [exercise.correctChoiceId];
+    if (correctIds.includes(answer.choiceId)) return result(true);
+    return { outcome: 'failure', explanation: exercise.wrongAnswerExplanation ?? exercise.hints[0] };
   }
   if (exercise.kind === 'number' && answer.kind === 'number') {
     if (exercise.rubric.kind === 'territory') {

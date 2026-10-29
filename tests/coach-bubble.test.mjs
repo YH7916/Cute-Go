@@ -38,12 +38,18 @@ test('markup-like input remains literal escaped text, including inside list item
   assert.match(html, /\*\*不是粗体\*\* \[文字\]\(https:\/\/example.com\)/);
 });
 
-test('loading hides old paragraphs and bullets while retaining the existing error and live region', () => {
-  const tree = CoachBubble({ ...props, text: '旧讲解\n- 旧提示', loading: true, error: '连接暂时中断' });
+test('cloud enrichment keeps the position-bound paragraphs and bullets readable while loading', () => {
+  const tree = CoachBubble({ ...props, text: '先看自己的弱棋\n- 检查能否接长', loading: true, error: '连接暂时中断' });
   const html = renderToStaticMarkup(tree);
   assert.equal(tree.props['aria-live'], 'polite');
   assert.equal(tree.props['aria-busy'], true);
-  assert.match(html, /让我看看这步棋…/);
+  assert.doesNotMatch(html, /正在看棋…/);
   assert.match(html, /连接暂时中断/);
-  assert.doesNotMatch(html, /旧讲解|旧提示|<ul/);
+  assert.match(html, /先看自己的弱棋/);
+  assert.match(html, /<ul[^>]*><li>检查能否接长<\/li><\/ul>/);
+});
+
+test('an empty pending explanation still has a loading message', () => {
+  const html = renderToStaticMarkup(CoachBubble({ ...props, loading: true }));
+  assert.match(html, /正在看棋…/);
 });

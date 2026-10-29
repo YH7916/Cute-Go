@@ -137,10 +137,8 @@ export const useStartGameFlow = ({
     gameTypeRef.current = 'Go';
     settings.setGameMode('PvAI');
     settings.setCoachMode(true);
-    settings.setUserColor('black');
-    settings.setDifficulty('Fun');
-    // A complete 9x9 reset also cancels pending move/analysis requests.
-    resetGame(false, 9, false);
+    // Keep the shared game preferences; reset still cancels the previous session.
+    resetGame(false, undefined, false);
     terminateAI();
     setShowStartScreen(false);
     vibrate(20);

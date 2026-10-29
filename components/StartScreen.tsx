@@ -175,7 +175,7 @@ const GoContent: React.FC<GoContentProps> = ({
         </div>
 
         <div className="grid grid-cols-2 gap-3 w-full lg:w-4/5">
-            <FeatureButton icon={BookOpen} label="进阶教学" onClick={onOpenLearning} color="btn-beige" />
+            <FeatureButton icon={BookOpen} label="围棋课堂" onClick={onOpenLearning} color="btn-beige" />
             <FeatureButton icon={PenTool} label="电子挂盘" onClick={onStartSetup} color="btn-beige" />
             <FeatureButton icon={Download} label="导入导出" onClick={onOpenImport} color="btn-beige" />
             <FeatureButton icon={Palette} label="外观商店" onClick={onOpenSkinShop} color="btn-beige" />

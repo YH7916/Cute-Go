@@ -3,9 +3,9 @@ import { exercisePosition } from './exercise';
 
 export const chasingLessons = [
   lesson('F', 'tactics.ladder', '连续追吃：每次都重新数气',
-    '连续打吃时，对方每逃一手，整块棋的气都会变化。跟着出口调整方向，一直读到真正提走。',
+    '连续打吃时，对方每逃一步，都要重数整块棋的气。根据出口调整方向，一直算到提子。',
     '一开始追对了不够。中途放宽一个出口，对方就可能从两气变成三气，摆脱追击。',
-    '路上出现对方援兵时，要重新检查能否接应；不能只按记住的折线路线落子。', [
+    '追吃路上有对方援兵，要检查能否接应，别只照着记住的路线下。', [
       { kind: 'sequence', familyId: 'go.tactics.ladder.short-chase',
         position: exercisePosition(['.....', '.X...', '.XO..', '..X..', '.....']), minimumCaptures: 4,
         prompt: '轮黑。用连续打吃追住中央白棋，一直下到把它提走。',

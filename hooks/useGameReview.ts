@@ -67,7 +67,7 @@ export function useGameReview({ gameState, gameType, showTerritory, engine, owne
     const snapshot = latest.current;
     if (snapshot.ownerScopeId !== ownerScopeId || snapshot.appMode !== 'review' || snapshot.current !== readGamePosition()) return;
     if (snapshot.selected.consecutivePasses >= 2) {
-      setError('这一局已连续停着结束。请先回到终局前的一手，再开始试下。');
+      setError('双方已连续停着，这局已结束。请先回到终局前的一手，再开始试下。');
       return;
     }
     const branch = { ownerScopeId, source: snapshot.current, cursor: snapshot.reviewIndex,
@@ -88,18 +88,18 @@ export function useGameReview({ gameState, gameType, showTerritory, engine, owne
     setVariation(branch);
     gameState.setReviewIndex(cursor);
     gameState.setAppMode('review');
-    setError(snapshot.consecutivePasses >= 2 ? '这是已结束的局面，可查看；继续试下请返回终局前。' : '');
+    setError(snapshot.consecutivePasses >= 2 ? '这局已结束，可以查看棋盘。继续试下请返回终局前。' : '');
   }, [readGamePosition, gameState.setAppMode, gameState.setReviewIndex, ownerScopeId]);
   const playVariation = useCallback((x: number, y: number) => {
     if (latest.current.ownerScopeId !== ownerScopeId) return;
     const branch = variationRef.current;
     if (!branch || readPosition() !== branch.position) return;
     const before = readPosition();
-    if (before.consecutivePasses >= 2) { setError('试下已结束，可以悔棋或返回原谱。'); return; }
+    if (before.consecutivePasses >= 2) { setError('试下已结束。可以悔棋或返回原谱。'); return; }
     const previous = before.history.at(-1);
     const move = attemptMove(before.board, x, y, before.currentPlayer, gameType,
       previous ? getBoardHash(previous.board) : null);
-    if (!move) { setError('这里不能落子，请检查占位、禁入点和劫。'); return; }
+    if (!move) { setError('这里不能落子。请检查是否已有棋子，或是否遇到禁入点、劫。'); return; }
     writePosition(recordMove(before, move.newBoard, { x, y }, move.captured, false));
   }, [readPosition, writePosition, gameType, ownerScopeId]);
   const passVariation = useCallback(() => {

@@ -2,29 +2,48 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { LearningCenter, TutorialModal, GameBoard, CoachMarkers, Panel, Modal, ProgressBar, props, render, elements, text, button, centerInput } from './helpers/learningUi.mjs';
 
-test('beginner directory opens the shared tutorial at the selected step and returns to the same course menu', t => {
-  const content = {}, vibrate = () => {}, calls = [];
-  const input = { ...centerInput(props), tutorialContent: content,
+test('formal course selection stays separate from guided beginner pages', t => {
+  const calls = [];
+  const input = { ...centerInput(props), tutorialContent: {},
     beginnerLessons: [{ id: 'beginner-capture', title: '提子' }, { id: 'beginner-connect-cut', title: '连接与断点' }],
-    appearance: { vibrate, stoneAnimationEnabled: false }, onLesson: id => calls.push(id) };
+    sections: [{ id: 'rules', title: '基础练习' }],
+    lessons: [{ id: 'liberties', section: 'rules', title: '数气练习', completedSteps: 0, totalSteps: 2 }],
+    onLesson: id => calls.push(id) };
   const host = render(t, input, LearningCenter);
   const top = elements(host.render()).find(node => node.props.leftButtons);
   elements(top.props.leftButtons).find(node => node.props['aria-label'] === '打开课程').props.onClick();
-  button(host.render(), '连接与断点').props.onClick();
-  let tree = host.render();
-  const tutorial = elements(tree).find(node => node.type === TutorialModal);
-  assert.equal(tutorial.props.initialStepId, 'beginner-connect-cut');
-  assert.equal(tutorial.props.tutorialContent, content);
-  assert.equal(tutorial.props.vibrate, vibrate);
-  assert.equal(tutorial.props.stoneAnimationEnabled, false);
-  assert.equal(elements(tree).find(node => node.type === Modal).props.isOpen, false);
-  assert.deepEqual(calls, [], 'replaying guided pages must not submit an advanced exercise');
-  assert.equal(elements(tree).find(node => node.type === GameBoard).props.board, props.board);
-  tutorial.props.onClose(); tree = host.render();
-  assert.equal(elements(tree).some(node => node.type === TutorialModal), false);
-  assert.equal(elements(tree).find(node => node.type === Modal).props.isOpen, true);
-  assert.match(text(tree), /已完成 0 \/ 0 课/, 'beginner pages do not inflate exercise completion');
+  const menu = elements(host.render()).find(node => node.type === Modal);
+  assert.equal(menu.props.isOpen, true);
+  assert.doesNotMatch(text(menu), /新手教学|连接与断点|提子/);
+  assert.match(text(menu), /已完成 0 \/ 1 课/);
+  button(menu, '数气练习').props.onClick();
+  assert.deepEqual(calls, ['liberties']);
+  assert.equal(elements(host.render()).find(node => node.type === Modal).props.isOpen, false);
+  assert.equal(elements(host.render()).some(node => node.type === TutorialModal), false);
+  assert.equal(elements(host.render()).find(node => node.type === GameBoard).props.board, props.board);
 });
+
+test('the completed course can be replayed or reviewed, while loading shows no entry buttons', t => {
+    const label = '从头练习';
+    const calls = [];
+    const input = { ...centerInput(null), startCourseLabel: label, onStartCourse: () => calls.push('course'),
+      onPractice: () => calls.push('companion') };
+    const host = render(t, input, LearningCenter);
+    const tree = host.render();
+    assert.deepEqual(calls, []);
+    assert.equal(elements(tree).find(node => node.type === Modal).props.isOpen, false);
+    assert.equal(elements(tree).some(node => node.type === GameBoard || node.type === TutorialModal), false);
+    const start = button(tree, label);
+    assert.equal(start.props.variant, 'primary');
+    start.props.onClick();
+    assert.deepEqual(calls, ['course']);
+    button(tree, '选择课程').props.onClick();
+    assert.equal(elements(host.render()).find(node => node.type === Modal).props.isOpen, true);
+    assert.deepEqual(calls, ['course'], 'opening the course menu does not begin another exercise');
+    input.loaded = false;
+    assert.match(text(host.render()), /正在读取学习进度/);
+    assert.doesNotMatch(text(host.render()), /从头练习|选择课程|去 9 路陪练/);
+  });
 
 test('course menu shows completed, current and untouched lessons directly without record management or filtering', t => {
   const calls = [];
@@ -73,8 +92,11 @@ test('action exercises dispatch pass, finish and selected-stone confirmation exp
   const host = render(t, input);
   for (const label of ['停一手', '结束对局', '选好了']) {
     input.actionLabel = label;
-    const action = button(host.render(), label);
-    assert.match(action.props.className, /btn-coffee/); action.props.onClick();
+    const [middle, speech] = host.render();
+    assert.deepEqual(elements(middle).filter(node => node.props.onClick).map(text), ['悔棋', '下一题', '重开']);
+    const tools = elements(speech).find(node => node.props.className?.includes('coach-tools'));
+    const action = button(tools, label);
+    assert.equal(action.props.appearance, 'retro'); assert.equal(action.props.variant, 'primary'); action.props.onClick();
   }
   assert.deepEqual(calls, ['停一手', '结束对局', '选好了']);
   assert.doesNotMatch(text(host.render()), /已选/);
@@ -102,20 +124,47 @@ test('variation exercises use ordinary point input while labels preserve letters
   assert.deepEqual(elements(board.props.extraSVG).find(node => node.type === CoachMarkers).props.points, active.markers);
 });
 
-test('action questions retain optional demonstration beside guidance while their main action stays above', t => {
+test('action questions keep the action and one demonstration together beside guidance', t => {
   const calls = [];
   const input = { ...props, kind: 'action', actionLabel: '停一手', onAction: () => calls.push('pass'), onDemonstrate: () => calls.push('demo') };
   const tree = render(t, input).render();
   assert.equal(elements(tree).filter(node => node.props.onClick && text(node).trim() === '示范').length, 1);
-  button(tree, '停一手').props.onClick(); button(tree, '示范').props.onClick();
+  const tools = elements(tree[1]).find(node => node.props.className?.includes('coach-tools'));
+  assert.deepEqual(elements(tools).filter(node => node.props.onClick).map(text), ['停一手', '示范']);
+  button(tools, '停一手').props.onClick(); button(tools, '示范').props.onClick();
   assert.deepEqual(calls, ['pass', 'demo']);
 });
 
-test('lesson sources are absent from practice and the course menu even when old data contains them', t => {
+for (const kind of ['number', 'choice', 'action']) {
+  test(`${kind}: the bubble disables answers and demonstration during an opponent reply and restores them afterward`, t => {
+    const calls = [];
+    const input = { ...props, kind, responding: true, canSubmit: true, numberAnswer: '3',
+      choices: [{ id: 'a', label: '连接' }, { id: 'b', label: '提子' }], actionLabel: '选好了',
+      onSubmit: () => calls.push('submit'), onChoice: id => calls.push(id),
+      onAction: () => calls.push('action'), onDemonstrate: () => calls.push('demo') };
+    const host = render(t, input);
+    const tools = () => elements(host.render().at(-1)).find(node => node.props.className?.includes('coach-tools'));
+    const inputs = tree => elements(tree).filter(node => node.type === 'input' || node.props.type === 'submit' || typeof node.props.onClick === 'function');
+    assert.equal(inputs(tools()).length, kind === 'action' ? 2 : 3);
+    assert.ok(inputs(tools()).every(node => node.props.disabled === true));
+    if (kind === 'number') elements(tools()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+    assert.deepEqual(calls, [], 'the response preview cannot submit another numeric answer');
+    input.responding = false;
+    const ready = tools();
+    assert.ok(inputs(ready).every(node => !node.props.disabled));
+    if (kind === 'number') elements(ready).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+    else button(ready, kind === 'choice' ? '连接' : '选好了').props.onClick();
+    button(ready, '示范').props.onClick();
+    assert.deepEqual(calls, [kind === 'number' ? 'submit' : kind === 'choice' ? 'a' : 'action', 'demo']);
+  });
+}
+
+test('LearningCenter container and course menu omit source text and links from legacy input', t => {
   const active = { ...props, sources: [{ title: 'PRIVATE_SOURCE', url: 'https://example.invalid/course-source' }] };
   const host = render(t, centerInput(active), LearningCenter);
   const top = elements(host.render()).find(node => node.props.leftButtons);
   elements(top.props.leftButtons).find(node => node.props['aria-label'] === '打开课程').props.onClick();
+  // This traversal does not execute the returned LearningExercise or its CoachBubble.
   const tree = host.render(); assert.doesNotMatch(text(tree), /本课参考|PRIVATE_SOURCE|校验|SGF/);
   assert.equal(elements(tree).some(node => node.type === 'a' && node.props.href === active.sources[0].url), false);
 });

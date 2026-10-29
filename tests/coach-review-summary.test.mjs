@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createInitialPosition, makeHumanTurn, move, setAgentInterceptor, settle, setup } from './helpers/coachSession.mjs';
 
-const offline = { endpoint: '', model: '', apiKey: '' };
+const offline = { endpoint: '', provider: 'deepseek', model: 'deepseek-flash', apiKey: '' };
 const points = [{ x: 1, y: 1, label: 'B8' }, { x: 3, y: 3, label: 'D6' }, { x: 6, y: 6, label: 'G3' }];
 function publish(text, hintPoints) {
   setAgentInterceptor((input, _signal, run) => input.proactive ? run() : Promise.resolve({
@@ -25,52 +25,56 @@ test('review keeps one complete cloud teaching part and only the point named by 
   s.options.playing = false;
   await makeHumanTurn(s);
   const position = s.api.state.readPosition();
-  const pending = s.api.coach.ask('hint');
+  const pending = s.api.coach.ask('hint', '分别看看 C7 的黑棋和 G3 的白棋有几口气。');
   await settle();
   s.respond(0, JSON.stringify({ kind: 'explain', parts: [
     { id: 'group.C7', variant: 0 }, { id: 'group.G3', variant: 0 },
   ] }));
   await pending;
   const { coach } = s.render();
-  assert.equal(coach.text, '圈出的这里 这块黑棋有1颗棋子，共有4口气；气数描述当前出口，不能单凭它判断死活。');
+  assert.equal(coach.text, '这里的黑棋有4口气。');
   assert.deepEqual(coach.hintPoints, [{ x: 2, y: 2, label: 'C7' }]);
   assert.equal(coach.source, 'cloud');
-  assert.match(coach.conversation[0].answer, /①.*黑棋.*\n②.*白棋/);
+  assert.match(coach.conversation[0].answer, /^- ①.*黑棋.*\n- ②.*白棋/);
   assert.equal(s.api.state.readPosition(), position);
   assert.equal(s.requests.length, 1);
 });
 
-test('review joins every sentence of the first nonempty part without losing its conditions', async t => {
-  const s = await localReview(t, '\n  \n③ 这里落子后有两口气。只验证当前一步，不证明已活！若遇到劫，还要先按规则核验。\n① 这是另一个要点。');
-  assert.equal(s.api.coach.text, '圈出的这里 这里落子后有两口气；只验证当前一步，不证明已活；若遇到劫，还要先按规则核验。');
+test('review keeps the first complete list item with its short sentences and every condition', async t => {
+  const s = await localReview(t, '\n  \n- ③ 落子后有两口气。只验证当前一步，不证明已活！若遇到劫，还要先按规则核验。\n- ① 是另一个要点。');
+  assert.equal(s.api.coach.text, '这里落子后有两口气。只验证当前一步，不证明已活！若遇到劫，还要先按规则核验。');
   assert.deepEqual(s.api.coach.hintPoints, [points[2]]);
   assert.doesNotMatch(s.api.coach.text, /[①②③]|另一个要点|\n/);
-  assert.equal([...s.api.coach.text.matchAll(/[。！？]/g)].length, 1);
+  assert.equal([...s.api.coach.text.matchAll(/[。！？]/g)].length, 3, 'keep sentence boundaries rather than join conditions into a long sentence');
 });
 
 test('review renumbers retained references in prose order and drops every unmentioned point', async t => {
   const s = await localReview(t, '先看②，再比较③。② 的气仍要重新数，不能只看棋子数量。\n① 这一块另说。');
-  assert.equal(s.api.coach.text, '先看①，再比较②；① 的气仍要重新数，不能只看棋子数量。');
+  assert.equal(s.api.coach.text, '先看①，再比较②。①的气仍要重新数，不能只看棋子数量。');
   assert.deepEqual(s.api.coach.hintPoints, [points[1], points[2]]);
 });
 
-test('an unnumbered ring is restored correctly and an unmarked lesson draws no leftover rings', async t => {
-  const single = await localReview(t, '圈出的这里只剩一口气。还要检查能否合法提子。\n再看围空。', [points[1]]);
-  assert.equal(single.api.coach.text, '圈出的这里只剩一口气；还要检查能否合法提子。');
+test('current and legacy unnumbered references restore correctly and unmarked lessons draw no leftover rings', async t => {
+  const single = await localReview(t, '这里只剩一口气。还要检查能否合法提子。\n再看围空。', [points[1]]);
+  assert.equal(single.api.coach.text, '这里只剩一口气。还要检查能否合法提子。');
+  assert.deepEqual(single.api.coach.hintPoints, [points[1]]);
+  publish('圈出的这里只剩一口气。还要检查能否合法提子。\n再看围空。', [points[1]]);
+  await single.api.coach.ask('hint', '旧讲解里的这里指哪里？');
+  assert.equal(single.render().coach.text, '这里只剩一口气。还要检查能否合法提子。');
   assert.deepEqual(single.api.coach.hintPoints, [points[1]]);
   publish('气要看整块棋。重复的空点只算一次。\n① 是另一个要点。', points);
-  await single.api.coach.ask('hint');
-  assert.equal(single.render().coach.text, '气要看整块棋；重复的空点只算一次。');
+  await single.api.coach.ask('hint', '怎样数这块棋的气？');
+  assert.equal(single.render().coach.text, '气要看整块棋。重复的空点只算一次。');
   assert.deepEqual(single.api.coach.hintPoints, []);
   publish('  \n ', points);
-  await single.api.coach.ask('hint');
+  await single.api.coach.ask('hint', '还有别的提示吗？');
   assert.equal(single.render().coach.text, '');
   assert.deepEqual(single.api.coach.hintPoints, []);
 });
 
 test('playing retains the complete answer and all original marks before and after visiting review', async t => {
   const s = await setup(t, offline);
-  const text = '① 这块多出了出口。暂时解了打吃，不等于做活。\n② 这一块也要照顾；③ 是它的出口。';
+  const text = '① 的棋多出了出口。暂时解了打吃，不等于做活。\n② 的棋也要照顾；③ 是它的出口。';
   publish(text, points);
   await s.api.coach.ask('hint');
   assert.equal(s.render().coach.text, text);
@@ -78,7 +82,7 @@ test('playing retains the complete answer and all original marks before and afte
   s.options.playing = false;
   s.render();
   await settle();
-  assert.equal(s.render().coach.text, '圈出的这里 这块多出了出口；暂时解了打吃，不等于做活。');
+  assert.equal(s.render().coach.text, '这里的棋多出了出口。暂时解了打吃，不等于做活。');
   assert.deepEqual(s.api.coach.hintPoints, [points[0]]);
   assert.equal(s.api.coach.conversation[0].answer, text, 'summary presentation must not replace the stored full answer');
   s.options.playing = true;
@@ -95,7 +99,7 @@ test('summarizing an old reviewed answer never projects its rings onto a newer o
   s.render();
   await settle();
   const explained = s.api.state.readPosition();
-  const text = '① 这里要先看气。多出气不等于做活。\n② 是另一个要点。';
+  const text = '先看①的气。多出气不等于做活。\n② 是另一个要点。';
   publish(text, points.slice(0, 2));
   await s.render().coach.ask('hint');
   move(s, 6, 6);
@@ -104,7 +108,7 @@ test('summarizing an old reviewed answer never projects its rings onto a newer o
   assert.deepEqual(s.api.coach.hintPoints, [], 'published history stays readable but its rings do not enter the live board');
   s.options.playing = false;
   s.api.state.writePosition(explained);
-  assert.equal(s.render().coach.text, '圈出的这里 这里要先看气；多出气不等于做活。');
+  assert.equal(s.render().coach.text, '先看这里的气。多出气不等于做活。');
   assert.deepEqual(s.api.coach.hintPoints, [points[0]]);
   s.api.state.writePosition(live);
   assert.equal(s.render().coach.text, '');

@@ -40,7 +40,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
     const leadTone = leadMatchesUser ? 'btn-beige' : 'btn-sand';
 
     return (
-        <Panel className="p-2 shadow-md">
+        <Panel className="game-analysis p-2 shadow-md">
             <div className="flex items-stretch gap-2">
                 <div className={`btn-retro ${leadTone} flex h-10 shrink-0 items-center rounded-xl px-3`}>
                     <span className="whitespace-nowrap text-[12px] font-black tracking-tight text-[#5c4033]">

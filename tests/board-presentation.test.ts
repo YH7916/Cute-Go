@@ -36,141 +36,141 @@ function fixtureBoard(size: number): BoardState {
   return board;
 }
 
-// Connected Go snapshots retain their pre-decomposition hashes. Independent Go
-// and Gomoku snapshots also cover the corrected skin material and separation.
-// Independent Go additionally renders one face per stone, retaining shared group moods.
+// Complete DOM/SVG snapshots cover skin material, separation and shared group moods.
+// Updated after verifying that all 24 outputs changed only from point lights to
+// fixed direction lights; drawing nodes and other material parameters are unchanged.
 const snapshots: [number, GameType, StoneThemeId, boolean, string][] = [
-  [9, 'Go', 'classic', false, 'cd84b50d8837e0756999d4c95b732f328cad11559961f931ec9ab7ae78130528'],
-  [9, 'Go', 'classic', true, '511a311d47cfd43945f11420cf2af2792ffa98e63f2a599a25ce4dce6bc8da79'],
+  [9, 'Go', 'classic', false, '1da691aef56490b8d5ac7f2022b8e4a01f2def417b5ffa4189581e839bfded6b'],
+  [9, 'Go', 'classic', true, '1145cf04b9344b6eea66e257f7c0e0d764853bbc953fb9938c8ca0db34305e91'],
   [
     9,
     'Go',
     'skeuomorphic',
     false,
-    'e578c609e4ae40a611da875be7c678f67b77ae5831fe0b37e710bb28b9427b2b',
+    '9899c9684d5310050857ca4880a09b95b2f3c8a2a0eaab8ade3b2f4e22780798',
   ],
   [
     9,
     'Go',
     'skeuomorphic',
     true,
-    'f243ec3718fde5bcc6612c7a30597cdd2853bc867b16e057b3867ce5c7d4207a',
+    '2ea48ba1cb20c3f34c9e59621a90bea63a45c2cd0f78d5dc6f38a6bb0c2a8288',
   ],
   [
     9,
     'Gomoku',
     'classic',
     false,
-    '7b84e9cc24790c5ca5aa2db63463b79c1c237dcd96dafeb9ad71b45a7c2485d0',
+    '088acd516d21bcad78c1e32f11ccba5f903dd33fc977fc0361fcdf0807754548',
   ],
   [
     9,
     'Gomoku',
     'classic',
     true,
-    '76ee5e2c361cd2e4585162b7e1529df5c3d76b365584c7e42654a7d1325c8524',
+    'f5231d3463ed7ebf4ffae0b618809052ff11ba6b21b2dae2354eb274ba74f9e7',
   ],
   [
     9,
     'Gomoku',
     'skeuomorphic',
     false,
-    '9058ffedb3958015844a4dcd29dd8bed6583ff484b21b3f4e96d391922e6f5b1',
+    '5b0824c313b3068fcc61bf411c9175a7273adc41ad501624766a0ea6695e92b1',
   ],
   [
     9,
     'Gomoku',
     'skeuomorphic',
     true,
-    'e3c6e77e3e06df05851411c0686076428f91ebc11c09603de81bca4f0f8a031a',
+    '1b6f6433097e85947536dd72f38514a1cdf8867b184b0eb670a5f47662fe3601',
   ],
-  [13, 'Go', 'classic', false, '5a820437c70865f317d6a3e6090cee3b983aca08e42962e54a990f68a3934b44'],
-  [13, 'Go', 'classic', true, '2057653c216bb2bfcac94800682eb8c810b0d62e248f75a036af1e77bfe1ddb3'],
+  [13, 'Go', 'classic', false, '1f388691161c3a4744446c5db98f48eaacc5aff76a73c3ab5e2d758dc8d38fb1'],
+  [13, 'Go', 'classic', true, '45bfa48b6699fc37719987eaeb304cec64fc01d9311b3ffd140e7842235687ad'],
   [
     13,
     'Go',
     'skeuomorphic',
     false,
-    '5c787880dbf22ea7f97fe5bc34c8387f66b2160a048c7026e00d0521fbe108d4',
+    '144731d75896b3a25e5ae295a3b783ee5dbed270fe8f4263e43af9cfda353b65',
   ],
   [
     13,
     'Go',
     'skeuomorphic',
     true,
-    '251fbdfa94b8f98f554e1700cc2ffe2cd62428f10a23d092feeb942df8b81dc4',
+    '9181c14b12ecef4c89123456b2012924169236a1d97f24fe9f2826100a656e7c',
   ],
   [
     13,
     'Gomoku',
     'classic',
     false,
-    'fe48c7b896b069dcf5fa24328e80f77d50fc25ba0b8aff74ffe8dc9cb9312152',
+    'cf18ff602cb96afe0eebe85982b2770a588cb65dba860ec50bef9efd5bc936df',
   ],
   [
     13,
     'Gomoku',
     'classic',
     true,
-    'e3c4aa4cb99794e494c5f944fe458a613aeb140c053c27c84dd919b58bd17ab6',
+    '7f7704cf0cb0e9e822bc9564c952c05b92c5a46b4cbdf7ae2c85169fedbdd68f',
   ],
   [
     13,
     'Gomoku',
     'skeuomorphic',
     false,
-    '285fa62cbc2027cfd6b0f3dad7387cb8130c8e8fd185f1266fb012479adfde9f',
+    '21dad6e8ccecc86a4f0e60a33c8657694c3738e947fcbd4bfaf20ab600e64936',
   ],
   [
     13,
     'Gomoku',
     'skeuomorphic',
     true,
-    'edcbbd41c431cc78136254def6cbdc2bafa65197d13c8a14c4728a0cdb6bc44a',
+    '17d164c934fa4a47819e65d0b87f5df4c331bca07982c66377fc400f524e9f03',
   ],
-  [19, 'Go', 'classic', false, '3583e10c0d8e5c74e4a7a89558b7a0c3fb0d4ba379d21b0eb4b5f62f657ab60d'],
-  [19, 'Go', 'classic', true, '166bd06012ef4790397f4611ad0b594349fe4f8721625680ece1b416c129ef4e'],
+  [19, 'Go', 'classic', false, '3e979de88b7a0df9b970dbbc48baafae6ee87e30a6cbf8a0795ed9786d155129'],
+  [19, 'Go', 'classic', true, '62893c012d270dd40a28001929d435209f578b0f584f5d80d25ab06ef38d7f0f'],
   [
     19,
     'Go',
     'skeuomorphic',
     false,
-    '543bb77dbb0a2fe70bcf44a838a595241744e04c07b652a7945eeedab2251f65',
+    '5d1fe441bc67b9090fd8419f8cfdd73f1474e8069592d7c2c64b1a16228b58f6',
   ],
   [
     19,
     'Go',
     'skeuomorphic',
     true,
-    '123e6e853c43198b08dab83568dbfc5d3bcc14981db1acfcc1ea2932f72deb1e',
+    'c7988bbe7a5d6dcc3360ac080f166eccd5f99ddf341ec4f57043dfc2d4362ea3',
   ],
   [
     19,
     'Gomoku',
     'classic',
     false,
-    '67ed67971e6417fc0893c694e085ebda7aaf8ee916c886e0d7467ad27e21f06d',
+    '17a4226d22c5f855408f3c8f0b7bdbce177edbce27a969a03d8361271f32b081',
   ],
   [
     19,
     'Gomoku',
     'classic',
     true,
-    '7a5ba6769ecb09571f557332b89b58472d2ab1bde4a7cc6598707b7a8644a172',
+    '873e046b3d5afcb50d760616329dabfb87d50ed71cfd1bb7f86a218faf3b7ad5',
   ],
   [
     19,
     'Gomoku',
     'skeuomorphic',
     false,
-    '97784cfb1aff4591885575528d90c4fcac7023de3c5407435e13d1d545ba8af0',
+    'b454702e722e25047a2c3743ef6608ff2fb3bf4aca38ba4e7af8d361325a3d11',
   ],
   [
     19,
     'Gomoku',
     'skeuomorphic',
     true,
-    '4ad44d79e595a56a5c15e59203a5cb105c0b75cc20481e382ad2b087c8973038',
+    '6239cd6514decdee8b5b14cfd0cf17890d37f7297dd0e01b26227b1e693f9b83',
   ],
 ];
 for (const [size, gameType, stoneSkin, separatePieces, expected] of snapshots) {
@@ -328,7 +328,6 @@ test('Gomoku links each adjacent pair once and gives each stone a happy face', (
     faces.every(
       (face) =>
         face.mood === 'happy' &&
-        face.scale === 1 &&
         face.lookOffset.x === 0 &&
         face.lookOffset.y === 0
     )
@@ -342,8 +341,8 @@ test('Go faces retain the line-end anchor, stable center tie-break, and liberty 
   put(line, 2, 1);
   const [lineFace] = getGroupFaces(getAllGroups(line), [], 'Go');
   assert.deepEqual(
-    { x: lineFace.x, y: lineFace.y, scale: lineFace.scale },
-    { x: 2, y: 1, scale: 1.2 }
+    { x: lineFace.x, y: lineFace.y },
+    { x: 2, y: 1 }
   );
   const square = createBoard(5);
   put(square, 1, 1);

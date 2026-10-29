@@ -79,6 +79,12 @@ test('shared teaching grading cannot disappear behind a similarly named local de
   }), /Missing named export domains\/coach\/exercise\.ts: gradeExercise/);
 });
 
+test('analysis still requires the shared Go search export when Hard play uses policy directly', () => {
+  includesError(changedSnapshot(snapshot => {
+    snapshot.entries['core/inference/search.ts'] = 'const runOwnershipSearch = async () => {}; export default runOwnershipSearch;';
+  }), /Missing named export core\/inference\/search\.ts: runOwnershipSearch/);
+});
+
 test('comments, strings and local declarations cannot masquerade as reusable named exports', () => {
   const sources = [
     '// export function searchGomoku() {}\nexport function getGomokuCandidates() {}',
@@ -127,6 +133,18 @@ test('CI cannot maintain a second partial pipeline beside the canonical entry', 
 test('CI cannot execute the complete canonical pipeline twice', () => {
   includesError(changedSnapshot(snapshot => { snapshot.ci += '\n      - run: npm run check\n'; }),
     /quality\.yml.*(?:once|duplicate|second)/i);
+});
+
+test('Pages rejects bypassed checks, PR deployment and publishing backend or repository files', () => {
+  for (const [before, after] of [
+    ['needs: check', 'needs: []'],
+    ["if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'", 'if: always()'],
+    ['run: npm run check', 'run: npm run check\n        continue-on-error: true'],
+    ['path: dist', 'path: .'],
+    ['path: dist', 'path: dist-server'],
+  ]) {
+    includesError(changedSnapshot(snapshot => { snapshot.ci = snapshot.ci.replace(before, after); }), /Pages/);
+  }
 });
 
 test('instruction and ESLint adapters must keep their authoritative pointers', () => {

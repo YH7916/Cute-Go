@@ -17,7 +17,12 @@ interface MutableVariation {
   point: Point | null; color: Player; correct?: boolean; wrong?: boolean; children: MutableVariation[];
 }
 const revision = `ogs:${data.source.commit}:zh-2026-10-03`;
-const teachingCopy: Readonly<Record<string, { prompt: string; notes: string }>> = { ...foundationCopy, ...skillsCopy };
+const teachingCopy: Readonly<Record<string, { prompt: string; notes: string; feedback?: string;
+  wrongAnswerExplanation?: string }>> = { ...foundationCopy, ...skillsCopy };
+// These source annotations label the answer itself, rather than a target or alternatives.
+// Keep the raw archive intact; candidate A/B labels and the ko last-move mark remain visible.
+const answerMarkPages = new Set(['ogs-count_chains-page01', 'ogs-cut-page01',
+  'ogs-make-alive-page01', 'ogs-net-page01', 'ogs-close_territory-page01']);
 const scoreLessons = new Set(['ogs-territory', 'ogs-count-territory', 'ogs-ending-the-game']);
 const scoring = '这组题按“地盘＋提子”的数目法计算。';
 const skillAliases: Readonly<Record<string, string>> = {
@@ -25,10 +30,10 @@ const skillAliases: Readonly<Record<string, string>> = {
 };
 const observationHints: Readonly<Record<string, string>> = {
   'ogs-rules-intro': '先看轮到哪一方，再找棋子旁边的空交叉点。',
-  'ogs-self-capture': '先看能否提掉邻近的棋；提子后才判断自己有没有气。',
+  'ogs-self-capture': '先看能否提掉邻近的对方棋；提子后再数自己的气。',
   'ogs-eyes': '分清两个独立的眼，还是一个较大的眼。',
   'ogs-ko': '留意提子后能否立即回提，以及别处有没有必须应对的劫材。',
-  'ogs-territory': '先数围住的空点；这组题中，死子同时计俘子和空地点。',
+  'ogs-territory': '- 数清围住的空点。\n- 这组题中，死子既算提子，也腾出空地。',
   'ogs-ending-the-game': '先确认现在是停着、移除死子，还是结束计分。',
   'ogs-the-board': '先辨认角、边、中央和星位。',
   'ogs-count-liberties': '沿着整块棋找上下左右的空点，同一个空点只数一次。',
@@ -48,7 +53,7 @@ const observationHints: Readonly<Record<string, string>> = {
   'ogs-net': '观察逃跑的路线，找能一次封住出口的位置。',
   'ogs-count-territory': '空地点逐个数，死子按这组题的数目法每颗合计两目。',
   'ogs-close_territory': '找对方能钻进地盘的缺口。',
-  'ogs-capturing_race': '比较两块棋的气，先紧对方的气，再检查自己的气。',
+  'ogs-capturing_race': '数清两块棋的气，再比较紧对方气和增加自己气的次序。',
 };
 
 function paths(value: unknown): Point[][] {
@@ -93,15 +98,16 @@ function exercise(page: OgsPage, lessonId: string, originalLessonId: string): Ex
   // This source page explicitly starts just after White captured at its "1" mark.
   if (page.id === 'ogs-ko-page05') position = restoreSourceCapture(position, { x: 0, y: 10 }, { x: 0, y: 9 });
   const symbols: Readonly<Record<string, string>> = { triangle: '△', square: '□', circle: '○', cross: '×' };
-  const boardMarks = Object.entries(page.position.marks).flatMap(([key, points]) =>
-    (points ?? []).map((point) => ({ point, label: symbols[key] ?? key })));
+  const boardMarks = Object.entries(page.position.marks)
+    .filter(([key]) => key !== 'cross' && (!answerMarkPages.has(page.id) || key === 'triangle'))
+    .flatMap(([key, points]) => (points ?? []).map((point) => ({ point, label: symbols[key] ?? key })));
   const copy = teachingCopy[page.id];
   if (!copy) throw new Error(`Missing teaching copy: ${page.id}`);
   const prompt = copy.prompt;
   const base = { id: page.id, familyId: page.id, skillId: lessonId, contentRevision: revision, position, boardMarks,
     teachingNotes: copy.notes,
     prompt, hints: [observationHints[originalLessonId] ?? '先观察目标棋块和它的气。', '试试圈出的点，再观察气的变化。'] as const,
-    explanation: '这一题完成了。',
+    explanation: '本题完成。',
     sources: [{ title: 'Online-Go.com Learning Hub', url: page.sourceUrl }] };
   if (page.answer.kind === 'move-tree') return { ...base, kind: 'variation', solution: variation(page) };
   if (page.answer.kind === 'choice') {
@@ -111,8 +117,10 @@ function exercise(page: OgsPage, lessonId: string, originalLessonId: string): Ex
     }
     const ids = correct.filter((value): value is string => typeof value === 'string');
     const label = page.answer.options.filter((option) => ids.includes(option.id)).map((option) => option.label).join('、');
+    if (!copy.feedback || !copy.wrongAnswerExplanation) throw new Error(`Missing choice explanation: ${page.id}`);
     return { ...base, kind: 'choice', choices: page.answer.options, correctChoiceId: ids[0], correctChoiceIds: ids,
-      hints: [base.hints[0], `这一题的答案是“${label}”。再看棋盘确认一下。`], explanation: `对，答案是“${label}”。` };
+      wrongAnswerExplanation: copy.wrongAnswerExplanation,
+      hints: [base.hints[0], `答案是“${label}”，对照棋盘再看一遍。`], explanation: copy.feedback };
   }
   if (page.answer.kind === 'remove-stones') {
     if (!page.answer.points?.length) throw new Error(`Missing removal points: ${page.id}`);
@@ -124,7 +132,7 @@ function exercise(page: OgsPage, lessonId: string, originalLessonId: string): Ex
     return { ...base, kind: 'action', action: page.answer.action,
       hints: [page.answer.action === 'pass' ? '双方都没有值得下的地方时，可以停着。' : '死子已移除，现在比较双方得分。',
         page.answer.action === 'pass' ? '点击“停一手”。' : '点击“结束对局”。'],
-      explanation: page.answer.action === 'pass' ? '停着不落子。双方先后停着后，就进入终局处理。' : '黑棋 24 目，白棋 22 目，黑棋获胜。' };
+      explanation: page.answer.action === 'pass' ? '- 停着就是这一手不落子。\n- 双方连续停着后，进入终局处理。' : '黑棋 24 目，白棋 22 目，黑棋获胜。' };
   }
   throw new Error(`Unsupported source interaction: ${page.id}`);
 }

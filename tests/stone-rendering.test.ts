@@ -5,6 +5,8 @@ import React from 'react';
 import { GameBoard } from '../components/GameBoard';
 import { ScoreBoard } from '../components/ScoreBoard';
 import { BoardStoneBody } from '../components/board/BoardStones';
+import { RenderStoneIcon } from '../components/common/RenderStoneIcon';
+import { StoneSkinPreview } from '../components/common/StoneSkinPreview';
 import { getBoardConnections } from '../components/board/connections';
 import { createBoard } from '../core/board';
 import { STONE_THEMES } from '../utils/themes';
@@ -20,6 +22,30 @@ const geometry: BoardGeometry = {
 };
 const themes: StoneThemeId[] = ['classic', 'skeuomorphic'];
 const colors: Player[] = ['black', 'white'];
+
+for (const [surface, element] of [
+  ['board', React.createElement(GameBoard, {
+    board: createBoard(9), currentPlayer: 'black', lastMove: null, showQi: false,
+    stoneSkin: 'classic', gameType: 'Go', onIntersectionClick: () => {},
+  })],
+  ['scoreboard', React.createElement(RenderStoneIcon, { color: 'black', stoneSkin: 'classic' })],
+  ['shop', React.createElement(StoneSkinPreview, { stoneSkin: 'classic' })],
+] as const) {
+  test(`classic/${surface}: highlights avoid device-dependent large point-light coordinates`, () => {
+    const markup = renderToStaticMarkup(element);
+    const lights = [...markup.matchAll(/<feSpecularLighting\b[^>]*>([\s\S]*?)<\/feSpecularLighting>/g)];
+    assert.equal(lights.length, 2, 'both colors must keep their specular lighting');
+    for (const [, light] of lights) {
+      assert.doesNotMatch(light, /<fe(?:Point|Spot)Light\b/,
+        'large light-to-pixel vectors can wash out the black body in X5 hardware rendering');
+      assert.match(light, /<feDistantLight azimuth="225" elevation="20"/,
+        'use a fixed upper-left direction independent of board position and display scale');
+    }
+    assert.match(markup, /specularConstant="0.8" specularExponent="20"/);
+    assert.match(markup, /specularConstant="1.2" specularExponent="15"/);
+    assert.match(markup, /<feComposite in="specularInBlob" in2="shadowedBlob" operator="over"/);
+  });
+}
 
 for (const stoneSkin of themes) {
   for (const gameType of ['Go', 'Gomoku'] as const) {

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { nextLearningSequence, projectLearning } from '../domains/coach/learning';
 import { emptyLearningRecord } from '../domains/coach/learningTypes';
-import type { LearningAttemptInput, LearningExposureInput, LearningRecord, SavedLearningPosition } from '../domains/coach/learningTypes';
-import { isLearningAttempt, isLearningExposure, isSavedLearningPosition, mergeLearningRecords,
+import type { LearningAttemptInput, LearningCourseCursor, LearningExposureInput, LearningRecord, SavedLearningPosition } from '../domains/coach/learningTypes';
+import { isLearningAttempt, isLearningCourseCursor, isLearningExposure, isSavedLearningPosition, mergeLearningRecords,
   parseLearningBackup, parseLearningRecord } from '../domains/coach/learningValidation';
 import { deleteLearningStorage, readLearningStorage, writeLearningStorage } from '../services/coach/learningStorage';
 
@@ -13,12 +13,11 @@ interface LearningState {
   saving: boolean;
   storageError: string;
   storageLocked: boolean;
-  revision: number;
 }
 const STORAGE_ERROR = '课程进度尚未保存到本机；关闭页面可能丢失本次进度，请稍后重试。';
 const LOAD_ERROR = '本机课程进度读取失败，已暂停保存并保留原数据。本次进度仅在当前页面有效。';
 function initial(owner: string): LearningState {
-  return { owner, record: emptyLearningRecord(), loaded: false, saving: false, storageError: '', storageLocked: false, revision: 0 };
+  return { owner, record: emptyLearningRecord(), loaded: false, saving: false, storageError: '', storageLocked: false };
 }
 
 export function useLearningProgress(ownerScopeId: string) {
@@ -59,7 +58,7 @@ export function useLearningProgress(ownerScopeId: string) {
   function commit(record: LearningRecord, remove = false): boolean {
     if (!available()) return false;
     const protectedWrite = current.current.storageLocked && !remove;
-    const next = { ...current.current, record: parseLearningRecord(record), saving: !protectedWrite, revision: current.current.revision + 1 };
+    const next = { ...current.current, record: parseLearningRecord(record), saving: !protectedWrite };
     current.current = next;
     setState(next);
     if (protectedWrite) return true;
@@ -87,7 +86,15 @@ export function useLearningProgress(ownerScopeId: string) {
     if (!available() || !isLearningAttempt(input)) return false;
     const record = current.current.record;
     if (record.attempts.length >= 10000 || record.attempts.some(item => item.attemptId === input.attemptId)) return false;
-    return commit({ ...record, attempts: [...record.attempts, { ...input, sequence: nextLearningSequence(record) }] });
+    const cursor = record.courseCursor;
+    return commit({ ...record,
+      ...(input.source === 'course' && cursor && cursor.exerciseId === input.exerciseId && cursor.contentRevision === input.contentRevision
+        ? { courseCursor: { ...cursor, completed: input.outcome === 'success', updatedAt: input.occurredAt } } : {}),
+      attempts: [...record.attempts, { ...input, sequence: nextLearningSequence(record) }] });
+  }
+  function setCourseCursor(cursor: LearningCourseCursor): boolean {
+    if (!available() || !isLearningCourseCursor(cursor)) return false;
+    return commit({ ...current.current.record, courseCursor: cursor });
   }
   function recordExposure(input: LearningExposureInput): boolean {
     if (!available() || !isLearningExposure(input)) return false;
@@ -119,6 +126,6 @@ export function useLearningProgress(ownerScopeId: string) {
   return {
     ...projectLearning(visible.record, now), ...visible.record,
     loaded: visible.loaded, saving: visible.saving, storageError: visible.storageError,
-    recordAttempt, recordExposure, savePosition, removePosition, exportBackup, importBackup, deleteProgress,
+    recordAttempt, recordExposure, setCourseCursor, savePosition, removePosition, exportBackup, importBackup, deleteProgress,
   };
 }

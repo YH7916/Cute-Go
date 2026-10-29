@@ -10,7 +10,6 @@ export const getGroupFaces = (
       y: stone.y,
       mood: 'happy' as const,
       color: stone.color,
-      scale: 1,
       lookOffset: { x: 0, y: 0 },
     }));
   }
@@ -86,8 +85,6 @@ export const getGroupFaces = (
     if (group.liberties === 1) mood = 'worried';
     else if (group.liberties <= 3) mood = 'neutral';
 
-    const sizeBonus = Math.min(count - 1, 3) * 0.1;
-
     const anchors = separatePieces
       ? sortedStones
       : [{ id: groupKey, x: finalX, y: finalY }];
@@ -102,7 +99,6 @@ export const getGroupFaces = (
       return {
         id, x, y, mood,
         color: group.stones[0].color,
-        scale: separatePieces ? 1 : 1 + sizeBonus,
         lookOffset,
       };
     });

@@ -1,8 +1,8 @@
 import { getDefaultKomi } from '../../core/go/config';
 import { useCallback } from 'react';
 import type { Player } from '../../types';
-import { calculateScore } from '../../utils/goLogic';
-import { calculateElo, calculateNewRating, getAiRating } from '../../utils/helpers';
+import { calculateScore } from '../../core/go/scoring';
+import { calculateNewRating, getAiRating } from '../../utils/helpers';
 import { platform } from '../../services/platform';
 import type { UseGameActionsOptions } from './types';
 
@@ -15,13 +15,11 @@ export const useEndGameAction = ({
   gameState,
   myColor,
   onlineStatus,
-  opponentProfile,
   pendingEndGameRef,
   playSfx,
   session,
   setEloDiffStyle,
   setEloDiffText,
-  setIsThinking,
   settings,
   stopWebThinking,
   userProfile,
@@ -33,7 +31,6 @@ export const useEndGameAction = ({
   pendingEndGameRef.current = null;
   stopWebThinking();
   aiTurnLock.current = false;
-  setIsThinking(false);
   if (aiTimerRef.current) {
     clearTimeout(aiTimerRef.current);
     aiTimerRef.current = null;
@@ -57,8 +54,7 @@ export const useEndGameAction = ({
     const position = gameState.readPosition();
     const captures = { black: position.blackCaptures, white: position.whiteCaptures };
     const komi = getDefaultKomi(settings.boardSize);
-    // The displayed board may already have had dead stones removed. Reusing
-    // settlement preserves their prisoner points as well as the displayed total.
+    // Reuse settlement so achievement checks keep its prisoner points and total.
     const currentScore = settledScore ?? calculateScore(position.board, displayTerritory, komi, captures);
     checkEndGameAchievements({
       winner: winnerColor,
@@ -68,40 +64,8 @@ export const useEndGameAction = ({
     });
   }
 
-  if (
-    onlineStatus === 'connected' &&
-    session &&
-    userProfile &&
-    opponentProfile &&
-    typeof opponentProfile.elo === 'number' &&
-    myColor
-  ) {
-    const isWin = myColor === winnerColor;
-    const result = isWin ? 'win' : 'loss';
-    const newElo = calculateElo(userProfile.elo, opponentProfile.elo, result);
-    const eloDiff = newElo - userProfile.elo;
-    const diffText = eloDiff > 0 ? `+${eloDiff}` : `${eloDiff}`;
-    gameState.setWinReason(`${reason} (积分 ${diffText})`);
-    setEloDiffText(diffText);
-    setEloDiffStyle(eloDiff > 0 ? 'normal' : 'negative');
-
-    if (isWin) {
-      const winnerNewElo = calculateElo(userProfile.elo, opponentProfile.elo, 'win');
-      const loserNewElo = calculateElo(opponentProfile.elo, userProfile.elo, 'loss');
-      await platform.profile.applyOnlineMatchResult({
-        winnerId: session.user.id,
-        loserId: opponentProfile.id,
-        winnerNewElo,
-        loserNewElo,
-      });
-
-      fetchProfile(session.user.id);
-    } else {
-      setTimeout(() => fetchProfile(session.user.id), 2000);
-    }
-  }
-  else if (onlineStatus === 'connected' && session?.provider === 'taptap') {
-    gameState.setWinReason(reason);
+  if (onlineStatus === 'connected') {
+    // Native matches have no persisted rating settlement, including legacy ELO payloads.
     setEloDiffText(null);
     setEloDiffStyle(null);
   }
@@ -134,13 +98,11 @@ export const useEndGameAction = ({
   gameState,
   myColor,
   onlineStatus,
-  opponentProfile,
   pendingEndGameRef,
   playSfx,
   session,
   setEloDiffStyle,
   setEloDiffText,
-  setIsThinking,
   settings,
   stopWebThinking,
   userProfile,

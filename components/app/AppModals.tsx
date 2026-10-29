@@ -107,11 +107,8 @@ export const AppModals: React.FC<AppModalsProps> = ({ vm }) => {
         hapticEnabled={settings.hapticEnabled} setHapticEnabled={settings.setHapticEnabled}
         vibrate={vibrate}
         skipStartScreen={settings.skipStartScreen} setSkipStartScreen={settings.setSkipStartScreen}
-        onStartSetup={() => { settings.setCoachMode(false); settings.setGameMode('PvP'); resetGame(false); gameState.setAppMode('setup'); setShowMenu(false); }}
         onOpenImport={() => { setShowImportModal(true); setShowMenu(false); }}
         onOpenTutorial={() => { setShowTutorial(true); setShowMenu(false); }}
-        onOpenOnline={() => setShowOnlineMenu(true)}
-        onOpenAbout={() => { setShowAboutModal(true); setShowMenu(false); }}
         onOpenSkinShop={() => setShowSkinShop(true)}
         separatePieces={settings.separatePieces}
         setSeparatePieces={settings.setSeparatePieces}

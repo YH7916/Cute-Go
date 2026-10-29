@@ -1,8 +1,9 @@
 import { useCallback } from 'react';
 import type { Player } from '../../types';
 import { recordMove } from '../../domains/game/positionState';
-import { attemptMove, checkGomokuWin } from '../../utils/goLogic';
-import { getBoardHash } from './boardHash';
+import { getBoardHash } from '../../core/board';
+import { attemptMove } from '../../core/go/rules';
+import { checkGomokuWin } from '../../core/gomoku/rules';
 import type { UseGameActionsOptions } from './types';
 
 export const useMoveAction = ({

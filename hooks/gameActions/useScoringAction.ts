@@ -13,8 +13,6 @@ export const useScoringAction = ({
   isWorkerReady,
   pendingEndGameRef,
   requestAnalysis,
-  setIsThinking,
-  setShowPassModal,
   settings,
   stopWebThinking,
 }: UseGameActionsOptions, endGame: (
@@ -26,9 +24,7 @@ export const useScoringAction = ({
   if (aiTimerRef.current !== null) clearTimeout(aiTimerRef.current);
   aiTimerRef.current = null;
   pendingEndGameRef.current = null;
-  setIsThinking(false);
   aiTurnLock.current = false;
-  setShowPassModal(false);
 
   const position = gameState.readPosition();
   const request: ScoringRequest = {
@@ -57,7 +53,6 @@ export const useScoringAction = ({
 
   const { score, lead } = evaluateScoring(request, displayTerritory);
   gameState.setFinalScore(score);
-  setShowPassModal(false);
   if (lead > 0) endGame('black', `计算机计分：黑领先 ${lead.toFixed(1)} 目`, score);
   else endGame('white', `计算机计分：白领先 ${Math.abs(lead).toFixed(1)} 目`, score);
 }, [
@@ -70,8 +65,6 @@ export const useScoringAction = ({
   isWorkerReady,
   pendingEndGameRef,
   requestAnalysis,
-  setIsThinking,
-  setShowPassModal,
   settings,
   stopWebThinking,
 ]);

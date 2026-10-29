@@ -24,6 +24,10 @@ before(async () => {
     'agent/coach/runtime.ts': 'export const value = 1;',
     'agent/coach/contract.ts': 'export type AgentMessage = { id: number };',
     'services/coach/client.ts': 'export const value = 1;',
+    'server/coach/http.ts': 'export const value = 1;',
+    'server/coach/runtime.ts': 'export const value = 1;',
+    'services/coach/types.ts': 'export type Shape = { x: number };',
+    'shared/coach.ts': 'export const value = 1;',
     'services/platform/index.ts': 'export const value = 1;',
     'services/platform/environment.ts': 'export const isTapTapEnv = () => false;',
     'services/platform/taptap/runtime.ts': 'export const value = 1;',
@@ -42,6 +46,9 @@ before(async () => {
     'utils/goLogic.ts': 'export const value = 1;',
     'utils/tapTapBridge.ts': 'export const value = 1; export const isTapTapEnv = () => false;',
     'core/board.ts': 'export const value = 1;',
+    'core/go/rules.ts': 'export const value = 1;',
+    'core/go/scoring.ts': 'export const value = 1;',
+    'core/gomoku/rules.ts': 'export const value = 1;',
     'unmapped/helper.ts': 'export const value = 1;',
     'core/cycle/a.ts': "import { b } from './b'; export const a = () => b;",
     'core/cycle/b.ts': "import { c } from './c'; export const b = () => c;",
@@ -166,6 +173,33 @@ test('core rejects React and native adapter packages', async () => {
   }
 });
 
+test('hosted Pi execution is isolated from browser imports and presentation dependencies', async () => {
+  assert.deepEqual(await messages('server/coach/probe.ts', imports('./runtime')), []);
+  const frontendType = await messages('server/coach/probe.ts', "import type { Shape } from '../../services/coach/types'; export type Result = Shape;");
+  assert.ok(frontendType.some(item => item.ruleId === 'boundaries/dependencies' && item.severity === 2));
+  for (const file of ['hooks/probe.ts', 'components/Coach.tsx', 'services/probe.ts', 'agent/coach/probe.ts', 'core/probe.ts']) {
+    const target = `${file.startsWith('agent/') ? '../../' : '../'}server/coach/runtime`;
+    for (const source of [imports(target), `export const result = import('${target}');`, `export const result = require('${target}');`]) {
+      const findings = await messages(file, source);
+      assert.ok(findings.some(item => item.ruleId === 'boundaries/dependencies' && item.severity === 2), `${file}: ${source}`);
+    }
+    for (const name of ['@earendil-works/pi-agent-core', '@earendil-works/pi-ai', '@earendil-works/pi-ai/api/openai-completions.lazy', '@earendil-works/pi-coding-agent']) {
+      for (const source of [imports(name), `export const result = import('${name}');`, `export const result = require('${name}');`]) {
+        const findings = await messages(file, source);
+        assert.ok(findings.some(item => item.ruleId?.startsWith('no-restricted-') && item.severity === 2), `${file}: ${source}`);
+      }
+    }
+  }
+  for (const target of ['../../components/Board', '../../hooks/useBoard', '../../core/board', '../../agent/coach/runtime']) {
+    const findings = await messages('server/coach/probe.ts', imports(target));
+    assert.ok(findings.some(item => item.ruleId === 'boundaries/dependencies' && item.severity === 2), target);
+  }
+  for (const name of ['react', '@capacitor/core']) {
+    const findings = await messages('server/coach/probe.ts', imports(name));
+    assert.ok(findings.some(item => item.ruleId === 'no-restricted-imports' && item.severity === 2), name);
+  }
+});
+
 test('UI uses public platform services; legacy bridge and SDK internals are closed', async () => {
   const environmentCheck = "import { isTapTapEnv } from '../utils/tapTapBridge'; export const result = isTapTapEnv();";
   const migrated = await messages('components/LoginModal.tsx', environmentCheck);
@@ -224,6 +258,25 @@ test('only the composition contract can reference hook types, with no runtime co
   assert.ok(otherComponent.some((item) => item.ruleId === 'boundaries/dependencies'));
 });
 
+test('coach wire contract is shared without admitting server, UI or Pi execution', async () => {
+  for (const file of ['server/coach/probe.ts', 'services/coach/probe.ts', 'services/coach/client.ts']) {
+    assert.deepEqual(await messages(file, imports('../../shared/coach')), [], file);
+  }
+  for (const target of ['../server/coach/runtime', '../services/coach/types', '../components/Board', '../hooks/useBoard']) {
+    const findings = await messages('shared/coach.ts', imports(target));
+    assert.ok(findings.some(item => item.ruleId === 'boundaries/dependencies'), target);
+  }
+  for (const target of ['react', '@earendil-works/pi-agent-core', '@earendil-works/pi-ai']) {
+    const findings = await messages('shared/coach.ts', imports(target));
+    assert.ok(findings.some(item => item.ruleId?.startsWith('no-restricted-')), target);
+  }
+  const directUi = await messages('components/Board.tsx', imports('../shared/coach'));
+  assert.ok(directUi.some(item => item.ruleId === 'boundaries/dependencies'));
+  // Restore the independent fixture before later import-graph checks.
+  await messages('shared/coach.ts', 'export const value = 1;');
+  await messages('components/Board.tsx', 'export const value = 1;');
+});
+
 test('new unclassified files and dependencies fail instead of escaping the graph', async () => {
   const unknownFile = await messages('new-layer/probe.ts', 'export const result = 1;');
   assert.ok(unknownFile.some((item) => item.ruleId === 'boundaries/no-unknown-files'));
@@ -270,7 +323,7 @@ test('debt suppressions cannot waive architecture, cycles, size limits, or arbit
   assert.deepEqual(baseline, {}, 'the cleared debt ledger must stay empty; do not restore type or architecture waivers');
 });
 
-test('new callers cannot use core compatibility bridges; only exact existing file-to-file edges survive', async () => {
+test('new callers cannot use core compatibility bridges', async () => {
   for (const file of ['hooks/new.ts', 'domains/new.ts', 'worker/new.ts', 'components/New.tsx',
     'components/TutorialModal.tsx', 'components/TutorialStates.ts', 'AppController.tsx']) {
     const prefix = file === 'AppController.tsx' ? './' : '../';
@@ -283,13 +336,23 @@ test('new callers cannot use core compatibility bridges; only exact existing fil
     const findings = await messages('hooks/new.ts', source);
     assert.ok(findings.some(item => item.ruleId === 'boundaries/dependencies'), source);
   }
-  for (const file of ['hooks/gameActions/useEndGameAction.ts', 'hooks/gameActions/useMoveAction.ts']) {
-    const prefix = file.startsWith('hooks/') ? '../../' : '../';
-    assert.deepEqual(await messages(file, imports(`${prefix}utils/goLogic`)), [], file);
-    const findings = await messages(file, imports(`${prefix}utils/onnx-engine`));
-    assert.ok(findings.some(item => item.ruleId === 'boundaries/dependencies'), file);
-  }
 });
+
+for (const [file, entries] of [
+  ['hooks/gameActions/useEndGameAction.ts', ['core/go/scoring']],
+  ['hooks/gameActions/useMoveAction.ts', ['core/board', 'core/go/rules', 'core/gomoku/rules']],
+]) {
+  test(`${file} uses core directly and cannot restore its former compatibility exception`, async () => {
+    for (const entry of entries) assert.deepEqual(await messages(file, imports(`../../${entry}`)), [], entry);
+    for (const bridge of ['goLogic', 'onnx-engine']) {
+      const target = `../../utils/${bridge}`;
+      for (const source of [imports(target), `export const result = import('${target}');`, `export const result = require('${target}');`]) {
+        const findings = await messages(file, source);
+        assert.ok(findings.some(item => item.ruleId === 'boundaries/dependencies' && item.severity === 2), `${file}: ${source}`);
+      }
+    }
+  });
+}
 
 test('public platform facades cannot be bypassed through provider composition or internal type files', async () => {
   for (const target of ['platformClient', 'providers/taptapPlatform', 'types']) {

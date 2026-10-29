@@ -6,8 +6,10 @@ import { loadTestModule } from './helpers/loadTestModule.mjs';
 
 const require = createRequire(import.meta.url);
 const leaves = new Set(['TutorialModal', 'SettingsModal', 'CoachSettings', 'UserPage', 'OnlineMenu',
-  'ImportExportModal', 'EndGameModal', 'OfflineLoadingModal', 'LoginModal', 'AboutModal', 'SkinShopModal']);
-const { useAppUiState, AppModals, TutorialModal, StartScreen, renderHook } = await loadTestModule({
+  'ImportExportModal', 'EndGameModal', 'OfflineLoadingModal', 'LoginModal', 'AboutModal', 'SkinShopModal',
+  'GameBoard', 'ScoreBoard', 'GameControls', 'PassConfirmationModal', 'AnalysisPanel', 'CoachAssistant',
+  'CoachMarkers', 'LearningCenter', 'AchievementNotification']);
+const { useAppUiState, AppView, AppModals, TutorialModal, StartScreen, renderHook } = await loadTestModule({
   reactHost: true, define: { 'process.env.NODE_ENV': '"production"' },
   plugins: [{ name: 'tutorial-entry-host', setup(build) {
     build.onResolve({ filter: /jsx-runtime$/ }, () => ({ path: require.resolve('react/jsx-runtime') }));
@@ -19,6 +21,7 @@ const { useAppUiState, AppModals, TutorialModal, StartScreen, renderHook } = awa
     build.onLoad({ filter: /.*/, namespace: 'tutorial-entry-leaf' }, args => ({ contents: `export const ${args.path} = () => null;` }));
   } }],
   contents: `export { useAppUiState } from './hooks/useAppUiState';
+    export { AppView } from './components/AppView';
     export { AppModals } from './components/app/AppModals';
     export { TutorialModal } from './components/TutorialModal';
     export { StartScreen } from './components/StartScreen';
@@ -78,22 +81,42 @@ test('the restored modal keeps original animation and haptic preferences and rec
   assert.equal(values.get('cute_go_tutorial_seen'), 'true');
 });
 
-test('home offers deeper teaching and companion without a beginner tutorial entry', t => {
+test('home routes classroom and companion through the existing owners without a beginner tutorial entry', t => {
+  storage(t, true);
   const calls = [];
-  const host = renderHook(() => StartScreen({
-    onOpenLearning: () => calls.push('advanced'), onStartCoach: () => calls.push('companion') }));
+  const host = renderHook(() => {
+    const ui = useAppUiState(false);
+    const vm = { ...ui, settings: { gameType: 'Go', gameMode: 'PvAI' },
+      gameState: { appMode: 'playing', history: [] }, viewPosition: { board: [], currentPlayer: 'black' },
+      coach: { active: false }, coachSettings: {}, review: {}, teaching: { view: { isOpen: false }, tutorialContent: {} },
+      handleOpenLearning: () => calls.push('classroom'), handleStartCoach: () => calls.push('companion'),
+      handleStartGame: (...args) => calls.push(['game', ...args]) };
+    const app = AppView({ vm });
+    const start = elements(app).find(node => node.type === StartScreen);
+    return { home: StartScreen(start.props), modals: AppModals({ vm }) };
+  });
   t.after(() => host.unmount());
-  const home = host.render();
+  const { home } = host.render();
   const content = elements(home).find(node => node.props.onStartCoach && node.props.onOpenLearning);
   const tree = content.type(content.props);
-  const beginner = elements(tree).find(node => node.type === 'button' && text(node) === '新手教学');
-  const advanced = elements(tree).find(node => node.props.label === '进阶教学');
+  const beginner = elements(tree).find(node => node.props.label === '新手教学');
+  const classroom = elements(tree).find(node => node.props.label === '围棋课堂');
   const companion = elements(tree).find(node => node.type === 'button' && text(node).includes('陪我下棋'));
   assert.equal(beginner, undefined);
-  assert.ok(advanced);
+  assert.ok(classroom);
   assert.ok(companion);
-  advanced.props.onClick(); companion.props.onClick();
-  assert.deepEqual(calls, ['advanced', 'companion']);
+  assert.equal(elements(host.render().modals).find(node => node.type === TutorialModal).props.isOpen, false);
+  classroom.props.onClick(); companion.props.onClick();
+  assert.deepEqual(calls, ['classroom', 'companion']);
+  assert.equal(elements(host.render().modals).find(node => node.type === TutorialModal).props.isOpen, false);
+  elements(home).find(node => node.props.label === '五子棋').props.onClick();
+  const gomoku = elements(host.render().home).find(node => node.props.onStartGame && !node.props.onOpenLearning);
+  assert.ok(gomoku);
+  assert.equal(gomoku.props.onStartCoach, undefined);
+  const gomokuTree = gomoku.type(gomoku.props);
+  assert.equal(elements(gomokuTree).some(node => ['新手教学', '围棋课堂'].includes(node.props.label)), false);
+  elements(gomokuTree).find(node => node.type === 'button' && text(node).includes('AI 对战')).props.onClick();
+  assert.deepEqual(calls.at(-1), ['game', 'PvAI', 'local', 'Gomoku']);
 });
 
 for (const [destination, expected] of [

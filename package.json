@@ -4,7 +4,7 @@
   "version": "4.0.0",
   "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.19.0"
   },
   "scripts": {
     "dev": "vite",
@@ -18,15 +18,17 @@
     "check": "node harness/run.mjs check",
     "format": "prettier --write \"**/*.{ts,tsx,css}\" --ignore-path .gitignore",
     "typecheck": "node harness/run.mjs typecheck",
-    "version:sync": "node update-version.js",
     "icon:gen": "capacitor-assets generate --android",
-    "make-android": "npm run version:sync && npm run build && npm run icon:gen && npx cap sync android",
-    "harness:sync": "node harness/contracts.mjs --write"
+    "make-android": "npm run build && npm run icon:gen && npx cap sync android",
+    "harness:sync": "node harness/contracts.mjs --write",
+    "coach:start": "node --env-file-if-exists=.env.coach.local dist-server/main.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.1",
     "@capacitor/app": "^8.0.0",
     "@capacitor/haptics": "^8.0.0",
+    "@earendil-works/pi-agent-core": "1.4.0",
+    "@earendil-works/pi-ai": "1.4.0",
     "@sabaki/immutable-gametree": "^1.9.4",
     "@sabaki/sgf": "^3.4.7",
     "lucide-react": "^0.562.0",

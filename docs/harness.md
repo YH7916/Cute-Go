@@ -27,13 +27,13 @@ Course practice and personal review exercises share Go rules, grading and isolat
 
 ### teaching-agent
 
-UI sends complete positions and intent; the agent owns evidence, prompts, provider calls and local fallback.
+UI sends complete positions and intent; the local agent owns evidence, response validation and fallback while hosted Pi owns cloud execution.
 
 - [agent/coach/client.ts](../agent/coach/client.ts)：`runCoachAgent`
 
 验证：Runtime, Worker cancellation and hook stale-reply regressions; independent ESLint boundary counterexamples.
 
-限制：This is in-app execution separation, not a hosted backend or a secret-hiding boundary; browser CORS still applies.
+限制：The browser holds the user key; only the hosted Pi backend calls model providers, using request-scoped credentials.
 
 ### game-position
 
@@ -60,7 +60,7 @@ Reuse Go legality and scoring; live estimates and final scoring have distinct se
 
 ### go-search
 
-One ownership-search implementation for Go analysis and Hard move selection.
+One ownership-search implementation for Go analysis; Hard play uses the model policy directly.
 
 - [core/inference/search.ts](../core/inference/search.ts)：`runOwnershipSearch`
 
@@ -130,13 +130,15 @@ Reuse existing Modal, Button and Toast before inventing equivalent controls.
 | `coach-agent-contract` | `agent/coach/contract.ts` | Shared teaching request/result and Worker message contracts. | `domains`, `services`, `shared-types` |
 | `coach-agent-client` | `agent/coach/client.ts` | Cancellable teaching Worker bridge with the same-runtime compatibility fallback. | `coach-agent-contract`, `coach-agent-runtime`, `shared-types` |
 | `coach-agent-runtime` | `agent/coach/**` | UI-independent teaching orchestration; reuse verified rules and provider transport. | `coach-agent-runtime`, `coach-agent-contract`, `coach-provider`, `domains`, `core`, `services`, `shared-types` |
-| `coach-provider` | `services/coach/client.ts` | Teaching-provider request policy and transport, called only through the agent runtime. | `services`, `shared-types` |
+| `coach-provider` | `services/coach/client.ts` | Bounded teaching-backend HTTP transport, called only through the local agent runtime. | `services`, `coach-protocol`, `shared-types` |
+| `coach-protocol` | `shared/coach.ts` | Public coach wire types and provider validation shared by browser transport and Pi dispatcher. | 无 |
+| `server` | `server/**` | Hosted Pi teaching execution, request-scoped user credentials and bounded HTTP lifetimes. | `server`, `coach-protocol` |
 | `ui` | `ui/**` | Reusable presentation primitives without business dependencies. | `ui`, `shared-types` |
 | `worker` | `worker/**` | Worker scheduling and engine lifetime; algorithms remain in core. | `worker`, `core`, `legacy-core`, `shared-types` |
 | `utils` | `utils/**` | Existing mixed utilities, not the default home for new business logic. | `utils`, `shared-types`, `metadata` |
 | `components` | `components/**` | Business UI composed from common UI and public capabilities. | `components`, `composition-contract`, `ui`, `core`, `services`, `platform-public`, `utils`, `shared-types` |
 | `hooks` | `hooks/**` | State ownership, user workflows and resource lifecycle. | `hooks`, `coach-agent-client`, `coach-agent-contract`, `domains`, `core`, `services`, `platform-public`, `utils`, `shared-types` |
-| `services` | `services/**` | Service adapters; application code uses public platform facades. | `services`, `platform-public`, `platform-internal`, `platform-sdk`, `shared-types` |
+| `services` | `services/**` | Service adapters; application code uses public platform facades. | `services`, `coach-protocol`, `platform-public`, `platform-internal`, `platform-sdk`, `shared-types` |
 | `shared-types` | `types.ts` | Cross-layer domain types, independent of upper layers. | 无 |
 | `metadata` | `package.json` | Repository version and package metadata. | 无 |
 | `app` | `{App,AppController,index}.{ts,tsx,js,jsx,mjs,cjs}` | Application composition and startup. | `app`, `components`, `composition-contract`, `hooks`, `domains`, `core`, `services`, `platform-public`, `utils`, `shared-types`, `styles` |
@@ -149,18 +151,20 @@ Reuse existing Modal, Button and Toast before inventing equivalent controls.
 ### 迁移例外
 
 - `composition-contract` → `hooks`, `services`, `platform-public`, `utils`, `shared-types`，仅 type 导入。Existing AppViewModel composes hook return types; runtime coupling is forbidden.
-- `hooks` (`hooks/gameActions/useEndGameAction.ts`, `hooks/gameActions/useMoveAction.ts`) → `legacy-bridge` (`utils/goLogic.ts`)。Existing end-game and move actions still import compatibility exports; no new files may do so.
 
 ### 检查范围与质量限制
 
-- 文件：`**/*.{ts,tsx}`, `{agent,core,domains,hooks,components,services,ui,utils,worker}/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `{App,AppController,index}.{ts,tsx,js,jsx,mjs,cjs}`, `harness/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `tests/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `scripts/run-tests.mjs`。
-- 排除：`dist/**`, `node_modules/**`, `android/**`, `*.config.js`, `*.config.ts`。
+- 文件：`**/*.{ts,tsx}`, `{agent,core,domains,hooks,components,server,services,shared,ui,utils,worker}/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `{App,AppController,index}.{ts,tsx,js,jsx,mjs,cjs}`, `harness/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `tests/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `scripts/run-tests.mjs`。
+- 排除：`dist/**`, `dist-server/**`, `node_modules/**`, `android/**`, `*.config.js`, `*.config.ts`。
 - 文件上限：400 有效行；忽略空行 true，忽略注释 true；大小豁免 无。
 - 禁止内联配置：true；未使用禁用指令：error；suppression 白名单：无。
 - 禁止显式 any、未说明的类型忽略及运行时循环依赖；外部数据先校验。
-- `agent/**/*.{ts,tsx,js,jsx,mjs,cjs}` 禁止包 `react`, `react/**`, `react-dom`, `react-dom/**`, `@capacitor/**`：Teaching execution must remain independent of presentation and native SDKs.
-- `core/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `utils/{micro-board,joseki}.ts` 禁止包 `react`, `react/**`, `react-dom`, `react-dom/**`, `@capacitor/**`：Core rules and inference must stay independent of React and native platform adapters.
-- `components/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `ui/**/*.{ts,tsx,js,jsx,mjs,cjs}` 禁止包 `@capacitor/**`：UI code must use the platform service instead of native SDKs.
+- `{domains,hooks,services,utils,worker}/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `{App,AppController,index}.{ts,tsx,js,jsx,mjs,cjs}` 禁止包 `@earendil-works/pi-agent-core`, `@earendil-works/pi-agent-core/**`, `@earendil-works/pi-ai`, `@earendil-works/pi-ai/**`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-coding-agent/**`：Pi provider execution belongs to the server; browser code uses the bounded coach HTTP transport.
+- `shared/**/*.{ts,tsx,js,jsx,mjs,cjs}` 禁止包 `react`, `react/**`, `react-dom`, `react-dom/**`, `@capacitor/**`, `@earendil-works/pi-agent-core`, `@earendil-works/pi-agent-core/**`, `@earendil-works/pi-ai`, `@earendil-works/pi-ai/**`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-coding-agent/**`：Shared coach wire validation must remain independent of UI and native SDKs.
+- `server/**/*.{ts,tsx,js,jsx,mjs,cjs}` 禁止包 `react`, `react/**`, `react-dom`, `react-dom/**`, `@capacitor/**`：Hosted teaching execution must remain independent of browser UI and native SDKs.
+- `agent/**/*.{ts,tsx,js,jsx,mjs,cjs}` 禁止包 `react`, `react/**`, `react-dom`, `react-dom/**`, `@capacitor/**`, `@earendil-works/pi-agent-core`, `@earendil-works/pi-agent-core/**`, `@earendil-works/pi-ai`, `@earendil-works/pi-ai/**`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-coding-agent/**`：Teaching execution must remain independent of presentation and native SDKs.
+- `core/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `utils/{micro-board,joseki}.ts` 禁止包 `react`, `react/**`, `react-dom`, `react-dom/**`, `@capacitor/**`, `@earendil-works/pi-agent-core`, `@earendil-works/pi-agent-core/**`, `@earendil-works/pi-ai`, `@earendil-works/pi-ai/**`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-coding-agent/**`：Core rules and inference must stay independent of React and native platform adapters.
+- `components/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `ui/**/*.{ts,tsx,js,jsx,mjs,cjs}` 禁止包 `@capacitor/**`, `@earendil-works/pi-agent-core`, `@earendil-works/pi-agent-core/**`, `@earendil-works/pi-ai`, `@earendil-works/pi-ai/**`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-coding-agent/**`：UI code must use the platform service instead of native SDKs.
 - `**/*.{ts,tsx,js,jsx,mjs,cjs}` 禁止属性 `tap`，排除 `services/platform/taptap/**`, `tests/**`：Access the TapTap SDK only inside services/platform/taptap; use the public platform service here.
 - 独立运行时 `public/service-worker.js`：Independent browser worker; covered by its dedicated runtime tests.
 
@@ -174,7 +178,7 @@ Reuse existing Modal, Button and Toast before inventing equivalent controls.
 | `lint` | 依赖边界、类型逃逸、循环与文件大小 |
 | `typecheck` | TypeScript 全量类型检查 |
 | `test` | Node 回归和 harness 负向测试 |
-| `build` | Vite 生产构建 |
+| `build` | Vite 前端与独立 Node Pi 后台生产构建 |
 
 | npm 入口 | 实际命令 |
 | --- | --- |

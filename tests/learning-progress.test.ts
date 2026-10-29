@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { projectLearning } from '../domains/coach/learning';
 import { emptyLearningRecord } from '../domains/coach/learningTypes';
-import type { LearningAttempt, LearningExposure } from '../domains/coach/learningTypes';
+import type { LearningAttempt, LearningCourseCursor, LearningExposure } from '../domains/coach/learningTypes';
 import { mergeLearningRecords, parseLearningBackup, parseLearningRecord } from '../domains/coach/learningValidation';
 import { createInitialPosition } from '../domains/game/positionState';
 
@@ -14,6 +14,54 @@ const attempt = (overrides: Partial<LearningAttempt> = {}): LearningAttempt => (
 const exposure = (overrides: Partial<LearningExposure> = {}): LearningExposure => ({
   exposureId: 'hint-1', skillId: 'go.liberties', exerciseId: 'exercise-1', familyId: 'family-1', contentRevision: 'v1',
   hintLevel: 1, occurredAt: 500, source: 'practice', sequence: 1, ...overrides,
+});
+const cursor = (overrides: Partial<LearningCourseCursor> = {}): LearningCourseCursor => ({
+  exerciseId: 'exercise-1', contentRevision: 'v1', completed: false, updatedAt: 1000, ...overrides,
+});
+
+test('version 1 records accept an optional course cursor and sanitize it without creating evidence', () => {
+  const legacy = emptyLearningRecord();
+  assert.deepEqual(parseLearningBackup(JSON.stringify(legacy)), legacy);
+  assert.equal(Object.hasOwn(parseLearningRecord(legacy), 'courseCursor'), false);
+  const input = { ...legacy, courseCursor: { ...cursor(), board: createInitialPosition(9), answer: 'private' } };
+  const parsed = parseLearningBackup(JSON.stringify(input));
+  assert.deepEqual(parsed.courseCursor, cursor());
+  assert.deepEqual(parsed.attempts, []);
+  assert.deepEqual(parsed.exposures, []);
+  input.courseCursor.completed = true;
+  assert.equal(parsed.courseCursor?.completed, false);
+  assert.deepEqual(Object.keys(projectLearning(parsed).progress), []);
+});
+
+test('invalid optional course cursors reject the whole record instead of silently dropping progress', () => {
+  for (const invalid of [null, false, [], {},
+    { ...cursor(), exerciseId: '' }, { ...cursor(), exerciseId: 'x'.repeat(241) },
+    { ...cursor(), contentRevision: 1 }, { ...cursor(), contentRevision: '' },
+    { ...cursor(), completed: 'false' }, { ...cursor(), completed: undefined },
+    { ...cursor(), updatedAt: -1 }, { ...cursor(), updatedAt: 1.5 },
+    { ...cursor(), updatedAt: Number.NaN }, { ...cursor(), updatedAt: Number.POSITIVE_INFINITY },
+    { ...cursor(), updatedAt: Number.MAX_SAFE_INTEGER + 1 }, { ...cursor(), updatedAt: '1000' },
+  ]) assert.throws(() => parseLearningRecord({ ...emptyLearningRecord(), courseCursor: invalid }));
+  assert.deepEqual(parseLearningRecord({ ...emptyLearningRecord(), courseCursor: cursor({ updatedAt: 0 }) }).courseCursor,
+    cursor({ updatedAt: 0 }));
+});
+
+test('backup merge selects the newer cursor, keeps current on ties and preserves legacy records', () => {
+  const legacy = emptyLearningRecord();
+  const current = { ...legacy, courseCursor: cursor() };
+  assert.deepEqual(mergeLearningRecords(legacy, current), current);
+  assert.deepEqual(mergeLearningRecords(current, legacy), current);
+  assert.deepEqual(mergeLearningRecords(legacy, legacy), legacy);
+  for (const updatedAt of [999, 1000, 1001]) {
+    const incoming = { ...legacy, courseCursor: cursor({ exerciseId: 'exercise-2', completed: true, updatedAt }) };
+    const merged = mergeLearningRecords(current, incoming);
+    assert.deepEqual(merged.courseCursor, updatedAt > 1000 ? incoming.courseCursor : current.courseCursor);
+    assert.notEqual(merged.courseCursor, current.courseCursor);
+    assert.notEqual(merged.courseCursor, incoming.courseCursor);
+    assert.deepEqual(merged.attempts, []);
+    assert.deepEqual(merged.exposures, []);
+  }
+  assert.deepEqual(current.courseCursor, cursor());
 });
 
 test('an exposed or previously attempted family cannot become independent by reopening it', () => {

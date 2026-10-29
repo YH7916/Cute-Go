@@ -1,7 +1,7 @@
-import type { CoachIntent, CoachPoint } from '../../domains/coach/evidence';
+import type { CoachIntent, CoachPoint, CoachEngineCandidate, CoachEngineMoveEvaluation } from '../../domains/coach/evidence';
 import type { GamePosition } from '../../domains/game/positionState';
 import type { CoachConfig } from '../../services/coach/types';
-import type { Player, Point } from '../../types';
+import type { Difficulty, Player, Point } from '../../types';
 import type { CoachConversationTurn } from '../../domains/coach/conversation';
 
 export type { CoachIntent } from '../../domains/coach/evidence';
@@ -14,12 +14,16 @@ export interface CoachEngineEvidence {
   visits: number;
   winRateBlack?: number;
   estimatedBlackLead?: number;
-  candidates: { point: Point; visits: number }[];
+  candidates: CoachEngineCandidate[];
+  pass?: CoachEngineMoveEvaluation;
+  /** Black-positive normalized ownership, averaged across visited search nodes. */
+  ownership?: Float32Array | null;
 }
 export interface CoachAgentInput {
   kind: 'inspect' | 'ask';
   position: GamePosition;
   userColor: Player;
+  difficulty?: Difficulty;
   intent: CoachIntent;
   /** Unsolicited commentary is gated by a verified teaching moment. Manual requests default to false. */
   proactive?: boolean;
@@ -33,6 +37,8 @@ export interface CoachAgentResult {
   text: string;
   source: 'local' | 'cloud';
   error?: string;
+  /** Rejected cloud content falls back locally without blocking a manual retry. */
+  cacheable?: false;
   configured: boolean;
   hintPoints: CoachPoint[];
   moveNumber: number;

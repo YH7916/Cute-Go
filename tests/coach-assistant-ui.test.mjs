@@ -169,7 +169,10 @@ test('new replies reset only message scrolling while unrelated renders preserve 
   assert.equal(s.env.body.scrollTop, 140, 'ordinary renders preserve the reading position');
   s.props.coach.loading = true;
   s.render();
-  assert.equal(s.env.body.scrollTop, 0);
+  assert.equal(s.env.body.scrollTop, 140, 'background enrichment must not restart reading');
+  s.props.coach.loading = false;
+  s.render();
+  assert.equal(s.env.body.scrollTop, 140, 'finishing without new text preserves the reading position');
   assert.equal(s.env.target.scrollTop, 37);
   assert.equal(s.env.focuses, 0, 'incoming speech does not summon the composer keyboard');
   assert.equal(s.env.scrolls.length, 0);
@@ -251,13 +254,11 @@ test('retained guidance labels its original move and opens that exact position t
   assert.equal(speech(tree).props.text, s.props.coach.text);
 });
 
-test('the permanent review action is passed through unchanged without secondary panels', t => {
+test('the permanent tools do not expose a review entry or secondary panels', t => {
   const s = setup(t);
-  const action = { type: 'review-action', props: { children: '回看棋谱' } };
-  s.props.reviewAction = action;
   const tree = s.render();
-  assert.equal(panel(tree).props.reviewAction, action);
-  for (const name of ['onSettings', 'onClose', 'onDetailsChange', 'onShowSpeech', 'dismissVersion', 'onInspectHistory', 'extraTools']) {
+  assert.equal(elements(tree).some(element => element.props['aria-label'] === '回看棋谱'), false);
+  for (const name of ['reviewAction', 'onSettings', 'onClose', 'onDetailsChange', 'onShowSpeech', 'dismissVersion', 'onInspectHistory', 'extraTools']) {
     assert.equal(name in panel(tree).props, false, `${name} is no longer part of the assistant interaction`);
   }
   assert.equal(elements(tree).some(element => element.type === 'details'), false);
@@ -303,11 +304,11 @@ test('quiet review always explains the next action in one sentence while live co
   s.props.coach.text = '';
   s.props.review = { inVariation: false, variationMoves: 0, error: '' };
   let tree = s.render();
-  assert.equal(speech(tree).props.text, '用上方按钮选一手，点讲解看原因。');
+  assert.equal(speech(tree).props.text, '选一手棋，点“讲解”看原因。');
   assert.equal(speech(tree).props.error, undefined);
   s.props.review.inVariation = true;
   tree = s.render();
-  assert.equal(speech(tree).props.text, '在棋盘上试下，点“原谱”回到这手。');
+  assert.equal(speech(tree).props.text, '在棋盘上试下，点“原谱”返回。');
   assert.equal(speech(tree).props.error, undefined);
   s.props.review = undefined;
   assert.equal(speech(s.render()), undefined, 'the review helper text does not leak into live coaching');

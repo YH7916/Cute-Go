@@ -50,7 +50,7 @@ test('course progress counts unique successful current pages and preserves the c
   assert.equal(lessonView(view).status, '练习通过');
 });
 
-test('course reentry resumes the first unfinished source page even after assistance and abandonment', t => {
+test('course reentry directly resumes the unfinished source page after assistance and abandonment', t => {
   const host = setup(t);
   host.render().open();
   const first = curriculumLessons[0].exercises[0];
@@ -60,7 +60,7 @@ test('course reentry resumes the first unfinished source page even after assista
   host.render().open();
   assert.equal(host.render().view.active.prompt, first.prompt, 'novelty selection must not skip unfinished source pages');
   assert.equal(host.render().view.active.independent, false);
-  assert.equal(first.kind, 'choice', 'advanced reentry now begins with identifying real and false eyes');
+  assert.equal(first.kind, 'choice', 'the first liberty question uses direct selection');
   host.render().view.active.onChoice(first.correctChoiceId);
   host.render().view.active.onSubmit();
   host.render().view.active.onContinue();
@@ -112,7 +112,7 @@ test('an unknown source move stops for retry, and undo returns to the original d
   assert.equal(active.result.outcome, 'unverified');
   assert.equal(active.currentPlayer, 'white');
   assert.equal(active.replyPreview, undefined);
-  assert.match(active.instruction, /暂不能判定.*重试/);
+  assert.match(active.instruction, /暂不能判定.*重开/);
   const firstBoard = active.board;
   const firstResult = active.result;
   const firstAttempt = { ...host.record.attempts[0] };
@@ -149,7 +149,7 @@ test('source-authored refutations receive exactly one reply and retain the origi
   assert.equal(active.board, active.result.nextPosition.board);
   assert.equal(active.currentPlayer, 'black');
   assert.equal(active.board[4][1].color, 'white');
-  assert.match(active.instruction, /没有完成目标.*\n.*重试/);
+  assert.match(active.instruction, /没有完成目标.*\n.*重开/);
   active.onPoint(3, 3);
   assert.equal(host.render().view.active.board, active.board, 'a refuted line cannot become endless exploration');
   assert.equal(host.record.attempts.length, 1);

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { defaultCoachConfig, readCoachSettings, validateCoachConfig, writeCoachSettings } from '../services/coach/settings';
 import type { CoachConfig, StoredCoachSettings } from '../services/coach/types';
 
-const STORAGE_ERROR = '本机存储不可用，配置仅在本次打开期间生效。若曾记住密钥，请在浏览器设置中清除此站点的数据。';
+const STORAGE_ERROR = '本机存储不可用，配置仅在本次打开期间生效。若曾记住 API 密钥，请在浏览器设置中清除此站点的数据。';
 
 function loadSettings(): StoredCoachSettings & { storageError: string } {
   try { return { ...readCoachSettings(localStorage), storageError: '' }; }

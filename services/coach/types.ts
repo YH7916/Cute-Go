@@ -1,5 +1,9 @@
+import type { CoachCloudReply, CoachProvider } from '../../shared/coach';
+export type { CoachCloudRequest, CoachProvider } from '../../shared/coach';
+
 export interface CoachConfig {
   endpoint: string;
+  provider: CoachProvider;
   model: string;
   apiKey: string;
 }
@@ -12,6 +16,6 @@ export interface CoachRequest {
   signal?: AbortSignal;
 }
 
-export interface CoachReply { text: string }
+export type CoachReply = CoachCloudReply;
 
 export interface StoredCoachSettings { config: CoachConfig; rememberKey: boolean }

@@ -120,6 +120,15 @@ export function validateContracts(snapshot, contract = architecture) {
   if ([...snapshot.ci.matchAll(/^\s*- run: npm run check\s*$/gm)].length !== 1) errors.push('quality.yml must call the canonical npm run check entry exactly once');
   const ciCommands = snapshot.ci.split(/\r?\n/).filter(line => /^\s*- run:/.test(line));
   if (ciCommands.some(line => /\bnpm (?:run )?(?:lint|typecheck|test|build)\b/.test(line))) errors.push('quality.yml must not maintain a second check pipeline');
+  const deploy = snapshot.ci.split(/^  deploy:\s*$/m)[1] ?? '';
+  if (!/^    needs: check\s*$/m.test(deploy)
+    || !/^    if: github\.ref == 'refs\/heads\/main' && github\.event_name != 'pull_request'\s*$/m.test(deploy)
+    || /(?:always\(\)|continue-on-error:\s*true)/.test(snapshot.ci)) {
+    errors.push('Pages deployment must require successful checks and a non-PR main ref');
+  }
+  if (!/uses: actions\/upload-pages-artifact@v4\s+with:\s+path: dist\s/m.test(snapshot.ci)) {
+    errors.push('Pages artifact must contain only the checked dist frontend');
+  }
   for (const pointer of ['harness/architecture.mjs', 'docs/harness.md']) if (!snapshot.agents.includes(pointer)) errors.push(`AGENTS.md must point to ${pointer}`);
   if (!snapshot.claude.includes('[AGENTS.md](AGENTS.md)')) errors.push('CLAUDE.md must reuse AGENTS.md');
   if (snapshot.eslint.trim() !== "export { default } from './harness/eslint.mjs';") errors.push('eslint.config.js must remain a thin harness adapter');

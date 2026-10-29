@@ -42,8 +42,6 @@ export const useAppAuthProfile = ({ setToastMsg }: UseAppAuthProfileOptions) => 
       return;
     }
 
-    setSession(result.session);
-    setUserProfile(result.profile);
     setToastMsg(result.message || 'TapTap 登录成功');
     setShowLoginModal(false);
   }, [setToastMsg]);

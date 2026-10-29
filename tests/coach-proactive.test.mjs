@@ -6,7 +6,7 @@ import { createInitialPosition, setAgentInterceptor, settle, setup, makeHumanTur
 const { executeCoachAgent } = await loadTestModule({
   contents: `export { executeCoachAgent } from './agent/coach/runtime';`,
 });
-const config = { endpoint: 'https://coach.example/v1', model: 'test-coach', apiKey: 'test-secret' };
+const config = { endpoint: 'https://coach.example/v1', provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test-secret' };
 
 test('proactive inspection stays silent on ordinary play while a manual inspection still responds', async t => {
   const s = await setup(t);
@@ -26,7 +26,7 @@ test('proactive inspection stays silent on ordinary play while a manual inspecti
 test('a nonessential proactive ask cannot reach the configured provider', async t => {
   const s = await setup(t);
   const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({
-    choices: [{ message: { content: 'unnecessary response' } }],
+    text: 'unnecessary response',
   })));
   const result = await executeCoachAgent({ kind: 'ask', proactive: true,
     position: s.api.state.readPosition(), userColor: 'black', intent: 'explain-last-move', config });
@@ -44,7 +44,7 @@ test('ordinary moves stay quiet even with automatic service enabled and manual q
   assert.equal(s.requests.length, 0);
   assert.equal(s.render().coach.text, '');
   assert.equal(s.api.coach.configured, true);
-  const pending = s.api.coach.ask('hint', '现在应该关注什么？');
+  const pending = s.api.coach.ask('hint', '斜对角算连接吗？');
   await settle();
   assert.equal(s.requests.length, 1);
   const answer = s.respondChoice(0, 'concept.connection');
@@ -52,21 +52,28 @@ test('ordinary moves stay quiet even with automatic service enabled and manual q
   assert.equal(s.render().coach.text, answer);
 });
 
-test('new atari explains locally and triggers configured cloud once by default', async t => {
+test('new atari explains locally, waits 700ms for cloud guidance and requests it only once', async t => {
   const s = await setup(t);
   await makeNewAtari(s);
   assert.ok(s.api.coach.text.length > 0);
+  assert.equal(s.api.coach.source, 'local');
   s.render();
   t.mock.timers.tick(699);
+  await settle();
   assert.equal(s.requests.length, 0);
   t.mock.timers.tick(1);
   await settle();
   assert.equal(s.requests.length, 1);
-  s.respondChoice(0, 'group.B8');
+  assert.equal(s.render().coach.loading, true);
+  const answer = s.respondChoice(0, 'group.B8');
   await settle();
-  s.render();
+  assert.equal(s.render().coach.text, answer.replace('B8', '这里'));
+  assert.deepEqual(s.api.coach.hintPoints, [{ x: 1, y: 1, label: 'B8' }]);
+  assert.equal(s.api.coach.source, 'cloud');
+  assert.equal(s.api.coach.loading, false);
   t.mock.timers.tick(5000);
   await settle();
+  s.render();
   assert.equal(s.requests.length, 1, 'an unchanged urgent position is explained once');
 });
 
@@ -107,12 +114,12 @@ for (const timing of ['before inspection', 'after scheduling']) {
     t.mock.timers.tick(2000);
     await settle();
     assert.equal(s.requests.length, 0, 'moving through review must not trigger automatic cloud commentary');
-    const pending = s.api.coach.ask('explain-last-move');
+    const pending = s.api.coach.ask('explain-last-move', '什么叫打吃，怎样解围？');
     await settle();
     assert.equal(s.requests.length, 1);
     const answer = s.respondChoice(0, 'concept.atari');
     await pending;
-    assert.equal(s.render().coach.text, '只剩一口气叫打吃；可以检查接长、连接或吃子能否解围；多出气不等于做活，一口气也不一定能被合法吃掉。');
+    assert.equal(s.render().coach.text, '只剩一口气就叫打吃。先检查能否接长或吃子解围。');
     assert.equal(s.api.coach.conversation.at(-1).answer, answer, 'review presentation keeps the complete manual answer in history');
   });
 }
@@ -123,7 +130,7 @@ test('returning from review does not automatically ask again about an already ex
   t.mock.timers.tick(700);
   await settle();
   assert.equal(s.requests.length, 1);
-  const answer = s.respondChoice(0, 'concept.atari');
+  const answer = s.respondChoice(0, 'group.B8').replace('B8', '这里');
   await settle();
   assert.equal(s.render().coach.text, answer);
   for (const playing of [false, true]) {
@@ -193,12 +200,12 @@ test('automatic preview and cloud request keep proactive identity while manual r
   t.mock.timers.tick(5000);
   await settle();
   assert.equal(s.requests.length, 1);
-  const manual = s.api.coach.ask('explain-last-move', '为什么要先救这块棋？');
+  const manual = s.api.coach.ask('explain-last-move', '为什么被打吃后要先解围？');
   await settle();
   assert.equal(s.requests.length, 2);
   assert.notEqual(calls.at(-1).proactive, true);
   const answer = s.respondChoice(1, 'concept.atari');
   await manual;
   assert.equal(s.render().coach.text, answer);
-  assert.match(s.api.coach.text, /接长、连接或吃子/);
+  assert.match(s.api.coach.text, /接长或吃子解围/);
 });

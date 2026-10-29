@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { capture, sequence, curriculumLessons, inspectMove, setup } from './helpers/learningCenter.mjs';
+import { capture, sequence, curriculumLessons, inspectMove, projectLearning, setup } from './helpers/learningCenter.mjs';
 
-test('course entry and lesson selection start with an unaided move, without an introductory slideshow', t => {
+test('course entry starts directly and keeps familiar rules as unaided practice', t => {
   const host = setup(t);
   host.render().open();
   let state = host.render();
   assert.equal(state.isOpen, true);
+  assert.equal(state.view.startCourseLabel, '从基础开始');
+  assert.deepEqual(host.events, [], 'opening a question must not count as an answer');
   assert.equal(state.view.active.phase, 'practice');
   assert.equal('sources' in state.view.active, false, 'source attribution belongs in About, not individual exercises');
   assert.equal(state.view.active.independent, true);
@@ -51,7 +53,7 @@ test('a failed move retries immediately without replaying the demonstration', t 
   state.view.active.onPoint(4, 4);
   state = host.render();
   assert.equal(state.view.active.result.outcome, 'failure');
-  assert.equal(state.view.active.continueLabel, '再试一次');
+  assert.equal(state.view.active.continueLabel, '重开');
   state.view.active.onContinue();
   state = host.render();
   assert.equal(state.view.active.phase, 'practice');
@@ -154,7 +156,7 @@ test('point practice submits directly and saves first attempt before feedback ex
   assert.equal(state.view.active.result.outcome, 'success');
   assert.equal(host.record.attempts[0].hintLevel, 0);
   assert.equal(host.record.attempts[0].source, 'review');
-  assert.equal(state.view.stats.independent, 1);
+  assert.equal(projectLearning(host.record).progress[capture.skillId].independentSuccesses, 1);
   assert.equal(state.view.active.independent, true);
   state.view.active.onExplanation(); state = host.render();
   assert.equal(host.record.attempts[0].hintLevel, 0);
@@ -162,7 +164,7 @@ test('point practice submits directly and saves first attempt before feedback ex
   assert.equal(state.view.active.independent, false);
   state.view.active.onPoint(1, 2); state = host.render();
   assert.equal(host.record.attempts[1].retryOf, host.record.attempts[0].attemptId);
-  assert.equal(state.view.stats.independent, 1);
+  assert.equal(projectLearning(host.record).progress[capture.skillId].independentSuccesses, 1);
 });
 
 test('hints and explanations record assistance before an answer', t => {
@@ -178,7 +180,7 @@ test('hints and explanations record assistance before an answer', t => {
   assert.equal(state.view.active.independent, false);
   state.view.active.onPoint(1, 2);
   assert.equal(host.record.attempts[0].hintLevel, 3);
-  assert.equal(host.render().view.stats.independent, 0);
+  assert.equal(projectLearning(host.record).progress[capture.skillId].independentSuccesses, 0);
 });
 
 test('old answer, hint and demonstration callbacks cannot change a replacement lesson or closed mode', t => {
@@ -246,9 +248,10 @@ test('multi-move practice waits for the complete line; undo removes student and 
 test('personal exercises share submission; loading, owner change and deletion invalidate actions', t => {
   const host = setup(t);
   let state = host.render();
-  assert.equal(state.view.personal[0].id, capture.id);
   state.view.onPersonal(capture.id);
   state = host.render();
+  assert.equal(state.view.active.prompt, capture.prompt);
+  assert.equal(state.view.active.board, capture.position.board);
   const oldPoint = state.view.active.onPoint;
   host.setLoaded(false); state = host.render();
   oldPoint(1, 2);
@@ -265,7 +268,7 @@ test('personal exercises share submission; loading, owner change and deletion in
   assert.equal(host.record.attempts.length, 1);
   state.view.onDelete(); state = host.render();
   assert.equal(host.record.attempts.length, 0);
-  assert.ok(!state.view.storageMessage.includes('已清空'));
+  assert.ok(!state.view.notice.includes('已清空'));
 });
 
 test('entry during initial load waits; closing prevents a late open', t => {
@@ -273,6 +276,7 @@ test('entry during initial load waits; closing prevents a late open', t => {
   host.setLoaded(false); host.render().open();
   assert.equal(host.render().view.active, null);
   host.setLoaded(true); host.render();
+  assert.equal(host.render().isOpen, true);
   assert.equal(host.render().view.active.phase, 'practice');
   host.setLoaded(false); host.render(); host.render().open(); host.render().close();
   host.setLoaded(true); host.render();
@@ -291,7 +295,7 @@ test('a delayed backup read cannot restore records after deletion', async t => {
   resolveText('{"version":1}');
   await Promise.resolve(); await Promise.resolve();
   assert.deepEqual(host.imports, []);
-  assert.ok(!host.render().view.storageMessage.includes('已合并'));
+  assert.ok(!host.render().view.notice.includes('已合并'));
 });
 
 test('leaving teaching invalidates a pending backup read', async t => {
@@ -307,7 +311,7 @@ test('leaving teaching invalidates a pending backup read', async t => {
   await Promise.resolve(); await Promise.resolve();
   assert.deepEqual(host.imports, []);
   assert.equal(host.render().view.active.kind, 'sequence');
-  assert.ok(!host.render().view.storageMessage.includes('已合并'));
+  assert.ok(!host.render().view.notice.includes('已合并'));
 });
 
 for (const transition of ['replace', 'reopen', 'owner']) {
@@ -362,5 +366,21 @@ test('course entry never replaces an exposed built-in exercise with a same-skill
   assert.ok(lesson.exercises.some(exercise => exercise.prompt === state.view.active.prompt));
   state.view.onPersonal(personal.id);
   assert.equal(host.render().view.active.prompt, personal.prompt, 'explicit personal entry remains available');
+});
+
+test('continuing a course preserves passed questions and resumes its next unfinished practice', t => {
+  const host = setup(t);
+  host.render().open();
+  const first = curriculumLessons[0].exercises[0];
+  assert.equal(first.kind, 'choice');
+  host.render().view.active.onChoice(first.correctChoiceId);
+  host.render().view.active.onSubmit();
+  assert.equal(host.render().view.active.result.outcome, 'success');
+  host.render().close();
+  const attempts = structuredClone(host.record.attempts);
+  host.render().open();
+  assert.equal(host.render().view.startCourseLabel, '继续学习');
+  assert.equal(host.render().view.active.prompt, curriculumLessons[0].exercises[1].prompt);
+  assert.deepEqual(host.record.attempts, attempts, 'resuming must not alter a completed answer');
 });
 

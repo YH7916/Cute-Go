@@ -40,7 +40,7 @@ function setup(t) {
     };
     return { state, resetGame,
       input: useBoardInputAction({ gameState: state, settings, aiTurnLock: { current: false },
-        isThinking: false, ...online, playSfx: noop,
+        ...online, playSfx: noop,
         vibrate: noop }, (...args) => { moves.push(args); }),
       imports: useImportExportFlow({ gameState: state,
         settings: { ...settings, setGameType: () => { observed.push(state.readPosition()); } },

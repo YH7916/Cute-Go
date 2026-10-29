@@ -20,7 +20,7 @@ for (const exception of architecture.dependencyExceptions) {
 
 function dynamicPackageSelector(packages) {
   const roots = [...new Set(packages.map(name => name.replace(/\/\*\*$/, '')))];
-  const escaped = roots.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const escaped = roots.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replaceAll('/', '\\u002F'));
   return `ImportExpression[source.value=/^(${escaped.join('|')})(\\u002F|$)/]`;
 }
 

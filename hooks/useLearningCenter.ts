@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { beginnerLessons, curriculumExercises, curriculumLessons, curriculumSections } from '../domains/coach/curriculum';
+import { curriculumExercises, curriculumLessons, curriculumSections } from '../domains/coach/curriculum';
 import type { Exercise } from '../domains/coach/exerciseTypes';
 import type { LearningSource } from '../domains/coach/learningTypes';
 import { useLearningPractice } from './useLearningPractice';
@@ -49,6 +49,8 @@ export function useLearningCenter(learning: ReturnType<typeof useLearningProgres
     const exercise = catalogRef.current.find(item => item.id === id);
     if (!exercise || !loaded.current) return false;
     practice.begin(exercise, source, retryOf);
+    if (source === 'course') learning.setCourseCursor({ exerciseId: exercise.id,
+      contentRevision: exercise.contentRevision, completed: false, updatedAt: Date.now() });
     setOpen(true); setMessage(''); setDeletePending(false);
     return true;
   }
@@ -66,8 +68,25 @@ export function useLearningCenter(learning: ReturnType<typeof useLearningProgres
     openExercise(exercise.id, filter === 'all' ? 'course' : 'practice');
   }
   function open() {
+    practice.leave();
     setOpen(true); setDeletePending(false); setFilter('all');
     if (!loaded.current) { pendingOpen.current = true; return; }
+    const cursor = learning.courseCursor;
+    let index = curriculumExercises.findIndex(item => item.id === cursor?.exerciseId && item.contentRevision === cursor.contentRevision);
+    let completed = cursor?.completed ?? false;
+    if (index < 0) {
+      const last = [...learning.attempts].sort((a, b) => b.sequence - a.sequence).find(attempt => attempt.source === 'course'
+        && curriculumExercises.some(item => item.id === attempt.exerciseId && item.contentRevision === attempt.contentRevision));
+      index = curriculumExercises.findIndex(item => item.id === last?.exerciseId);
+      completed = last?.outcome === 'success';
+    }
+    if (index < 0) { startCourse(); return; }
+    const next = curriculumExercises[index + Number(completed)];
+    if (next) openExercise(next.id, 'course');
+    else finishCourse();
+  }
+  function startCourse() {
+    if (!loaded.current || !opened.current) return;
     const next = curriculumLessons.find(lesson => lesson.exercises.some(exercise => !learning.attempts.some(attempt =>
       attempt.exerciseId === exercise.id && attempt.contentRevision === exercise.contentRevision && attempt.outcome === 'success')))
       ?? curriculumLessons[0];
@@ -75,14 +94,14 @@ export function useLearningCenter(learning: ReturnType<typeof useLearningProgres
   }
   function nextExercise(exercise: Exercise, source: LearningSource): void {
     const lesson = curriculumLessons.find(item => item.skillId === exercise.skillId);
-    const remaining = lesson?.exercises.filter(item => item.id !== exercise.id && !learning.attempts.some(attempt =>
-      attempt.exerciseId === item.id && attempt.contentRevision === item.contentRevision && attempt.outcome === 'success'));
-    const next = source === 'course' ? remaining?.[0] : chooseExercise(exercise.skillId, exercise.id);
+    const next = source === 'course' ? lesson?.exercises[lesson.exercises.findIndex(item => item.id === exercise.id) + 1]
+      : chooseExercise(exercise.skillId, exercise.id);
     if (next) openExercise(next.id, source);
     else if (source === 'course' && lesson && curriculumLessons.indexOf(lesson) < curriculumLessons.length - 1) {
-      openLesson(curriculumLessons[curriculumLessons.indexOf(lesson) + 1].id);
-    } else { practice.leave(); setMessage('这一轮练习完成了。可以选一课复习，或返回首页进入陪练实战。'); }
+      openExercise(curriculumLessons[curriculumLessons.indexOf(lesson) + 1].exercises[0].id, source);
+    } else finishCourse();
   }
+  function finishCourse() { practice.leave(); setMessage('这一轮练习完成了。可以选一课复习，或返回首页进入陪练实战。'); }
   function close() { pendingOpen.current = false; practice.leave(); setOpen(false); setDeletePending(false); }
   function exportBackup() {
     try {
@@ -109,10 +128,14 @@ export function useLearningCenter(learning: ReturnType<typeof useLearningProgres
   }
   const visibleLessons = curriculumLessons.filter(item => filter === 'all' || filter === 'personal'
     || (filter === 'mistakes' ? learning.mistakeSkillIds : learning.dueSkillIds).includes(item.skillId));
-  const skills = Object.values(learning.progress);
+  const completedCourse = curriculumExercises.every(exercise => learning.attempts.some(attempt =>
+    attempt.exerciseId === exercise.id && attempt.contentRevision === exercise.contentRevision && attempt.outcome === 'success'));
+  const startedCourse = learning.attempts.some(attempt => curriculumExercises.some(exercise =>
+    attempt.exerciseId === exercise.id && attempt.contentRevision === exercise.contentRevision));
   const view = {
     isOpen, onClose: bindAction(close), loaded: learning.loaded, filter,
-    beginnerLessons: beginnerLessons.map(({ id, title }) => ({ id, title })),
+    onStartCourse: bindAction(startCourse),
+    startCourseLabel: completedCourse ? '从头练习' as const : startedCourse ? '继续学习' as const : '从基础开始' as const,
     onFilter: bindAction((value: LearningFilter) => { practice.leave(); setFilter(value); setDeletePending(false); }), sections: curriculumSections,
     lessons: visibleLessons.map(item => {
       const attempts = learning.attempts.filter(attempt => attempt.skillId === item.skillId && attempt.contentRevision === item.contentRevision);
@@ -123,11 +146,8 @@ export function useLearningCenter(learning: ReturnType<typeof useLearningProgres
         status: completedSteps === item.exercises.length
           ? '练习通过' : attempts.length ? '练习中' : '未练',
         prerequisites: item.prerequisites.map(id => curriculumLessons.find(entry => entry.skillId === id)?.title ?? id).join('、') };
-    }), onLesson: bindAction(openLesson), personal: personalExercises.map(item => ({ id: item.id, title: item.prompt })),
+    }), onLesson: bindAction(openLesson),
     onPersonal: bindAction((id: string) => { openExercise(id); }), active: practice.activeView, activeLessonId: practice.activeView?.lessonId,
-    stats: { practiced: skills.length, independent: skills.filter(item => item.independentSuccesses > 0).length,
-      retained: skills.filter(item => item.retained).length, due: learning.dueSkillIds.length, mistakes: learning.mistakeSkillIds.length },
-    storageMessage: learning.storageError || message || (learning.saving ? '正在保存到本机…' : ''),
     notice: learning.storageError || message,
     onExport: bindAction(exportBackup), onImport: bindAction((file: File) => { void importBackup(file); }), onDelete: bindAction(deleteProgress), deletePending,
   };

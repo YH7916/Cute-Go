@@ -57,7 +57,7 @@ export const useOnlineMatch = (options: UseOnlineMatchOptions) => {
     update({ onlineStatus: 'disconnected', opponentProfile: null, myColor: null, roomId: null,
       isCreatingRoom: false, isJoiningRoom: false, isMatching: false, matchTime: 0 });
   }, [stopTimer, update]);
-  const cleanupOnline = useCallback(async (_isManual = false) => {
+  const cleanupOnline = useCallback(async () => {
     const cleanup = lifecycle.cancel();
     resetUi();
     await cleanup;
@@ -74,7 +74,7 @@ export const useOnlineMatch = (options: UseOnlineMatchOptions) => {
     };
   }, [lifecycle, stopTimer]);
   useEffect(() => {
-    if (account.current !== options.session?.user.id) void cleanupOnline(true);
+    if (account.current !== options.session?.user.id) void cleanupOnline();
     account.current = options.session?.user.id;
   }, [cleanupOnline, options.session?.user.id]);
 
@@ -193,7 +193,7 @@ export const useOnlineMatch = (options: UseOnlineMatchOptions) => {
     latest.current.myColorRef.current = myColor;
     update({ myColor });
   }, [update]);
-  const cancelMatchmaking = useCallback(() => cleanupOnline(true), [cleanupOnline]);
+  const cancelMatchmaking = useCallback(() => cleanupOnline(), [cleanupOnline]);
 
   return { ...state, setShowOnlineMenu, setMyColor, sendData, cleanupOnline,
     startMatchmaking, createRoom, joinRoom, cancelMatchmaking };

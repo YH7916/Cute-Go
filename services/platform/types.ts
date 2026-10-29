@@ -73,6 +73,7 @@ export interface PlatformLeaderboardApi {
 export interface PlatformAuthApi {
   restoreSession(): Promise<AuthState>;
   onSessionChange(listener: (state: AuthState) => void): () => void;
+  // Successful login publishes the complete AuthState to subscribers before resolving.
   signInWithTapTap(): Promise<PlatformAuthResult>;
   signOut(): Promise<void>;
 }

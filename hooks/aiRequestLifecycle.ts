@@ -194,7 +194,7 @@ export class AiRequestLifecycle {
     if (mode === 'play') this.deps.onMove(data.move);
     else this.deps.onAnalysis({ winRate: data.winRate, lead: data.lead ?? 0, ownership,
       ...(purpose === 'coach' ? { purpose, visits: data.visits, candidates: data.candidates,
-        estimatedBlackLead: data.estimatedBlackLead } : {}) });
+        estimatedBlackLead: data.estimatedBlackLead, ...(data.pass ? { pass: data.pass } : {}) } : {}) });
   }
   stopThinking = () => {
     this.generation++;

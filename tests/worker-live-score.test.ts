@@ -5,6 +5,10 @@ import { createBoard } from '../core/board';
 import type { AnalysisResult } from '../core/inference/engine';
 import type { WorkerInMessage, WorkerOutMessage } from '../core/inference/protocol';
 import type { Player } from '../types';
+import { extractPolicyMoves } from '../core/inference/policy';
+import { attemptMove } from '../core/go/rules';
+import { getBoardHash } from '../core/board';
+import type { MicroBoard, Sign } from '../utils/micro-board';
 
 // Real Worker entry/scheduler/response path; only model execution is substituted.
 const replies: WorkerOutMessage[] = [];
@@ -99,7 +103,7 @@ test('Coach analysis returns legal candidate points and a separate live estimate
   assert.equal(response.estimatedBlackLead, -6.5);
   assert.equal(response.winRate, 63);
   assert.equal(response.visits, 1);
-  assert.deepEqual(response.candidates, [{ point: { x: 0, y: 0 }, visits: 0 }]);
+  assert.deepEqual(response.candidates, [{ point: { x: 0, y: 0 }, visits: 0, prior: 1, variation: [] }]);
   assert.equal(response.move, null, 'analysis must never place its suggested move');
 });
 
@@ -123,3 +127,95 @@ test('Coach analysis refuses a board that cannot be reconstructed from its histo
     await send({ type: 'release', generation: ++generation });
   }
 });
+
+for (const color of ['black', 'white'] as const) {
+  test(`real coach Worker returns evaluated focus and legal short variation for ${color}`, async t => {
+    const focus = { x: 8, y: 8 };
+    t.mock.method(OnnxEngine.prototype, 'initialize', async () => {});
+    t.mock.method(OnnxEngine.prototype, 'dispose', async () => {});
+    const analyze = t.mock.method(OnnxEngine.prototype, 'analyze', async (board: MicroBoard, toPlay: Sign) => {
+      const policy = new Float32Array(82).fill(-5);
+      policy[0] = 3;
+      policy[80] = -30;
+      return { rootInfo: { winrate: toPlay === 1 ? 80 : 20, lead: 999, scoreStdev: 777, ownership: null },
+        moves: extractPolicyMoves(policy, 9, board, toPlay, 0) };
+    });
+    const send = (data: WorkerInMessage) => worker.onmessage({ data });
+    await send({ type: 'init', generation: ++generation, payload: { modelPath: 'unused' } });
+    replies.length = 0;
+    try {
+      await send({ type: 'compute', generation, requestId: ++requestId, data: {
+        board: createBoard(9), history: [], size: 9, color, gameType: 'Go', difficulty: 'Hard',
+        mode: 'analyze', purpose: 'coach', simulations: 8, coachFocusPoints: [focus],
+      } });
+      const response = replies.find(reply => reply.type === 'ai-response');
+      assert.ok(response, JSON.stringify(replies));
+      assert.equal(response.data.move, null);
+      assert.equal(analyze.mock.callCount(), 8);
+      const candidate = response.data.candidates?.find(move => move.point.x === focus.x && move.point.y === focus.y);
+      assert.ok(candidate && candidate.visits >= 2);
+      const recommendation = response.data.candidates?.[0];
+      assert.ok(recommendation && recommendation.visits > candidate.visits,
+        'retaining a requested low-prior comparison must not promote it over the searched recommendation');
+      assert.notDeepEqual(recommendation.point, focus);
+      assert.ok(response.data.candidates?.every((item, index, candidates) => index === 0 || candidates[index - 1].visits >= item.visits));
+      assert.equal(candidate.winRateBlack, 80);
+      assert.ok(candidate.prior !== undefined && candidate.prior > 0 && candidate.prior < 0.01);
+      assert.ok(candidate.variation?.length && candidate.variation.length <= 4);
+      assert.deepEqual(candidate.variation[0], focus);
+      let board = createBoard(9), previousHash: string | null = null;
+      let toPlay: Player = color;
+      for (const point of candidate.variation) {
+        const move = attemptMove(board, point.x, point.y, toPlay, 'Go', previousHash);
+        assert.ok(move, 'reported search variations must replay through the game rules');
+        previousHash = getBoardHash(board);
+        board = move.newBoard;
+        toPlay = toPlay === 'black' ? 'white' : 'black';
+      }
+      assert.equal(Object.hasOwn(candidate, 'lead'), false);
+      assert.equal(Object.hasOwn(candidate, 'scoreMean'), false);
+      replies.length = 0;
+      await send({ type: 'compute', generation, requestId: ++requestId, data: {
+        board: createBoard(9), history: [], size: 9, color, gameType: 'Go', difficulty: 'Hard',
+        mode: 'play', simulations: 8, coachFocusPoints: [focus],
+      } });
+      const playing = replies.find(reply => reply.type === 'ai-response');
+      assert.ok(playing);
+      assert.deepEqual(playing.data.move, { x: 0, y: 0 }, 'a teaching focus must not alter the opponent model policy');
+      assert.equal(playing.data.candidates, undefined);
+      assert.equal(analyze.mock.callCount(), 9, 'eight coach visits followed by one policy inference');
+    } finally { await send({ type: 'release', generation: ++generation }); }
+  });
+}
+
+for (const color of ['black', 'white'] as const) for (const visits of [1, 8]) {
+  test(`coach Worker forwards actual pass and normalized ownership for ${color}/${visits}`, async t => {
+    t.mock.method(OnnxEngine.prototype, 'initialize', async () => {});
+    t.mock.method(OnnxEngine.prototype, 'dispose', async () => {});
+    const ownership = new Float32Array(81).fill(-0.25);
+    const analyze = t.mock.method(OnnxEngine.prototype, 'analyze', async (board: MicroBoard, toPlay: Sign) => {
+      const policy = new Float32Array(82).fill(-20);
+      policy[81] = 20;
+      return { rootInfo: { winrate: toPlay === 1 ? 80 : 20, lead: 999, scoreStdev: 777, ownership },
+        moves: extractPolicyMoves(policy, 9, board, toPlay, 0) };
+    });
+    const send = (data: WorkerInMessage) => worker.onmessage({ data });
+    await send({ type: 'init', generation: ++generation, payload: { modelPath: 'unused' } });
+    replies.length = 0;
+    try {
+      await send({ type: 'compute', generation, requestId: ++requestId, data: {
+        board: createBoard(9), history: [], size: 9, color, gameType: 'Go', difficulty: 'Hard',
+        mode: 'analyze', purpose: 'coach', simulations: visits,
+      } });
+      const response = replies.find(reply => reply.type === 'ai-response');
+      assert.ok(response, JSON.stringify(replies));
+      assert.equal(analyze.mock.callCount(), visits);
+      assert.equal(response.data.move, null, 'analysis is still forbidden from placing or passing');
+      assert.ok(response.data.pass);
+      assert.equal(response.data.pass.visits, visits - 1);
+      assert.ok(response.data.pass.prior !== undefined && response.data.pass.prior > 0.99 && response.data.pass.prior <= 1);
+      assert.equal(response.data.pass.winRateBlack, visits === 1 ? undefined : 80);
+      assert.deepEqual(response.data.ownership, ownership);
+    } finally { await send({ type: 'release', generation: ++generation }); }
+  });
+}

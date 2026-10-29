@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { capture, sequence, exercisePosition, setup } from './helpers/learningCenter.mjs';
-import { props, render, button } from './helpers/learningUi.mjs';
+import { props, render, button, elements, text } from './helpers/learningUi.mjs';
 
 const variation = { ...capture, id: 'retry-variation', familyId: 'retry-variation', kind: 'variation',
   solution: [{ point: { x: 1, y: 2 }, color: 'black', correct: true, children: [] }] };
@@ -18,7 +18,7 @@ for (const exercise of [capture, sequence, variation, white]) test(`${exercise.k
   let active = host.render().view.active;
   assert.equal(active.phase, 'feedback');
   assert.equal(active.result.outcome, exercise.kind === 'point' ? 'failure' : 'unverified');
-  assert.match(active.instruction, /重试/);
+  assert.match(active.instruction, /重开或悔棋/);
   assert.doesNotMatch(active.instruction, /继续试下/);
   assert.equal(active.result.nextPosition.history.length, 1, 'no generic AI reply after leaving the exercise');
   assert.equal(active.replyKey, undefined);
@@ -46,15 +46,20 @@ for (const exercise of [capture, sequence, variation, white]) test(`${exercise.k
   assert.equal(JSON.stringify(exercise.position), original);
 });
 
-test('stopped board feedback makes retry the main action while preserving undo and demonstration', t => {
+test('stopped board feedback keeps next in the middle, restart on the right and demonstration in the bubble', t => {
   const calls = [];
   const input = { ...props, phase: 'feedback', kind: 'variation', canUndo: true,
-    result: { outcome: 'unverified', explanation: '无法验证本题目标，请重试。' },
-    onRetry: () => calls.push('retry'), onUndo: () => calls.push('undo'), onDemonstrate: () => calls.push('demo') };
-  const tree = render(t, input).render();
-  assert.match(button(tree, '重试').props.className, /btn-coffee/);
-  button(tree, '重试').props.onClick();
-  button(tree, '悔棋').props.onClick();
-  button(tree, '示范').props.onClick();
-  assert.deepEqual(calls, ['retry', 'undo', 'demo']);
+    result: { outcome: 'unverified', explanation: '无法验证本题目标，请重开或悔棋。' },
+    onNext: () => calls.push('next'), onRetry: () => calls.push('retry'),
+    onUndo: () => calls.push('undo'), onDemonstrate: () => calls.push('demo') };
+  const [middle, speech] = render(t, input).render();
+  assert.deepEqual(elements(middle).filter(node => node.props.onClick).map(text), ['悔棋', '下一题', '重开']);
+  assert.match(button(middle, '下一题').props.className, /btn-coffee/);
+  assert.match(button(middle, '重开').props.className, /btn-beige/);
+  assert.equal(button(middle, '下一题').props.disabled, false);
+  button(middle, '下一题').props.onClick();
+  button(middle, '重开').props.onClick();
+  button(middle, '悔棋').props.onClick();
+  button(speech, '示范').props.onClick();
+  assert.deepEqual(calls, ['next', 'retry', 'undo', 'demo']);
 });

@@ -29,7 +29,7 @@ const { useCoachSession, useGameState, createInitialPosition, recordMove, undoPo
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
-async function setup(t, config = { endpoint: 'https://coach.example/v1', model: 'test-coach', apiKey: 'test-secret' }) {
+async function setup(t, config = { endpoint: 'https://coach.example/v1', provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test-secret' }) {
   setAgentInterceptor(undefined);
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const requests = [];
@@ -57,15 +57,14 @@ async function setup(t, config = { endpoint: 'https://coach.example/v1', model: 
   render();
   t.after(async () => { host.unmount(); setAgentInterceptor(undefined); await settle(); });
   function respond(index, text) {
-    requests[index].resolve(new Response(JSON.stringify({ choices: [
-      { message: { content: text }, finish_reason: 'stop' },
-    ] }), { headers: { 'Content-Type': 'application/json' } }));
+    requests[index].resolve(new Response(JSON.stringify({ text }), { headers: { 'Content-Type': 'application/json' } }));
   }
   function respondChoice(index, id = 'current', variant = 0) {
-    const content = JSON.parse(requests[index].init.body).messages[1].content;
-    const evidence = JSON.parse(content.slice('局面证据：\n'.length, content.indexOf('\n玩家问题：')));
+    const evidence = JSON.parse(requests[index].init.body).evidence;
     const choice = evidence.teachingChoices.find(item => item.id === id);
     assert.ok(choice?.variants[variant], 'the fixture must select an available verified explanation');
+    // This helper selects complete authored material, including legacy multi-sentence
+    // conditions; synthesis-specific tests supply their own single-sentence text.
     respond(index, JSON.stringify({ kind: 'explain', parts: [{ id, variant }] }));
     return choice.variants[variant];
   }

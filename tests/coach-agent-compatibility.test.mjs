@@ -71,7 +71,7 @@ test('the actual runtime supports engine hints when an older WebView has no Arra
     globalThis.runWithoutAt = () => {
       const position = createInitialPosition(9);
       return executeCoachAgent({kind:'inspect',position,userColor:'black',intent:'hint',
-        config:{endpoint:'https://api.deepseek.com',model:'deepseek-flash',apiKey:''}, engineEvidence:{
+        config:{endpoint:'https://api.deepseek.com', provider: 'deepseek', model: 'deepseek-flash', apiKey:''}, engineEvidence:{
           positionKey:coachPositionKey(position,position.currentPlayer,3.5),source:'local-katago',perspective:'black',
           visits:8,candidates:[{point:{x:2,y:2},visits:5}]
         }});

@@ -68,6 +68,7 @@ function button(tree, label) {
 }
 function centerInput(active) {
   return { isOpen: true, active, loaded: true, filter: 'all', sections: [], lessons: [], personal: [],
+    startCourseLabel: '从基础开始', onStartCourse: noop,
     storageMessage: '', notice: '', onClose: noop, onFilter: noop, onLesson: noop, onPersonal: noop,
     onExport: noop, onImport: noop, onDelete: noop };
 }

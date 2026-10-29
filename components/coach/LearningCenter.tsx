@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookOpen, Check, ChevronRight, Home, X } from 'lucide-react';
-import { Button, Modal, Panel, ProgressBar, Toast } from '../../ui/common';
+import { ArrowRight, BookOpen, Check, CircleCheck, ChevronRight, Home, X } from 'lucide-react';
+import { Button, Modal, Panel, ProgressBar, Toast, renderTextBlocks } from '../../ui/common';
 import { GameBoard } from '../GameBoard';
 import { ScoreBoard } from '../ScoreBoard';
 import { LearningControls } from './LearningControls';
@@ -9,19 +9,17 @@ import { CoachMarkers } from '../board/CoachMarkers';
 import { calculateBoardConstants } from '../board/geometry';
 import { LearningExercise, type LearningExerciseProps } from './LearningExercise';
 import type { CoachSkinId } from '../../utils/coachSkins';
-import { TutorialModal } from '../TutorialModal';
-import type { TutorialContent } from '../app/AppViewModel';
 
 export interface LearningCenterProps {
   isOpen: boolean; onClose: () => void; loaded: boolean; onPractice?: () => void;
   sections: readonly { id: string; title: string }[];
   lessons: readonly { id: string; section: string; title: string; completedSteps: number; totalSteps: number }[];
   onLesson: (id: string) => void;
+  onStartCourse: () => void;
+  startCourseLabel: '从基础开始' | '继续学习' | '从头练习';
   active: LearningExerciseProps | null; activeLessonId?: string;
   notice: string;
   coachSkin?: CoachSkinId;
-  tutorialContent?: TutorialContent;
-  beginnerLessons?: readonly { id: string; title: string }[];
   appearance?: Pick<React.ComponentProps<typeof GameBoard>, 'stoneSkin' | 'boardSkin' | 'stoneAnimationEnabled' | 'separatePieces' | 'vibrate'>;
 }
 
@@ -49,9 +47,11 @@ function TeachingBoardMarks({ board, marks }: {
 
 export function LearningCenter(props: LearningCenterProps) {
   const [coursesOpen, setCoursesOpen] = useState(false);
-  const [beginnerStep, setBeginnerStep] = useState<string>();
   const courseDialog = useRef<HTMLDivElement>(null);
   const courseTrigger = useRef<HTMLButtonElement>(null);
+  const learningActions = useRef<HTMLDivElement>(null);
+  const successDialog = useRef<HTMLDivElement>(null);
+  const successWasOpen = useRef(false);
   function closeCourses() { setCoursesOpen(false); courseTrigger.current?.focus(); }
   useEffect(() => {
     if (coursesOpen) courseDialog.current?.focus();
@@ -66,28 +66,36 @@ export function LearningCenter(props: LearningCenterProps) {
   }, [replyKey]);
   const responding = Boolean(replyKey && replyKey !== settledReplyKey);
   const active = responding && props.active?.replyPreview ? {
-    ...props.active, ...props.active.replyPreview, instruction: '你的棋已落下，看看对方怎样应手。',
-    turnLabel: '对方应手中…', hint: '', markers: [], boardMarks: [], focusPoint: undefined,
+    ...props.active, ...props.active.replyPreview, instruction: '看看对方的应手。',
+    turnLabel: '对方应手中…', hint: '', result: null, markers: [], boardMarks: [], focusPoint: undefined,
     onPoint: () => {}, onInspect: () => {},
   } : props.active;
+  const successOpen = props.isOpen && !coursesOpen && !responding && active?.phase === 'feedback' && active.result?.outcome === 'success';
+  useEffect(() => {
+    if (successOpen) successDialog.current?.querySelector('button')?.focus();
+    else if (successWasOpen.current && props.isOpen) {
+      (learningActions.current?.querySelector<HTMLButtonElement>('button[aria-label="下一题"]') ?? courseTrigger.current)?.focus();
+    }
+    successWasOpen.current = successOpen;
+  }, [successOpen, props.isOpen]);
   function startPractice() { setCoursesOpen(false); props.onPractice?.(); }
   if (!props.isOpen) return null;
   const theme = props.appearance?.boardSkin === 'sakura_wood' ? 'theme-sakura' : '';
   const completedLessons = props.lessons.filter(item => item.completedSteps === item.totalSteps).length;
-  return <main aria-label="进阶教学" className={`${theme} teaching-layout coach-layout h-full w-full bg-[#f7e7ce] text-[#5c4033] pb-safe ${coursesOpen ? '!overflow-hidden' : ''}`}>
+  return <main aria-label="围棋课堂" className={`${theme} teaching-layout coach-layout h-full w-full bg-[#f7e7ce] text-[#5c4033] pb-safe ${coursesOpen || successOpen ? '!overflow-hidden' : ''}`}>
     <Toast message={props.notice || null} />
     <header className="game-sidebar min-w-0 flex flex-col gap-4 pb-4">
       <TopBar leftButtons={<>
         <button aria-label="返回首页" onClick={props.onClose} className="btn-retro btn-brown h-11 w-11 shrink-0 rounded-xl flex items-center justify-center"><Home size={20} /></button>
         <button ref={courseTrigger} aria-label="打开课程" title="课程" onClick={() => setCoursesOpen(true)} className="btn-retro btn-brown h-11 w-11 shrink-0 rounded-xl flex items-center justify-center"><BookOpen size={20} /></button>
       </>} rightContent={<>
-        <span className="max-w-[210px] truncate font-black text-lg sm:text-xl" title={active?.title}>{active?.title ?? '进阶教学'}</span>
+        <span className="max-w-[210px] truncate font-black text-lg sm:text-xl" title={active?.title}>{active?.title ?? '围棋课堂'}</span>
         <span className="text-right text-[11px] sm:text-xs leading-4 text-[#8c6b38] mt-1 whitespace-nowrap"
           aria-label={active?.phase === 'demonstration' ? '本题示范进度' : '课程进度'}>
-          {active ? active.phase === 'demonstration' ? `本题示范 · ${active.demoStep} / ${active.demoTotal}` : active.lessonProgress : '选择课程开始'}
+          {active ? active.phase === 'demonstration' ? `本题示范 · ${active.demoStep} / ${active.demoTotal}` : active.lessonProgress : props.loaded ? '选择课程复习' : '正在读取进度…'}
         </span>
       </>} />
-      {active && <div className="game-actions flex flex-col gap-4 px-4">
+      {active && <div ref={learningActions} className="game-actions flex flex-col gap-4 px-4">
         <ScoreBoard currentPlayer={active.currentPlayer} blackCaptures={active.blackCaptures} whiteCaptures={active.whiteCaptures}
           gameType="Go" stoneSkin={props.appearance?.stoneSkin ?? 'classic'} isThinking={responding}
           showWinRate={false} showCaptures={false} appMode="playing" gameOver={false} userColor={active.currentPlayer} displayWinRate={50} />
@@ -105,15 +113,18 @@ export function LearningCenter(props: LearningCenterProps) {
             <TeachingBoardMarks board={active.board} marks={active.boardMarks} />
             <CoachMarkers points={[...active.markers]} board={active.board} />
           </> : <CoachMarkers points={[...active.markers]} board={active.board} />} />
-          : <div className="max-w-xs p-4 space-y-3 text-center">
-            <Button appearance="retro" variant="secondary" onClick={() => setCoursesOpen(true)} disabled={!props.loaded}>选择课程</Button>
+          : <div className="w-64 max-w-full p-4 flex flex-col gap-3 text-center">
+            {!props.loaded ? <p role="status" className="text-sm">正在读取学习进度…</p> : <>
+            <Button appearance="retro" variant="primary" onClick={props.onStartCourse}>{props.startCourseLabel}</Button>
+            <Button appearance="retro" variant="secondary" onClick={() => setCoursesOpen(true)}>选择课程</Button>
             {!active && props.onPractice && <>
-              <Button appearance="retro" variant="primary" onClick={startPractice} disabled={!props.loaded}>去 9 路陪练</Button>
+              <Button appearance="retro" variant="secondary" onClick={startPractice}>去 9 路陪练</Button>
+            </>}
             </>}
           </div>}
       </div>
     </div>
-    {active && <LearningExercise {...active} coachSkin={props.coachSkin} />}
+    {active && <LearningExercise {...active} coachSkin={props.coachSkin} responding={responding} />}
     <Modal isOpen={coursesOpen} onClose={closeCourses} position="fixed" maxWidth="max-w-lg" className="!p-0 !border-4 overflow-hidden">
       <div ref={courseDialog} role="dialog" aria-modal="true" aria-labelledby="course-menu-title" tabIndex={-1}
         className="flex max-h-[85dvh] flex-col outline-none" onKeyDown={event => {
@@ -143,21 +154,6 @@ export function LearningCenter(props: LearningCenterProps) {
           </div>}
         </header>
         <div className="course-menu-list min-h-0 overflow-y-auto overscroll-contain bg-[#e3c086]/20 p-4 sm:p-5 space-y-4" aria-label="课程列表">
-          {!!props.beginnerLessons?.length && props.tutorialContent && <section aria-labelledby="course-section-beginner">
-            <Panel appearance="retro" className="course-card overflow-hidden">
-              <header className="mx-4 border-b border-[#e3c086]/30 py-4">
-                <h3 id="course-section-beginner" className="text-lg font-black">新手教学</h3>
-              </header>
-              <div>
-                {props.beginnerLessons.map(item => <Button key={item.id} appearance="retro" variant="ghost" size="md"
-                  className="w-full min-h-14 flex items-center gap-3 !rounded-none !px-4 !py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current"
-                  onClick={() => { setBeginnerStep(item.id); setCoursesOpen(false); }}>
-                  <span className="min-w-0 flex-1 text-[15px] text-[#5c4033] font-medium leading-6">{item.title}</span>
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center text-[#8c6b38] opacity-60"><ChevronRight size={16} aria-hidden="true" /></span>
-                </Button>)}
-              </div>
-            </Panel>
-          </section>}
           {!props.loaded ? <p role="status" className="text-sm py-4 text-center">正在读取课程进度…</p>
             : props.sections.map(section => {
               const lessons = props.lessons.filter(item => item.section === section.id);
@@ -194,9 +190,20 @@ export function LearningCenter(props: LearningCenterProps) {
         </div>
       </div>
     </Modal>
-    {beginnerStep && props.tutorialContent && <TutorialModal key={beginnerStep} isOpen
-      initialStepId={beginnerStep} tutorialContent={props.tutorialContent}
-      vibrate={props.appearance?.vibrate ?? (() => {})} stoneAnimationEnabled={props.appearance?.stoneAnimationEnabled}
-      onClose={() => { setBeginnerStep(undefined); setCoursesOpen(true); }} />}
+    {successOpen && <Modal isOpen position="fixed" maxWidth="max-w-sm" className="!p-5 !border-4">
+      <div ref={successDialog} role="dialog" aria-modal="true" aria-labelledby="learning-success-title" aria-describedby="learning-success-explanation"
+        className="text-center" onKeyDown={event => {
+          if (event.key === 'Tab') { event.preventDefault(); successDialog.current?.querySelector('button')?.focus(); }
+        }}>
+        <div className="teaching-answer-correct mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+          <CircleCheck size={38} strokeWidth={2.5} aria-hidden="true" />
+        </div>
+        <h2 id="learning-success-title" className="text-xl font-black">答对了！</h2>
+        <div id="learning-success-explanation" className="mt-2 max-h-[28dvh] overflow-y-auto text-left text-sm leading-6">{renderTextBlocks(active?.result?.explanation ?? '')}</div>
+        <Button appearance="retro" variant="primary" onClick={active?.onContinue}
+          className="mt-4 min-h-11 w-full flex items-center justify-center gap-2">下一题<ArrowRight size={18} aria-hidden="true" /></Button>
+        {active?.autoAdvance && <p className="mt-2 text-xs text-[#8c6b38]">稍后自动进入下一题</p>}
+      </div>
+    </Modal>}
   </main>;
 }

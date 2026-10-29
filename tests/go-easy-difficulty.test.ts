@@ -3,7 +3,9 @@ import test from 'node:test';
 import { createBoard, getBoardHash } from '../core/board';
 import { getBeginnerAIMove } from '../core/go/ai';
 import { attemptMove, isSimpleEye } from '../core/go/rules';
+import { extractPolicyMoves } from '../core/inference/policy';
 import { selectMoveByDifficulty } from '../core/inference/selection';
+import { MicroBoard } from '../utils/micro-board';
 import type { BoardState, Player, Point } from '../types';
 
 type PolicyPoint = Point & { prior: number };
@@ -71,9 +73,13 @@ test('Easy cannot jump from the beginner local pool to a distant high-prior mode
 
 test('Easy preserves an empty-board center opening even when the model prefers a corner or pass', () => {
   for (const size of [9, 13, 19]) for (const color of ['black', 'white'] as const) {
-    const policy = ranked([{ x: 0, y: 0, prior: 1 }, { x: -1, y: -1, prior: 0.5 }]);
-    const move = withRandom(() => 0.5, () => selectMoveByDifficulty(policy, createBoard(size), color, null, 'Easy'));
-    assert.deepEqual(move, { x: Math.floor(size / 2), y: Math.floor(size / 2) });
+    for (const preferred of [0, size * size]) {
+      const logits = Float32Array.from({ length: size * size + 1 }, (_, i) => -i * 0.01);
+      logits[preferred] = 10;
+      const policy = extractPolicyMoves(logits, size, new MicroBoard(size), color === 'black' ? 1 : -1, 2.1);
+      const move = selectMoveByDifficulty(policy, createBoard(size), color, null, 'Easy');
+      assert.deepEqual(move, { x: Math.floor(size / 2), y: Math.floor(size / 2) });
+    }
   }
 });
 

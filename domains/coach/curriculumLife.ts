@@ -3,9 +3,9 @@ import { exercisePosition } from './exercise';
 
 export const lifeLessons = [
   lesson('F', 'life.make-two-eyes', '已有一眼，另一眼缺在哪里',
-    '做眼不总是往内部填子。先保留已经成形的眼，再找另一片眼位的缺口，分清补墙与填眼。',
+    '做眼不一定要往内部填子。先保住已有的眼，再找另一处眼位的缺口，分清补墙和填眼。',
     '看着像眼的空点，若还通向外面的对方棋，就需要先补好边界。',
-    '两个空点不一定是两眼。要检查它们是否分开，以及围住空点的棋是否连成一整块。', [
+    '两个空点未必是两眼：要彼此分开，周围的棋还要连成同一块。', [
       { kind: 'point', familyId: 'go.life.make-two-eyes.wall-gap',
         position: exercisePosition(['OOOOOOO', 'OXXXXXO', 'OX.X..O', 'OXXXXXO', 'OOOOOOO', '.......', '.......']),
         rubric: { kind: 'two-eyes', anchor: { x: 1, y: 1 } }, prompt: '轮黑。黑棋已有一只眼。保住它，并补出第二只完整的眼。',

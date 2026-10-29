@@ -5,11 +5,11 @@ import { Button } from '../ui/common';
 export type TutorialDestination = 'learning' | 'local' | 'online' | 'ai' | 'coach';
 
 const modes = [
-    { id: 'learning', title: '进阶教学', description: '跟着教程，练习更深入的攻防。', icon: BookOpen },
+    { id: 'learning', title: '围棋课堂', description: '按顺序练习基础规则和攻防。', icon: BookOpen },
     { id: 'local', title: '本地双人', description: '和身边的朋友轮流落子。', icon: Users },
     { id: 'online', title: '联机对战', description: '在 TapTap 小游戏里邀请朋友下棋。', icon: Globe },
-    { id: 'ai', title: 'AI 对战', description: '选个合适的难度，自己下一盘。', icon: Cpu },
-    { id: 'coach', title: 'AI 陪练', description: '边下边听讲解，需要时再要提示。', icon: MessageCircle },
+    { id: 'ai', title: 'AI 对战', description: '选好难度，和 AI 下一盘。', icon: Cpu },
+    { id: 'coach', title: 'AI 陪练', description: '边下边看讲解，需要时点提示。', icon: MessageCircle },
 ] as const;
 
 export function TutorialGuide({ onExplore }: { onExplore: (destination: TutorialDestination) => void }) {

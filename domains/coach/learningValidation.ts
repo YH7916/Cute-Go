@@ -1,6 +1,6 @@
 import type { BoardState, HistoryItem, Point } from '../../types';
 import type { GamePosition } from '../game/positionState';
-import type { LearningAttemptInput, LearningExposureInput, LearningRecord, SavedLearningPosition } from './learningTypes';
+import type { LearningAttemptInput, LearningCourseCursor, LearningExposureInput, LearningRecord, SavedLearningPosition } from './learningTypes';
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -60,11 +60,21 @@ export function isSavedLearningPosition(value: unknown): value is SavedLearningP
   return object(value) && text(value.id) && text(value.label) && integer(value.createdAt)
     && (value.skillId === undefined || text(value.skillId)) && gamePosition(value.position);
 }
+export function isLearningCourseCursor(value: unknown): value is LearningCourseCursor {
+  return object(value) && text(value.exerciseId) && text(value.contentRevision)
+    && typeof value.completed === 'boolean' && integer(value.updatedAt);
+}
 
 export function parseLearningRecord(value: unknown): LearningRecord {
   if (!object(value) || value.version !== 1 || !Array.isArray(value.attempts) || !Array.isArray(value.exposures)
     || !Array.isArray(value.savedPositions) || value.attempts.length > 10000 || value.exposures.length > 20000
     || value.savedPositions.length > 100) throw new Error('学习备份格式或版本不支持。');
+  let courseCursor: LearningCourseCursor | undefined;
+  if (value.courseCursor !== undefined) {
+    if (!isLearningCourseCursor(value.courseCursor)) throw new Error('课程学习位置无效。');
+    const { exerciseId, contentRevision, completed, updatedAt } = value.courseCursor;
+    courseCursor = { exerciseId, contentRevision, completed, updatedAt };
+  }
   const sequences = new Set<number>();
   function sequence(item: unknown): number {
     if (!object(item) || !integer(item.sequence) || item.sequence === 0 || sequences.has(item.sequence)) {
@@ -93,7 +103,7 @@ export function parseLearningRecord(value: unknown): LearningRecord {
   if (new Set(attempts.map(item => item.attemptId)).size !== attempts.length
     || new Set(exposures.map(item => item.exposureId)).size !== exposures.length
     || new Set(savedPositions.map(item => item.id)).size !== savedPositions.length) throw new Error('学习记录标识重复。');
-  return { version: 1, attempts, exposures, savedPositions };
+  return { version: 1, attempts, exposures, savedPositions, ...(courseCursor ? { courseCursor } : {}) };
 }
 
 export function parseLearningBackup(json: string): LearningRecord {
@@ -119,6 +129,9 @@ export function mergeLearningRecords(current: LearningRecord, incoming: Learning
   }
   for (const position of incoming.savedPositions) {
     if (!merged.savedPositions.some(item => item.id === position.id)) merged.savedPositions.push(position);
+  }
+  if (incoming.courseCursor && (!merged.courseCursor || incoming.courseCursor.updatedAt > merged.courseCursor.updatedAt)) {
+    merged.courseCursor = incoming.courseCursor;
   }
   return parseLearningRecord(merged);
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { capture, sequence, exercisePosition, setup } from './helpers/learningCenter.mjs';
+import { capture, sequence, exercisePosition, projectLearning, setup } from './helpers/learningCenter.mjs';
 
 const number = { ...capture, id: 'personal-number', familyId: 'number-fixture', kind: 'number',
   position: exercisePosition(['.....', '.....', '.XX..', '.....', '.....']),
@@ -30,7 +30,7 @@ test('a failed number answer can be cleared and corrected in place without rewri
   assert.equal(active.result.outcome, 'success');
   assert.deepEqual(host.record.attempts[0], original);
   assert.equal(host.record.attempts[1].retryOf, original.attemptId);
-  assert.equal(host.render().view.stats.independent, 0);
+  assert.equal(projectLearning(host.record).progress[number.skillId].independentSuccesses, 0);
 });
 
 test('the visible hint action after a wrong number answer starts an assisted correction on the same board', t => {
@@ -65,7 +65,7 @@ test('leaving halfway through a demonstration records the suspended attempt as a
   assert.equal(host.record.attempts.length, 1);
   assert.equal(host.record.attempts[0].outcome, 'abandoned');
   assert.equal(host.record.attempts[0].hintLevel, 3);
-  assert.equal(host.render().view.stats.independent, 0);
+  assert.equal(projectLearning(host.record).progress[sequence.skillId].independentSuccesses, 0);
 });
 
 test('old demonstration, inspection and undo callbacks cannot touch a replacement exercise', t => {
@@ -111,7 +111,7 @@ for (const assistance of ['hint', 'demonstration', 'inspection']) test(`undo ret
   assert.equal(active.result.outcome, 'success');
   assert.equal(host.record.attempts.length, 1);
   assert.ok(host.record.attempts[0].hintLevel >= (assistance === 'demonstration' ? 3 : 1));
-  assert.equal(host.render().view.stats.independent, 0);
+  assert.equal(projectLearning(host.record).progress[sequence.skillId].independentSuccesses, 0);
 });
 
 test('unassisted answers to two exercises from the same family still provide only one independent success', t => {
@@ -119,12 +119,12 @@ test('unassisted answers to two exercises from the same family still provide onl
   const host = setup(t, [capture, sibling]);
   host.render().openExercise(capture.id);
   host.render().view.active.onPoint(1, 2);
-  assert.equal(host.render().view.stats.independent, 1);
+  assert.equal(projectLearning(host.record).progress[capture.skillId].independentSuccesses, 1);
   host.render().openExercise(sibling.id);
   assert.equal(host.render().view.active.independent, false);
   host.render().view.active.onPoint(1, 2);
   assert.equal(host.record.attempts.length, 2);
-  assert.equal(host.render().view.stats.independent, 1);
+  assert.equal(projectLearning(host.record).progress[capture.skillId].independentSuccesses, 1);
 });
 
 test('demo return restores the pending numeric answer and a sequence reply keeps captures in its preview', t => {

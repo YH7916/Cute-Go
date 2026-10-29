@@ -1,5 +1,6 @@
 import React, { useId } from 'react';
 import { STONE_THEMES, StoneThemeId } from '../../utils/themes';
+import { BoardStoneBody } from '../board/BoardStones';
 
 interface StoneSkinPreviewProps {
     stoneSkin: string;
@@ -23,19 +24,12 @@ const PreviewStone: React.FC<{
     const mainColor = isBlack ? theme.blackColor : theme.whiteColor;
 
     if (theme.id === 'skeuomorphic') {
-        const shadowStyle = isBlack
-            ? { filter: 'drop-shadow(1.5px 1.5px 1px rgba(0,0,0,0.4)) drop-shadow(2.5px 2.5px 2px rgba(0,0,0,0.2))' }
-            : { filter: 'drop-shadow(1.5px 1.5px 1px rgba(80,60,40,0.25)) drop-shadow(2.5px 2.5px 2px rgba(50,30,10,0.12))' };
-
         return (
-            <g style={shadowStyle}>
-                <circle
-                    cx={cx}
-                    cy={cy}
-                    r={STONE_RADIUS}
-                    fill={isBlack ? '#2d2d30' : '#f5f5f2'}
-                    stroke={isBlack ? theme.blackBorder : theme.whiteBorder}
-                    strokeWidth="0"
+            <g transform={`translate(${cx},${cy})`}>
+                <BoardStoneBody
+                    color={color} stoneSkin={themeId} gameType="Go" separatePieces
+                    stones={[{ x: 0, y: 0, color, id: color }]} connections={[]} animatingStoneId={null}
+                    boardSize={1} CELL_SIZE={40} GRID_PADDING={0} STONE_RADIUS={STONE_RADIUS} boardPixelSize={40}
                 />
             </g>
         );
@@ -69,7 +63,7 @@ export const StoneSkinPreview: React.FC<StoneSkinPreviewProps> = ({ stoneSkin, c
                         <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="blob" />
                         <feGaussianBlur in="blob" stdDeviation="2" result="blurBlob" />
                         <feSpecularLighting in="blurBlob" surfaceScale="5" specularConstant="0.8" specularExponent="20" lightingColor="#ffffff" result="specular">
-                            <fePointLight x="-500" y="-500" z="300" />
+                            <feDistantLight azimuth="225" elevation="20" />
                         </feSpecularLighting>
                         <feComposite in="specular" in2="blob" operator="in" result="specularInBlob" />
                         <feDropShadow dx="0" dy="2" stdDeviation="1.2" floodColor="#000000" floodOpacity="0.5" in="blob" result="shadow" />
@@ -82,7 +76,7 @@ export const StoneSkinPreview: React.FC<StoneSkinPreviewProps> = ({ stoneSkin, c
                         <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="blob" />
                         <feGaussianBlur in="blob" stdDeviation="2" result="blurBlob" />
                         <feSpecularLighting in="blurBlob" surfaceScale="5" specularConstant="1.2" specularExponent="15" lightingColor="#ffffff" result="specular">
-                            <fePointLight x="-500" y="-500" z="300" />
+                            <feDistantLight azimuth="225" elevation="20" />
                         </feSpecularLighting>
                         <feComposite in="specular" in2="blob" operator="in" result="specularInBlob" />
                         <feDropShadow dx="0" dy="2" stdDeviation="1.2" floodColor="#5c4033" floodOpacity="0.3" in="blob" result="shadow" />

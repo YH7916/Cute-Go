@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { runCoachAgent } from '../agent/coach/client';
 import type { CoachAgentResult, CoachConversationTurn, CoachEngineEvidence, CoachIntent } from '../agent/coach/contract';
-import { coachPositionKey } from '../domains/coach/evidence';
+import { coachPositionKey, coachQuestionPoints } from '../domains/coach/evidence';
+import { coachHistoryAnswer, resolveCoachQuestionReferences } from '../domains/coach/conversation';
 import { renderCoachReviewSummary } from '../domains/coach/response';
 import { getDefaultKomi } from '../core/go/config';
 import type { GamePosition, PositionAccess } from '../domains/game/positionState';
 import type { CoachConfig } from '../services/coach/types';
-import type { Player, Point } from '../types';
+import type { Difficulty, Player, Point } from '../types';
 
 interface CoachSessionOptions {
   active: boolean;
@@ -14,11 +15,12 @@ interface CoachSessionOptions {
   position: GamePosition;
   readPosition: PositionAccess['readPosition'];
   userColor: Player;
+  difficulty?: Difficulty;
   gameOver: boolean;
   config: CoachConfig;
   ownerScopeId?: string;
   conversationRoot?: object;
-  analyze?: (position: GamePosition, signal: AbortSignal) => Promise<CoachEngineEvidence | undefined>;
+  analyze?: (position: GamePosition, signal: AbortSignal, focusPoints?: Point[]) => Promise<CoachEngineEvidence | undefined>;
 }
 
 interface Answer extends CoachAgentResult {
@@ -27,12 +29,18 @@ interface Answer extends CoachAgentResult {
   config: CoachConfig;
   userColor: Player;
   gameOver: boolean;
+  referencesReady?: boolean;
 }
 
 interface Exchange extends CoachConversationTurn {
   id: number;
   position: GamePosition;
+  hintPoints: CoachAgentResult['hintPoints'];
 }
+const createConversation = (root: object, config: CoachConfig, userColor: Player, ownerScopeId: string) => ({
+  root, config, userColor, ownerScopeId, turns: [] as Exchange[],
+  replies: new Map<string, { position: GamePosition; result: CoachAgentResult; analyzed: boolean }>(),
+});
 
 function followsOpponentReply(before: GamePosition, after: GamePosition, userColor: Player): boolean {
   const reply = after.history.at(-1);
@@ -43,7 +51,7 @@ function followsOpponentReply(before: GamePosition, after: GamePosition, userCol
 }
 
 export function useCoachSession({ active, playing = true, position, readPosition, userColor, gameOver, config, analyze,
-  ownerScopeId = 'local:guest', conversationRoot }: CoachSessionOptions) {
+  ownerScopeId = 'local:guest', conversationRoot, difficulty }: CoachSessionOptions) {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [serviceState, setServiceState] = useState<{ config: CoachConfig; configured: boolean } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,9 +59,9 @@ export function useCoachSession({ active, playing = true, position, readPosition
   const askedPosition = useRef<{ position: GamePosition; scope: object } | null>(null);
   const version = useRef(0);
   const root = conversationRoot ?? position.history[0]?.board ?? position.board;
-  const scope = useRef({ root, config, userColor, ownerScopeId, turns: [] as Exchange[] });
+  const scope = useRef(createConversation(root, config, userColor, ownerScopeId));
   if (scope.current.root !== root || scope.current.config !== config || scope.current.userColor !== userColor
-    || scope.current.ownerScopeId !== ownerScopeId) scope.current = { root, config, userColor, ownerScopeId, turns: [] };
+    || scope.current.ownerScopeId !== ownerScopeId) scope.current = createConversation(root, config, userColor, ownerScopeId);
   const currentScope = scope.current;
   const [, refreshConversation] = useState(0);
   const exchangeId = useRef(0);
@@ -85,15 +93,18 @@ export function useCoachSession({ active, playing = true, position, readPosition
   useEffect(() => {
     cancel();
     setAnswer(previous => readable(previous) ? previous : null);
-    if (!active) return cancel;
+    // Intermediate AI-turn positions are not a decision point for the learner.
+    if (!active || (playing && !gameOver && position.currentPlayer !== userColor)) return cancel;
     const controller = new AbortController();
     requestRef.current = controller;
     const requestVersion = version.current;
-    void runCoachAgent({ kind: 'inspect', proactive: true, position, userColor, intent: 'explain-last-move', config }, controller.signal)
+    void runCoachAgent({ kind: 'inspect', proactive: true, position, userColor,
+      intent: playing ? 'hint' : 'explain-last-move', config }, controller.signal)
       .then(result => {
         if (stillCurrent(requestVersion, controller.signal)) {
           setAnswer(previous => readable(previous) && previous?.text && (previous.position === position || !result.text) ? previous
-            : { ...result, position, scope: currentScope, config, userColor, gameOver,
+            : { ...result, hintPoints: result.hintPoints.map(point => ({ ...point })),
+              position, scope: currentScope, config, userColor, gameOver, referencesReady: true,
               ...(gameOver ? { text: '', hintPoints: [], shouldAutoExplain: false } : {}) });
           setServiceState({ config, configured: result.configured });
         }
@@ -107,7 +118,7 @@ export function useCoachSession({ active, playing = true, position, readPosition
         if (stillCurrent(requestVersion, controller.signal)) requestRef.current = null;
       });
     return cancel;
-  }, [active, position, userColor, gameOver, config, cancel, stillCurrent, currentScope, readable]);
+  }, [active, playing, position, userColor, gameOver, config, cancel, stillCurrent, currentScope, readable]);
 
   const ask = useCallback(async (nextIntent: CoachIntent, question?: string, attemptedPoint?: Point, proactive = false) => {
     if (!active || readPosition() !== position) return;
@@ -117,6 +128,30 @@ export function useCoachSession({ active, playing = true, position, readPosition
     requestRef.current = controller;
     const requestVersion = version.current;
     const requestScope = scope.current;
+    const prompt = question?.trim().slice(0, 500) ?? '';
+    const displayed = !loading && answer?.referencesReady && readable(answer) && answer.hintPoints.length ? answer : null;
+    const displayedTurn = displayed ? [...requestScope.turns].reverse().find(turn => turn.position === displayed.position
+      && turn.answer === displayed.text && turn.hintPoints.length === displayed.hintPoints.length
+      && turn.hintPoints.every((point, index) => point.label === displayed.hintPoints[index].label)) ?? {
+      positionKey: coachPositionKey(displayed.position, userColor, getDefaultKomi(displayed.position.board.length)),
+      question: '当前显示的讲解', answer: displayed.text, hintPoints: displayed.hintPoints,
+    } : undefined;
+    // Re-displaying a cached or automatic answer changes the visible reference,
+    // without duplicating the user's conversation history.
+    const referenceHistory = displayedTurn
+      ? [...requestScope.turns.filter(turn => turn !== displayedTurn), displayedTurn].slice(-6) : requestScope.turns;
+    // Explicit questions send the latest three conversation turns. Their ids
+    // distinguish changed context without copying positions or long answers.
+    const replyKey = JSON.stringify([nextIntent, prompt, prompt ? requestScope.turns.slice(-3).map(turn => turn.id) : [],
+      prompt && displayedTurn ? [displayedTurn.positionKey, displayedTurn.hintPoints.map(point => point.label)] : []]);
+    const cached = requestScope.replies.get(replyKey);
+    if (!proactive && !attemptedPoint && cached?.position === position && (!analyze || cached.analyzed)) {
+      requestScope.replies.delete(replyKey); requestScope.replies.set(replyKey, cached);
+      setAnswer({ ...cached.result, hintPoints: cached.result.hintPoints.map(point => ({ ...point })),
+        position, scope: requestScope, config, userColor, gameOver, referencesReady: true });
+      requestRef.current = null;
+      return;
+    }
     const current = () => stillCurrent(requestVersion, controller.signal);
     const remember = (result: CoachAgentResult) => {
       if (proactive || !result.text || !current() || scope.current !== requestScope) return;
@@ -124,30 +159,45 @@ export function useCoachSession({ active, playing = true, position, readPosition
         : nextIntent === 'explain-position' ? '怎么看这个局面？' : nextIntent === 'explain-illegal-move' ? '这里为什么不能下？' : '请讲解这一手。');
       requestScope.turns = [...requestScope.turns, { id: ++exchangeId.current, position,
         positionKey: coachPositionKey(position, userColor, getDefaultKomi(position.board.length)),
-        question: label, answer: result.text }].slice(-6);
+        question: label, answer: result.text, hintPoints: result.hintPoints.map(point => ({ ...point })) }].slice(-6);
       refreshConversation(value => value + 1);
     };
     setLoading(true);
     try {
-      const input = { position, userColor, intent: nextIntent, config, question, proactive,
-        history: requestScope.turns.map(({ positionKey, question: prompt, answer: text }) => ({ positionKey, question: prompt, answer: text })),
+      const input = { position, userColor, difficulty, intent: nextIntent, config, question, proactive,
+        history: referenceHistory.map(({ positionKey, question: prompt, answer: text, hintPoints }) => ({
+          positionKey, question: prompt, answer: coachHistoryAnswer(text, hintPoints, config.apiKey),
+          hintPoints: hintPoints.map(point => ({ ...point })),
+        })),
         ...(attemptedPoint ? { attemptedPoint: { ...attemptedPoint } } : {}) };
       const preview = await runCoachAgent({ ...input, kind: 'inspect' }, controller.signal);
       if (!current()) return;
-      setAnswer({ ...preview, position, scope: requestScope, config, userColor, gameOver });
+      setAnswer({ ...preview, hintPoints: preview.hintPoints.map(point => ({ ...point })),
+        position, scope: requestScope, config, userColor, gameOver,
+        referencesReady: nextIntent === 'explain-illegal-move' });
       setServiceState({ config, configured: preview.configured });
       if (proactive && !preview.shouldAutoExplain) return;
-      if (nextIntent === 'explain-illegal-move' || (!preview.configured && nextIntent !== 'explain-position')) {
+      if (nextIntent === 'explain-illegal-move') {
         remember(preview); return;
       }
       let engineEvidence: CoachEngineEvidence | undefined;
-      try { engineEvidence = await analyze?.(position, controller.signal); }
+      const { references } = resolveCoachQuestionReferences(question ?? '', referenceHistory, position.board.length,
+        coachPositionKey(position, userColor, getDefaultKomi(position.board.length)));
+      const focusedQuestion = `${question ?? ''} ${references.map(reference => reference.point.label).join(' ')}`;
+      try { engineEvidence = await analyze?.(position, controller.signal, coachQuestionPoints(focusedQuestion, position.board.length)); }
       catch { /* Agent can explain the verified rules without engine estimates. */ }
       if (!current()) return;
       const reply = await runCoachAgent({ ...input, engineEvidence, kind: 'ask' }, controller.signal);
       if (current()) {
+        // A busy or loading model may recover without changing the board. Do
+        // not turn its temporary rule-only fallback into a permanent cache hit.
+        if (!proactive && !reply.error && reply.cacheable !== false && reply.text && (!analyze || engineEvidence)) {
+          requestScope.replies.set(replyKey, { position, result: reply, analyzed: Boolean(engineEvidence) });
+          if (requestScope.replies.size > 8) requestScope.replies.delete(requestScope.replies.keys().next().value!);
+        }
         setAnswer(previous => proactive && !reply.text && readable(previous) && previous?.text ? previous
-          : { ...reply, position, scope: requestScope, config, userColor, gameOver });
+          : { ...reply, hintPoints: reply.hintPoints.map(point => ({ ...point })),
+            position, scope: requestScope, config, userColor, gameOver, referencesReady: true });
         setServiceState({ config, configured: reply.configured });
         remember(reply);
       }
@@ -166,7 +216,7 @@ export function useCoachSession({ active, playing = true, position, readPosition
         setLoading(false);
       }
     }
-  }, [active, gameOver, readPosition, position, config, userColor, analyze, cancel, stillCurrent, readable, currentScope]);
+  }, [active, gameOver, readPosition, position, config, userColor, difficulty, analyze, cancel, stillCurrent, readable, currentScope, answer, loading]);
 
   const explainIllegalMove = useCallback((point: Point, attemptedPosition: GamePosition) => {
     if (!active || attemptedPosition !== position || readPosition() !== attemptedPosition) return Promise.resolve();
@@ -185,7 +235,7 @@ export function useCoachSession({ active, playing = true, position, readPosition
       || position.currentPlayer !== userColor || !position.history.length) return;
     const automaticVersion = version.current;
     const timer = setTimeout(() => {
-      if (version.current === automaticVersion) void ask('explain-last-move', undefined, undefined, true);
+      if (version.current === automaticVersion) void ask('hint', undefined, undefined, true);
     }, 700);
     return () => clearTimeout(timer);
   }, [playing, shouldAutoExplain, configured, active, gameOver, position, userColor, ask, currentScope]);

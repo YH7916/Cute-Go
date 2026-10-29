@@ -52,7 +52,7 @@ function setup(t, { composeStartFlow = false, composeGameFlow = false, deferMove
   const host = renderHook(() => {
     const webAiEngine = useWebKataGo(callbacks);
     if (composeGameFlow) useGameFlow({
-      settings, gameState, isThinking: false, setIsThinking: noop, showStartScreen: false, showPassModal: false,
+      settings, gameState, showStartScreen: false,
       aiTimerRef, aiTurnLock, webAi: {
         isWorkerReady: webAiEngine.isWorkerReady, isWebLoading: webAiEngine.isLoading,
         isWebThinking: webAiEngine.isThinking, isWebInitializing: webAiEngine.isInitializing,

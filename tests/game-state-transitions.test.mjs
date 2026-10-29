@@ -4,10 +4,11 @@ import { loadTestModule } from './helpers/loadTestModule.mjs';
 
 // Exercise the real hooks and rules, replacing only React's host. This covers
 // callbacks before another render, not React scheduling or browser interaction.
-const { useGameState, useMoveAction, usePassAction, useUndoAction, useResetGameAction, useScoringAction, useEndGameAction, renderHook, createBoard, evaluateScoring } = await loadTestModule({
+const { useGameState, useGameAiSession, useMoveAction, usePassAction, useUndoAction, useResetGameAction, useScoringAction, useEndGameAction, renderHook, createBoard, evaluateScoring } = await loadTestModule({
   reactHost: true,
   contents: `
       export { useGameState } from './hooks/useGameState';
+      export { useGameAiSession } from './hooks/useGameAiSession';
       export { useMoveAction } from './hooks/gameActions/useMoveAction';
       export { usePassAction } from './hooks/gameActions/usePassAction';
       export { useUndoAction } from './hooks/gameActions/useUndoAction';
@@ -21,6 +22,10 @@ const { useGameState, useMoveAction, usePassAction, useUndoAction, useResetGameA
 });
 
 function setup(t, gameType = 'Go', boardSize = 9) {
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true, value: Object.assign(new EventTarget(), { hidden: false }),
+  });
   const noop = () => {};
   const endings = [];
   const achievements = [];
@@ -30,20 +35,24 @@ function setup(t, gameType = 'Go', boardSize = 9) {
     boardSizeRef: { current: boardSize }, gameTypeRef: { current: gameType },
     pendingEndGameRef: { current: null },
     myColorRef: { current: null }, onlineStatusRef: { current: 'disconnected' },
-    onlineStatus: 'disconnected', isThinking: false, isWebThinking: false,
+    onlineStatus: 'disconnected', isWebThinking: false,
     session: null,
     isWorkerReady: false, displayTerritory: null, userProfile: null,
     requestAnalysis: () => true, checkEndGameAchievements: input => achievements.push(input),
     settings: { gameMode: 'PvP', gameType, boardSize, userColor: 'black', setBoardSize: noop },
-    sendData: async () => true, webAiEngine: { resetAI: noop },
-    checkMoveAchievements: noop, playSfx: noop, vibrate: noop, setIsThinking: noop,
+    sendData: async () => true,
+    checkMoveAchievements: noop, playSfx: noop, vibrate: noop,
     stopWebThinking: noop, cleanupOnline: noop,
-    clearInitialStones: noop, setEloDiffStyle: noop, setEloDiffText: noop,
-    setMyColor: noop, setShowMenu: noop, setShowPassModal: noop,
+    setEloDiffStyle: noop, setEloDiffText: noop,
+    setMyColor: noop, setShowMenu: noop,
   };
   const host = renderHook(() => {
     const state = useGameState(boardSize);
-    const input = { ...options, gameState: state };
+    const ai = useGameAiSession({ boardSize, gameState: state, executeMoveRef: { current: noop },
+      handlePassRef: { current: noop }, endGameRef: { current: noop }, setToastMsg: noop });
+    Object.assign(options, { aiTimerRef: ai.aiTimerRef, aiTurnLock: ai.aiTurnLock,
+      pendingEndGameRef: ai.pendingEndGameRef });
+    const input = { ...options, gameState: state, webAiEngine: ai.webAiEngine };
     return {
       state,
       move: useMoveAction(input, (...args) => endings.push(args)),
@@ -53,7 +62,11 @@ function setup(t, gameType = 'Go', boardSize = 9) {
       end: useEndGameAction(input),
     };
   });
-  t.after(() => host.unmount());
+  t.after(() => {
+    host.unmount();
+    if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument);
+    else Reflect.deleteProperty(globalThis, 'document');
+  });
   return { ...host, options, endings, achievements, get scoring() { return scoring; } };
 }
 
@@ -104,6 +117,48 @@ test('successive moves snapshot captures, last move and passes from the latest p
   ]);
   assertRefs(state);
 });
+
+for (const color of ['black', 'white']) {
+  test(`${color}: move action rejects immediate ko recapture without changing the complete position`, t => {
+    const host = setup(t);
+    const api = host.render();
+    const board = createBoard(9);
+    const opponent = color === 'black' ? 'white' : 'black';
+    for (const [x, y] of [[0, 1], [1, 0], [1, 2]]) board[y][x] = { x, y, color, id: `${x}-${y}` };
+    for (const [x, y] of [[1, 1], [2, 0], [3, 1], [2, 2]]) board[y][x] = { x, y, color: opponent, id: `${x}-${y}` };
+    api.state.writePosition({
+      ...api.state.readPosition(), board, currentPlayer: opponent,
+      blackCaptures: 2, whiteCaptures: 3, lastMove: { x: 3, y: 1 }, consecutivePasses: 1,
+    });
+    // Keep an older, different snapshot to catch using the wrong history end.
+    assert.equal(api.move(8, 8, true), true);
+    const original = api.state.readPosition();
+    const originalSnapshot = structuredClone(original);
+    assert.equal(api.move(2, 1, true), true);
+    const captured = api.state.readPosition();
+    const capturedSnapshot = structuredClone(captured);
+    assert.equal(captured.board[1][1], null);
+    assert.equal(captured.board[1][2].color, color);
+    assert.equal(captured.currentPlayer, opponent);
+    assert.equal(captured.blackCaptures, color === 'black' ? 3 : 2);
+    assert.equal(captured.whiteCaptures, color === 'white' ? 4 : 3);
+    assert.deepEqual(captured.lastMove, { x: 2, y: 1 });
+    assert.equal(captured.consecutivePasses, 0);
+    const { history, ...beforeCapture } = original;
+    assert.deepEqual(captured.history, [...history, { ...beforeCapture, move: { x: 2, y: 1 } }]);
+    for (const isRemote of [false, true]) {
+      assert.equal(api.move(1, 1, isRemote), false);
+      assert.equal(api.state.readPosition(), captured, 'rejection must not publish a new position');
+      assert.deepEqual(api.state.readPosition(), capturedSnapshot);
+      assert.deepEqual(original, originalSnapshot, 'neither the input board nor its history may be mutated');
+    }
+    assertRefs(host.render().state);
+    api.undo();
+    assert.deepEqual(api.state.readPosition(), originalSnapshot);
+    assert.equal(api.state.readPosition().board, original.board);
+    assertRefs(host.render().state);
+  });
+}
 
 test('undo restores every position field even when moves and undo share a render', t => {
   const host = setup(t);
@@ -233,20 +288,23 @@ function deadWhitePosition(state) {
   return new Float32Array(81).fill(1);
 }
 
-test('settled achievements retain dead-stone prisoners after the displayed board is cleaned', async t => {
+test('settled achievements retain dead-stone prisoners while preserving the recorded position', async t => {
   const host = setup(t);
   host.options.settings.gameMode = 'PvAI';
   host.options.session = { user: { id: 'test-user' } };
   const api = host.render();
   const ownership = deadWhitePosition(api.state);
   const position = api.state.readPosition();
+  const before = structuredClone(position);
+  const deadStone = position.board[4][4];
   const result = evaluateScoring({ board: position.board, history: position.history,
     player: position.currentPlayer, komi: 3.5, captures: { black: 2, white: 3 } }, ownership);
   assert.deepEqual(result.score, { black: 4, white: 6.5 });
-  api.state.writePosition(current => ({ ...current, board: result.board }));
   api.state.setFinalScore(result.score);
   await api.end('white', 'AI result', result.score);
-  assert.equal(api.state.readPosition().board[4][4], null);
+  assert.equal(api.state.readPosition(), position);
+  assert.equal(api.state.readPosition().board[4][4], deadStone);
+  assert.deepEqual(api.state.readPosition(), before);
   assert.equal(host.achievements[0].score, result.score, 'achievements reuse the authoritative settlement');
   assert.deepEqual(host.achievements[0].score, host.render().state.finalScore);
   assert.deepEqual(host.achievements[0].captures, { black: 2, white: 3 });
@@ -256,7 +314,13 @@ test('local scoring passes its exact settled score to the endgame action', t => 
   const host = setup(t);
   host.options.displayTerritory = deadWhitePosition(host.render().state);
   const api = host.render();
+  const position = api.state.readPosition();
+  const before = structuredClone(position);
+  const deadStone = position.board[4][4];
   api.score();
+  assert.equal(api.state.readPosition(), position, 'local settlement must preserve the recorded position');
+  assert.equal(api.state.readPosition().board[4][4], deadStone);
+  assert.deepEqual(api.state.readPosition(), before);
   const score = host.render().state.finalScore;
   assert.deepEqual(score, { black: 4, white: 6.5 });
   assert.equal(host.endings[0][0], 'white');

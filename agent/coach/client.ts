@@ -10,7 +10,7 @@ async function executeFallback(input: CoachAgentInput, signal?: AbortSignal): Pr
   let rejectLoading!: (reason: Error) => void;
   const interrupted = new Promise<never>((_, reject) => { rejectLoading = reject; });
   const cancel = () => rejectLoading(abortError());
-  const timer = setTimeout(() => rejectLoading(new Error('教学执行模块加载超时，请重试。')), STARTUP_TIMEOUT_MS);
+  const timer = setTimeout(() => rejectLoading(new Error('讲解加载超时，请重试。')), STARTUP_TIMEOUT_MS);
   signal?.addEventListener('abort', cancel, { once: true });
   try {
     // Import downloads cannot be aborted, but their late completion must never
@@ -58,7 +58,7 @@ export function runCoachAgent(input: CoachAgentInput, signal?: AbortSignal): Pro
       const recovery = sent ? { ...input, kind: 'inspect' as const } : input;
       void executeFallback(recovery, signal).then(result => {
         resolve(sent && input.kind === 'ask'
-          ? { ...result, error: '教学执行暂时中断，已恢复本地提示；可重新请求讲解。' } : result);
+          ? { ...result, error: '讲解中断，已恢复本地提示。可以重新请求讲解。' } : result);
       }, reject);
     };
     signal?.addEventListener('abort', cancel, { once: true });

@@ -3,7 +3,7 @@ import { getBoardHash, getGroup } from '../core/board';
 import { inspectMove } from '../core/go/rules';
 import { curriculumLessons } from '../domains/coach/curriculum';
 import { applyExerciseGrade, gradeExercise } from '../domains/coach/exercise';
-import { createExerciseDemonstration, getExerciseGuidance, playExerciseExploration } from '../domains/coach/exerciseInteraction';
+import { createExerciseDemonstration, explainExerciseMoveRejection, getExerciseGuidance } from '../domains/coach/exerciseInteraction';
 import type { Exercise, ExerciseAnswer, ExerciseGrade } from '../domains/coach/exerciseTypes';
 import type { LearningSource } from '../domains/coach/learningTypes';
 import { undoPosition, type GamePosition } from '../domains/game/positionState';
@@ -39,6 +39,17 @@ export function useLearningPractice(learning: ReturnType<typeof useLearningProgr
   latest.current = session;
   const demonstration = useMemo(() => session ? createExerciseDemonstration(session.exercise) : [], [session?.exercise]);
   useEffect(() => () => { latest.current = null; }, []);
+  useEffect(() => {
+    if (!learning.loaded || !session || session.source !== 'course' || session.phase !== 'feedback'
+      || session.grade?.outcome !== 'success' || session.explanationVisible || session.observation) return;
+    // Let the learner read the feedback. Inspecting a result or leaving the
+    // question cancels this timer; it never advances a replacement session.
+    const delay = Math.min(6000, Math.max(1500, session.grade.explanation.length * 90));
+    const timer = setTimeout(() => {
+      if (options.canAct() && latest.current === session) options.onNext(session.exercise, session.source);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [session, learning.loaded]);
   function update(next: PracticeSession | null) { latest.current = next; setSession(next); }
   function context(current: PracticeSession) {
     const { exercise } = current;
@@ -126,8 +137,8 @@ export function useLearningPractice(learning: ReturnType<typeof useLearningProgr
     const boardAnswer = answer.kind === 'point' || answer.kind === 'sequence' || answer.kind === 'variation';
     const grade = boardAnswer && (graded.outcome === 'failure' || graded.outcome === 'unverified')
       ? { ...graded, explanation: graded.outcome === 'unverified'
-        ? '这步暂不能判定，请重试或悔棋。'
-        : `${graded.explanation}\n请重试或悔棋。` } : graded;
+        ? '这步暂不能判定，请重开或悔棋。'
+        : `- ${graded.explanation}\n- 请重开或悔棋。` } : graded;
     let position = current.position;
     if (position) applyExerciseGrade({ readPosition: () => position!, writePosition: next => { position = typeof next === 'function' ? next(position!) : next; } },
       { ...current.exercise, position } as Exercise, grade);
@@ -157,8 +168,7 @@ export function useLearningPractice(learning: ReturnType<typeof useLearningProgr
     const previous = current.position.history.at(-1);
     const legal = inspectMove(current.position.board, x, y, current.position.currentPlayer, 'Go', previous ? getBoardHash(previous.board) : null);
     if (!legal.legal) {
-      const rejected = playExerciseExploration(current.position, { x, y }, current.position.currentPlayer);
-      update({ ...current, observation: rejected.explanation, focusPoint: undefined }); return;
+      update({ ...current, observation: explainExerciseMoveRejection(legal.reason), focusPoint: undefined }); return;
     }
     if (current.exercise.kind === 'point') submitAnswer(current, { kind: 'point', point: { x, y } });
     if (current.exercise.kind === 'sequence') submitAnswer(current, { kind: 'sequence', points: [...current.moves, { x, y }] });
@@ -195,14 +205,16 @@ export function useLearningPractice(learning: ReturnType<typeof useLearningProgr
     if (!current.grade && current.phase === 'practice') learning.recordExposure({ ...context(current), hintLevel: 1,
       exposureId: crypto.randomUUID(), attemptId: current.attemptId });
     update({ ...current, focusPoint: { x, y }, hintLevel: Math.max(1, current.hintLevel),
-      observation: `这块${group.stones[0].color === 'black' ? '黑' : '白'}棋有 ${group.stones.length} 颗棋子，共 ${group.liberties} 气。沿着亮起的线找空点；同一个空点只数一次。`, explanationVisible: false });
+      observation: `- 这块${group.stones[0].color === 'black' ? '黑' : '白'}棋共 ${group.stones.length} 子、${group.liberties} 气。\n- 沿亮线找空点，同一个空点只数一次。`, explanationVisible: false });
   }
   function setAnswer(answer: ExerciseAnswer, numberText = '') {
     const current = active();
     if (!current || current.phase === 'demonstration' || current.grade?.outcome === 'success') return;
-    update({ ...current, answer, numberText, phase: 'practice', grade: null, observation: '',
+    const next: PracticeSession = { ...current, answer, numberText, phase: 'practice', grade: null, observation: '',
       ...(current.grade ? { attemptId: crypto.randomUUID(), retryOf: current.attemptId,
-        eligibleIndependent: false, hintLevel: Math.max(1, current.hintLevel) } : {}) });
+        eligibleIndependent: false, hintLevel: Math.max(1, current.hintLevel) } : {}) };
+    if (answer.kind === 'choice') submitAnswer(next, answer);
+    else update(next);
   }
   function retry() {
     const current = active();
@@ -221,21 +233,26 @@ export function useLearningPractice(learning: ReturnType<typeof useLearningProgr
     if (current) options.onNext(current.exercise, current.source);
   }
   const lesson = session ? curriculumLessons.find(item => item.skillId === session.exercise.skillId) : undefined;
+  const introduction = session?.source === 'course' && !session.retryOf && lesson?.exercises[0]?.id === session.exercise.id
+    ? lesson.introduction : undefined;
   const guidance = useMemo(() => session ? getExerciseGuidance(session.exercise, session.moves, session.position, session.hintCount)
     : { hint: '', points: [] }, [session?.exercise, session?.moves, session?.position, session?.hintCount]);
   const instruction = session?.phase === 'demonstration' ? demonstration[session.demoIndex]?.text ?? ''
-    : session?.explanationVisible ? session.exercise.teachingNotes
+    : session?.explanationVisible ? session.grade?.explanation ?? session.exercise.teachingNotes
       ?? [lesson?.concept, lesson?.misconception, session.exercise.prompt].filter(Boolean).join('\n')
       : session?.observation || (session?.grade?.explanation ?? (session?.continuation || (lesson?.reviewStatus === 'source-adapted'
-          ? session?.exercise.prompt : [lesson?.concept, session?.exercise.prompt].filter(Boolean).join('\n'))));
+          ? introduction ? `- ${introduction}\n- ${session?.exercise.prompt}` : session?.exercise.prompt
+          : [lesson?.concept, session?.exercise.prompt].filter(Boolean).join('\n'))));
   const activeView = session ? {
     phase: session.phase, lastMove: session.position?.lastMove ?? null,
+    autoAdvance: session.source === 'course' && session.phase === 'feedback' && session.grade?.outcome === 'success'
+      && !session.explanationVisible && !session.observation,
     blackCaptures: session.position?.blackCaptures ?? 0, whiteCaptures: session.position?.whiteCaptures ?? 0,
     replyKey: session.replyKey, replyPreview: session.replyKey && session.position ? undoPosition(session.position, 1) : undefined,
     instruction: instruction ?? '',
     continueLabel: session.phase === 'demonstration'
       ? (session.demoIndex + 1 < demonstration.length ? '下一手' : '回到练习')
-      : session.grade?.outcome === 'success' ? '继续学习' : '再试一次',
+      : session.grade?.outcome === 'success' ? '下一题' : '重开',
     onContinue: continueLesson, onUndo: undo,
     onDemonstrate: demonstration.length ? showDemonstration : undefined,
     onReturnFromDemo: returnFromDemo, demoStep: session.demoIndex + 1, demoTotal: demonstration.length,
@@ -247,7 +264,7 @@ export function useLearningPractice(learning: ReturnType<typeof useLearningProgr
       : session.phase === 'practice' ? guidance.points : [],
     lessonProgress: lesson ? `第 ${curriculumLessons.indexOf(lesson) + 1} / ${curriculumLessons.length} 课 · 第 ${lesson.exercises.findIndex(item => item.id === session.exercise.id) + 1} / ${lesson.exercises.length} 题` : '我的复盘练习',
     turnLabel: session.phase === 'demonstration' ? '本题示范'
-      : session.grade?.outcome === 'success' ? '本题完成' : session.grade && ['point', 'sequence', 'variation'].includes(session.exercise.kind) ? '请重试或悔棋'
+      : session.grade?.outcome === 'success' ? '本题完成' : session.grade && ['point', 'sequence', 'variation'].includes(session.exercise.kind) ? '请重开或悔棋'
         : session.exercise.kind === 'choice' || session.exercise.kind === 'number' ? '观察棋盘后作答'
         : session.exercise.kind === 'action' ? session.exercise.action === 'remove' ? '点选死子' : '一起收官' : `你执${session.exercise.position?.currentPlayer === 'white' ? '白' : '黑'}`,
     lessonId: lesson?.id,

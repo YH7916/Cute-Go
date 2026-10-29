@@ -47,7 +47,7 @@ const schedule = createAiScheduler(async (msg, task) => {
         } else if (msg.type === 'reinit') {
             await lifecycle.ready(task);
         } else if (msg.type === 'compute') {
-            const { board: boardState, history: gameHistory, color, size, gameType = 'Go', komi, difficulty, temperature, mode = 'play', purpose, simulations } = msg.data;
+            const { board: boardState, history: gameHistory, color, size, gameType = 'Go', komi, difficulty, temperature, mode = 'play', purpose, simulations, coachFocusPoints } = msg.data;
             console.log(`[AI Worker] Compute Request Received. Type=${gameType}, Size=${size}, Diff=${difficulty}`);
 
             // ============================================================
@@ -70,7 +70,7 @@ const schedule = createAiScheduler(async (msg, task) => {
             }
 
             // ============================================================
-            // === GO SECTION — 围棋逻辑（ONNX推理 + MCTS搜索）===
+            // === GO SECTION — 对弈用模型策略，分析用共享搜索 ===
             // ============================================================
 
             // Fun 模式：用手写初学者 AI，不走 ONNX 模型
@@ -131,7 +131,8 @@ const schedule = createAiScheduler(async (msg, task) => {
                     effectiveKomi,
                     difficulty,
                     temperature,
-                    simulations
+                    simulations,
+                    purpose === 'coach' ? coachFocusPoints : undefined
                 );
 
                 const blackLead = (() => {
@@ -144,11 +145,13 @@ const schedule = createAiScheduler(async (msg, task) => {
                 const coachDetails = purpose === 'coach' ? {
                     purpose,
                     visits: analyzed.visits,
+                    ...(analyzed.coachPass ? { pass: analyzed.coachPass } : {}),
                     estimatedBlackLead: estimateLiveLead(boardState, analyzed.ownership, effectiveKomi, captures),
-                    candidates: analyzed.rankedMoves.filter(move => Number.isInteger(move.x) && Number.isInteger(move.y)
-                        && move.x >= 0 && move.y >= 0 && move.x < size && move.y < size
-                        && attemptMove(boardState, move.x, move.y, color, 'Go', previousHash))
-                        .slice(0, 3).map(move => ({ point: { x: move.x, y: move.y }, visits: move.vists })),
+                    candidates: [...analyzed.coachCandidates].sort((a, b) =>
+                        Number(!!coachFocusPoints?.some(point => point.x === b.point.x && point.y === b.point.y))
+                        - Number(!!coachFocusPoints?.some(point => point.x === a.point.x && point.y === a.point.y)))
+                        .filter(candidate => attemptMove(boardState, candidate.point.x, candidate.point.y, color, 'Go', previousHash))
+                        .slice(0, 3).sort((a, b) => b.visits - a.visits),
                 } : {};
 
                 task.reply({
@@ -165,15 +168,11 @@ const schedule = createAiScheduler(async (msg, task) => {
                 return;
             }
 
-            const searched = difficulty === 'Hard'
-                ? await runOwnershipSearch(engine, board, pla, historyMoves, size, effectiveKomi, difficulty, 0, simulations)
-                : null;
-            const result = searched ? {
-                ...searched.rootAnalysis,
-                moves: [...searched.rankedMoves, ...searched.rootAnalysis.moves.filter(m =>
-                    !searched.rankedMoves.some(r => r.x === m.x && r.y === m.y))]
-            } : await engine.analyze(board, pla, {
-                history: historyMoves, komi: effectiveKomi, difficulty, temperature
+            // Hard follows the model's legal policy order. A shallow value search
+            // must not replace its preferred move; stale temperatures cannot sample it.
+            const result = await engine.analyze(board, pla, {
+                history: historyMoves, komi: effectiveKomi, difficulty,
+                temperature: difficulty === 'Hard' ? 0 : temperature
             });
             console.log("[AI Worker] Analysis returned.");
 
@@ -181,6 +180,10 @@ const schedule = createAiScheduler(async (msg, task) => {
 
             // Normal Move Selection
             let selectedMove: Point | null | undefined = null;
+            // Pass is a legal model action. Hard must not fill territory just
+            // because the game has fewer than half a board's worth of moves.
+            const passAllowed = difficulty === 'Hard'
+                || canPass(size, gameHistory.length, gameHistory[gameHistory.length - 1]?.move === null);
 
             if (result.moves.length > 0) {
                 const validationBoard = boardState as BoardState;
@@ -195,14 +198,13 @@ const schedule = createAiScheduler(async (msg, task) => {
                 // Candidates list
                 let candidates = [...result.moves];
 
-                const passAllowed = canPass(size, gameHistory.length, gameHistory[gameHistory.length - 1]?.move === null);
                 if (!passAllowed) candidates = candidates.filter(m => m.x >= 0);
                 // Ownership predicts the outcome, not move legality; never delete tactical replies.
                 if (passAllowed && candidates[0]?.x === -1) {
                     selectedMove = null;
                 } else if (difficulty === 'Easy' || difficulty === 'Medium') {
                     selectedMove = selectMoveByDifficulty(candidates as RankedMove[], validationBoard, color, prevHash, difficulty);
-                } else if (temperature && temperature > 0) {
+                } else if (difficulty !== 'Hard' && temperature && temperature > 0) {
                     selectedMove = selectMoveByDifficulty(candidates as RankedMove[], validationBoard, color, prevHash, difficulty);
                 } else {
                     // Argmax (Iterate filtered+sorted candidates)
@@ -218,7 +220,7 @@ const schedule = createAiScheduler(async (msg, task) => {
                 selectedMove = null; // Pass
             }
 
-            if (selectedMove == null && !canPass(size, gameHistory.length, gameHistory[gameHistory.length - 1]?.move === null)) {
+            if (selectedMove == null && !passAllowed) {
                 const prevHash = gameHistory.length ? getBoardHash(gameHistory[gameHistory.length - 1].board) : null;
                 outer: for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
                     if (attemptMove(boardState as BoardState, x, y, color, 'Go', prevHash)) {

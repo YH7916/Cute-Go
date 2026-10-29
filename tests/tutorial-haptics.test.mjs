@@ -67,22 +67,16 @@ function setup(t, vibrate, onClose = () => {}, onExplore = () => {}, options = {
 function completeTutorial(s) {
   s.click('下一步'); // qi -> capture
   s.board().props.onIntersectionClick(0, 0); // wrong capture
-  s.board().props.onIntersectionClick(2, 3); // successful capture
+  s.board().props.onIntersectionClick(3, 4); // successful capture
   s.click('下一步'); // capture -> connection
-  s.click('下一步'); // connection -> escape
-  s.board().props.onIntersectionClick(2, 3);
-  s.click('下一步'); // escape -> connect
-  s.board().props.onIntersectionClick(2, 2);
-  s.click('下一步'); // connect -> capture group
-  s.board().props.onIntersectionClick(2, 3);
-  s.click('下一步'); // capture group -> forbidden
-  s.board().props.onIntersectionClick(2, 2);
-  s.click('下一步'); // forbidden -> ko
-  s.board().props.onIntersectionClick(2, 2);
-  assert.equal(s.board().props.currentPlayer, 'white');
-  s.board().props.onIntersectionClick(1, 2);
-  s.click('下一步'); // ko -> eyes
+  s.click('下一步'); // connection -> forbidden
   s.board().props.onIntersectionClick(3, 3);
+  s.click('下一步'); // forbidden -> ko
+  s.board().props.onIntersectionClick(8, 4);
+  assert.equal(s.board().props.currentPlayer, 'white');
+  s.board().props.onIntersectionClick(8, 3);
+  s.click('下一步'); // ko -> eyes
+  s.board().props.onIntersectionClick(4, 4);
   s.click('下一步'); // eyes -> endgame
   s.click('停着');
   s.click('下一步'); // endgame -> territory
@@ -97,8 +91,7 @@ test('tutorial feedback uses the supplied haptic callback for every teaching act
   const vibrate = pattern => patterns.push(pattern);
   const s = setup(t, vibrate);
   completeTutorial(s);
-  assert.deepEqual(patterns, [50, [20, 30, 20], [20, 30, 20], [20, 30, 20], [20, 30, 20],
-    200, [20, 30, 20], 200, [20, 30, 20], 20, 20, [20, 30, 20]]);
+  assert.deepEqual(patterns, [50, [20, 30, 20], 200, [20, 30, 20], 200, [20, 30, 20], 20, 20, [20, 30, 20]]);
   assert.deepEqual(s.nativeVibrations, [], 'tutorial must not bypass the application haptic preference');
 });
 
@@ -168,17 +161,17 @@ for (const destination of ['learning', 'local', 'online', 'ai', 'coach']) {
 
 test('opening a catalog lesson selects it and reopening clears its prior answer', t => {
   const s = setup(t, () => {}, () => {}, undefined, { initialStepId: 'beginner-capture' });
-  assert.equal(s.board().props.board[2][2].color, 'white');
-  s.board().props.onIntersectionClick(2, 3);
-  assert.equal(s.board().props.board[2][2], null);
+  assert.equal(s.board().props.board[3][3].color, 'white');
+  s.board().props.onIntersectionClick(3, 4);
+  assert.equal(s.board().props.board[3][3], null);
   s.setProps({ isOpen: false });
   assert.equal(s.render(), null);
   s.setProps({ isOpen: true });
-  assert.equal(s.board().props.board[2][2].color, 'white');
-  assert.equal(s.board().props.board[3][2], null);
+  assert.equal(s.board().props.board[3][3].color, 'white');
+  assert.equal(s.board().props.board[4][3], null);
   s.setProps({ initialStepId: 'beginner-two-eyes' });
-  assert.equal(s.board().props.board.length, 7);
-  assert.equal(s.board().props.board[3][3], null);
+  assert.equal(s.board().props.board.length, 9);
+  assert.equal(s.board().props.board[4][4], null);
   s.setProps({ initialStepId: 'missing-lesson' });
   assert.equal(s.board().props.board.length, 5);
   assert.equal(s.board().props.showQi, true);

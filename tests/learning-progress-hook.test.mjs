@@ -32,6 +32,9 @@ function attempt(overrides = {}) {
   return { attemptId: 'a1', skillId: 'go.liberties', exerciseId: 'e1', familyId: 'f1', contentRevision: 'v1',
     outcome: 'success', hintLevel: 0, occurredAt: 1000, source: 'practice', ...overrides };
 }
+function cursor(overrides = {}) {
+  return { exerciseId: 'e1', contentRevision: 'v1', completed: false, updatedAt: 1000, ...overrides };
+}
 function setup(t, initialOwner = 'guest') {
   storage.records.clear(); storage.reads.clear(); storage.writes.length = 0; storage.fail = false; storage.deleteGate = null;
   let owner = initialOwner;
@@ -184,4 +187,132 @@ test('memory work during protected deletion saves only after deletion actually s
   assert.equal(storage.records.get('guest').attempts[0].attemptId, 'during-deletion');
   assert.equal(host.render().saving, false);
   assert.equal(host.render().storageError, '');
+});
+
+test('opening a course cursor survives a fresh hook without attempts, exposure or shared input references', async t => {
+  const host = setup(t);
+  assert.equal(host.render().setCourseCursor(cursor()), false, 'loading cannot overwrite persisted progress');
+  await tick();
+  const input = cursor();
+  assert.equal(host.render().setCourseCursor(input), true);
+  input.exerciseId = 'mutated';
+  await tick();
+  assert.deepEqual(storage.records.get('guest'), {
+    version: 1, attempts: [], exposures: [], savedPositions: [], courseCursor: cursor(),
+  });
+  const old = host.render();
+  assert.deepEqual(Object.keys(old.progress), []);
+  assert.deepEqual(old.attemptedFamilyIds, []);
+  assert.deepEqual(old.exposedFamilyIds, []);
+  host.unmount();
+  assert.equal(old.setCourseCursor(cursor({ exerciseId: 'stale' })), false);
+  const reloaded = renderHook(() => useLearningProgress('guest'));
+  t.after(() => reloaded.unmount());
+  assert.equal(reloaded.render().loaded, false);
+  await tick();
+  assert.deepEqual(reloaded.render().courseCursor, cursor());
+  assert.equal(storage.writes.length, 1);
+});
+
+test('owner switching rejects old cursor callbacks during and after the next owner loads', async t => {
+  const host = setup(t, 'A');
+  host.render(); await tick();
+  const old = host.render();
+  assert.equal(old.setCourseCursor(cursor()), true);
+  let resolveB;
+  storage.reads.set('B', new Promise(resolve => { resolveB = resolve; }));
+  host.owner('B');
+  assert.equal(host.render().setCourseCursor(cursor()), false);
+  assert.equal(old.setCourseCursor(cursor({ exerciseId: 'stale' })), false);
+  resolveB(undefined); await tick();
+  assert.equal(host.render().courseCursor, undefined);
+  const next = cursor({ exerciseId: 'B-exercise' });
+  assert.equal(host.render().setCourseCursor(next), true);
+  assert.equal(old.setCourseCursor(cursor({ exerciseId: 'stale' })), false);
+  assert.deepEqual(host.render().courseCursor, next);
+  assert.deepEqual(storage.records.get('A').courseCursor, cursor());
+  assert.deepEqual(storage.records.get('B').courseCursor, next);
+  assert.deepEqual(storage.writes, ['A', 'B']);
+});
+
+test('course outcomes atomically update only a matching cursor in the same persisted record', async t => {
+  const host = setup(t);
+  host.render(); await tick();
+  const state = host.render();
+  state.setCourseCursor(cursor());
+  for (const [index, outcome] of ['success', 'failure', 'success', 'abandoned', 'success', 'unverified'].entries()) {
+    const input = attempt({ attemptId: `course-${index}`, source: 'course', outcome, occurredAt: 2000 + index });
+    const count = storage.writes.length;
+    assert.equal(state.recordAttempt(input), true);
+    assert.equal(storage.writes.length, count + 1, 'attempt and cursor use one commit');
+    const saved = storage.records.get('guest');
+    assert.deepEqual(saved.courseCursor, cursor({ completed: outcome === 'success', updatedAt: input.occurredAt }));
+    assert.equal(saved.attempts.at(-1).outcome, outcome);
+    assert.equal(saved.attempts.at(-1).sequence, index + 1, 'cursor writes do not consume evidence sequences');
+    assert.deepEqual(host.render().courseCursor, saved.courseCursor);
+  }
+  const before = state.exportBackup();
+  assert.equal(state.recordAttempt(attempt({ attemptId: 'course-0', source: 'course' })), false);
+  assert.equal(state.exportBackup(), before, 'duplicate attempts cannot change cursor completion');
+});
+
+test('practice, review, different course exercises and revisions cannot move or complete the course cursor', async t => {
+  const host = setup(t);
+  host.render(); await tick();
+  const state = host.render();
+  assert.equal(state.recordAttempt(attempt({ attemptId: 'before-cursor', source: 'course' })), true);
+  assert.equal(host.render().courseCursor, undefined, 'attempts do not invent a navigation cursor');
+  state.setCourseCursor(cursor());
+  for (const [index, context] of [
+    { source: 'practice' }, { source: 'review' }, { source: 'game' },
+    { source: 'course', exerciseId: 'different' }, { source: 'course', contentRevision: 'v2' },
+  ].entries()) {
+    assert.equal(state.recordAttempt(attempt({ attemptId: `unrelated-${index}`, occurredAt: 3000 + index, ...context })), true);
+    assert.deepEqual(host.render().courseCursor, cursor());
+    assert.deepEqual(storage.records.get('guest').courseCursor, cursor());
+  }
+  state.recordExposure({ ...attempt({ source: 'course' }), exposureId: 'hint', hintLevel: 1 });
+  assert.deepEqual(host.render().courseCursor, cursor());
+});
+
+test('invalid stored cursor protects the original data; explicit deletion clears the pointer and unlocks saves', async t => {
+  const host = setup(t);
+  const invalid = { version: 1, attempts: [], exposures: [], savedPositions: [], courseCursor: { ...cursor(), updatedAt: -1 } };
+  storage.records.set('guest', invalid);
+  host.render(); await tick();
+  assert.match(host.render().storageError, /暂停保存/);
+  assert.equal(host.render().setCourseCursor(cursor()), true);
+  assert.deepEqual(host.render().courseCursor, cursor());
+  assert.deepEqual(storage.records.get('guest'), invalid);
+  assert.equal(storage.writes.length, 0);
+  host.render().deleteProgress(); await tick();
+  assert.equal(host.render().courseCursor, undefined);
+  assert.equal(Object.hasOwn(JSON.parse(host.render().exportBackup()), 'courseCursor'), false);
+  assert.equal(storage.records.has('guest'), false);
+  assert.equal(host.render().setCourseCursor(cursor({ exerciseId: 'after-delete' })), true);
+  await tick();
+  assert.equal(storage.records.get('guest').courseCursor.exerciseId, 'after-delete');
+  assert.equal(host.render().storageError, '');
+});
+
+test('cursor imports choose newer timestamps and reject malformed updates without changing memory or storage', async t => {
+  const host = setup(t);
+  host.render(); await tick();
+  const state = host.render();
+  state.setCourseCursor(cursor());
+  const backup = JSON.parse(state.exportBackup());
+  for (const updatedAt of [1000, 999, 1001]) {
+    const incoming = cursor({ exerciseId: 'imported', completed: true, updatedAt });
+    state.importBackup(JSON.stringify({ ...backup, courseCursor: incoming }));
+    const expected = updatedAt > 1000 ? incoming : cursor();
+    assert.deepEqual(host.render().courseCursor, expected);
+    assert.deepEqual(storage.records.get('guest').courseCursor, expected);
+  }
+  const before = state.exportBackup();
+  const writes = storage.writes.length;
+  assert.throws(() => state.importBackup(JSON.stringify({ ...backup, courseCursor: null })));
+  assert.equal(state.setCourseCursor({ ...cursor(), completed: 'yes' }), false);
+  assert.equal(state.exportBackup(), before);
+  assert.equal(JSON.stringify(storage.records.get('guest')), JSON.stringify(JSON.parse(before)));
+  assert.equal(storage.writes.length, writes);
 });

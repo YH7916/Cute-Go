@@ -108,6 +108,15 @@ export async function verifyOnnxBrowser({ workerUrl, baseUrl = location.href, di
           && point.x >= 0 && point.x < size && point.y >= 0 && point.y < size
           && board[point.y][point.x] === null && Number.isInteger(candidate.visits) && candidate.visits >= 0;
       }), `${label}: invalid coach candidates`);
+      if (data.pass !== undefined) {
+        check(data.pass && Number.isInteger(data.pass.visits) && data.pass.visits >= 0
+          && data.pass.visits <= data.visits, `${label}: invalid pass visits`);
+        check(data.pass.prior === undefined || Number.isFinite(data.pass.prior)
+          && data.pass.prior >= 0 && data.pass.prior <= 1, `${label}: invalid pass prior`);
+        check(data.pass.visits === 0 ? data.pass.winRateBlack === undefined
+          : data.pass.winRateBlack === undefined || Number.isFinite(data.pass.winRateBlack)
+            && data.pass.winRateBlack >= 0 && data.pass.winRateBlack <= 100, `${label}: invalid pass value`);
+      }
     }
     report.cases.push({ label, requestId: message.requestId, generation: message.generation,
       size, difficulty: message.data.difficulty, mode, simulations: message.data.simulations,
@@ -117,12 +126,14 @@ export async function verifyOnnxBrowser({ workerUrl, baseUrl = location.href, di
       input: message.data, ownership: Array.from(data.ownership),
       ...(message.data.purpose === 'coach' ? {
         purpose: data.purpose, visits: data.visits, candidates: data.candidates,
+        ...(data.pass ? { pass: data.pass } : {}),
         estimatedBlackLead: data.estimatedBlackLead,
       } : {}),
     });
   }
   async function startCancelled(label) {
-    const message = compute(19, 'Hard', 'play', 32);
+    // Cancellation must exercise multi-visit analysis; Hard play is now a single inference.
+    const message = compute(19, 'Hard', 'analyze', 32);
     cancelled.set(message.requestId, { label, sent: false });
     send(message);
     await delay(40);

@@ -24,7 +24,8 @@ export interface ExerciseBase {
   refutations?: readonly ExerciseRefutation[];
 }
 export type Exercise = ExerciseBase & (
-  | { kind: 'choice'; choices: readonly { id: string; label: string }[]; correctChoiceId: string; correctChoiceIds?: readonly string[] }
+  | { kind: 'choice'; choices: readonly { id: string; label: string }[]; correctChoiceId: string; correctChoiceIds?: readonly string[];
+    wrongAnswerExplanation?: string }
   | { kind: 'point'; position: GamePosition; rubric:
     | { kind: 'capture'; minimum: number }
     | { kind: 'connect'; anchors: readonly [Point, Point] }

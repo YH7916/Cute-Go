@@ -4,6 +4,7 @@ import { GameBoard } from './GameBoard';
 import { calculateBoardConstants } from './board/geometry';
 import { TutorialGuide, type TutorialDestination } from './TutorialGuide';
 import type { TutorialContent } from './app/AppViewModel';
+import { renderTextBlocks } from '../ui/common';
 
 interface TutorialModalProps {
     isOpen: boolean;
@@ -159,9 +160,9 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({
                                 {isCompleted && !isGuide && <CheckCircle2 size={24} className="text-green-500 animate-in zoom-in spin-in shrink-0" />}
                             </h3>
                         </div>
-                        <p className="text-[#8c6b38] text-sm leading-relaxed font-medium whitespace-pre-wrap">
-                            {feedback || (isInfoPage && !onExplore ? '基础规则就到这里。返回课程目录，继续学习下一项。' : step.content)}
-                        </p>
+                        <div className="text-[#8c6b38] text-sm leading-relaxed font-medium whitespace-pre-wrap">
+                            {renderTextBlocks(feedback || (isInfoPage && !onExplore ? '基础规则先讲到这里。返回课程目录，继续学习。' : step.content))}
+                        </div>
                     </div>
 
                     {/* Board Area */}

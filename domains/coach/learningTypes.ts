@@ -29,11 +29,18 @@ export interface SavedLearningPosition {
   skillId?: string;
   createdAt: number;
 }
+export interface LearningCourseCursor {
+  exerciseId: string;
+  contentRevision: string;
+  completed: boolean;
+  updatedAt: number;
+}
 export interface LearningRecord {
   version: 1;
   attempts: LearningAttempt[];
   exposures: LearningExposure[];
   savedPositions: SavedLearningPosition[];
+  courseCursor?: LearningCourseCursor;
 }
 export interface SkillProgress {
   skillId: string;

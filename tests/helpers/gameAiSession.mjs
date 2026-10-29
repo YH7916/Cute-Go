@@ -1,12 +1,13 @@
 import { loadTestModule } from './loadTestModule.mjs';
 
-const { useGameState, useGameAiSession, useGameReview, useGameFlow, createInitialPosition, recordMove, renderHook } = await loadTestModule({
+const { useGameState, useGameAiSession, useGameReview, useGameFlow, useResetGameAction, createInitialPosition, recordMove, renderHook } = await loadTestModule({
   reactHost: true,
   contents: `
     export { useGameState } from './hooks/useGameState';
     export { useGameAiSession } from './hooks/useGameAiSession';
     export { useGameReview } from './hooks/useGameReview';
     export { useGameFlow } from './hooks/useGameFlow';
+    export { useResetGameAction } from './hooks/gameActions/useResetGameAction';
     export { createInitialPosition, recordMove } from './domains/game/positionState';
     export { renderHook } from './tests/helpers/reactHooks';
   `,
@@ -32,21 +33,28 @@ export function setupAiSession(t, withGameFlow = false) {
     const state = useGameState(9);
     const ai = useGameAiSession({ boardSize: 9, gameState: state,
       executeMoveRef: { current: (...args) => moves.push(args) }, handlePassRef: { current: () => moves.push('pass') },
-      endGameRef: { current: (...args) => endings.push(args) }, setToastMsg: message => errors.push(message), setShowPassModal() {},
+      endGameRef: { current: (...args) => endings.push(args) }, setToastMsg: message => errors.push(message),
     });
     const review = useGameReview({ gameState: state, gameType: 'Go', showTerritory: options.showTerritory,
       ownerScopeId: options.ownerScopeId, engine: ai.webAiEngine });
     options.onReviewRender?.(review);
     const engine = ai.webAiEngine;
+    const noop = () => {};
+    const resetGame = useResetGameAction({
+      ...ai, gameState: state, settings: { boardSize: 9, setBoardSize: noop },
+      boardSizeRef: { current: 9 }, onlineStatusRef: { current: 'disconnected' },
+      sendData: async () => true, cleanupOnline: noop,
+      setEloDiffStyle: noop, setEloDiffText: noop, setMyColor: noop, setShowMenu: noop,
+    });
     const flow = withGameFlow ? useGameFlow({
       settings: { boardSize: 9, gameType: 'Go', gameMode: 'PvAI', difficulty: 'Fun', userColor: 'black', showWinRate: false },
-      gameState: state, isThinking: ai.isThinking, setIsThinking: ai.setIsThinking,
-      showStartScreen: false, showPassModal: false, aiTimerRef: ai.aiTimerRef, aiTurnLock: ai.aiTurnLock,
+      gameState: state,
+      showStartScreen: false, aiTimerRef: ai.aiTimerRef, aiTurnLock: ai.aiTurnLock,
       webAi: { isWorkerReady: engine.isWorkerReady, isWebLoading: engine.isLoading, isWebThinking: engine.isThinking,
         isWebInitializing: engine.isInitializing, webWinRate: engine.aiWinRate, webLead: engine.aiLead,
         webTerritory: engine.aiTerritory, stopWebThinking: engine.stopThinking, requestWebAiMove: engine.requestWebAiMove },
     }) : null;
-    return { state, ...ai, review, flow };
+    return { state, ...ai, review, flow, resetGame };
   });
   t.after(() => {
     host.unmount();
@@ -66,4 +74,3 @@ export function setupAiSession(t, withGameFlow = false) {
 }
 
 export { createInitialPosition, recordMove };
-

@@ -36,7 +36,6 @@ export function setupGameFlow(t, { gameType = 'Go', boardSize = 9 } = {}) {
   const executeMoveRef = { current: noop }, handlePassRef = { current: noop }, endGameRef = { current: noop };
   const boardSizeRef = { current: boardSize }, gameTypeRef = { current: gameType };
   let showStartScreen = true;
-  let showPassModal = false;
   const settings = {
     boardSize, gameType, gameMode: 'PvP', difficulty: 'Fun', userColor: 'black', showWinRate: false, coachMode: false,
     setBoardSize: value => { settings.boardSize = value; boardSizeRef.current = value; },
@@ -51,12 +50,10 @@ export function setupGameFlow(t, { gameType = 'Go', boardSize = 9 } = {}) {
     const ai = useGameAiSession({ boardSize: settings.boardSize, gameState: state,
       executeMoveRef, handlePassRef, endGameRef,
       setToastMsg: message => { if (message) errors.push(message); },
-      setShowPassModal: value => { showPassModal = value; },
     });
     const engine = ai.webAiEngine;
     const flow = useGameFlow({
-      settings, gameState: state, showStartScreen, showPassModal,
-      isThinking: ai.isThinking, setIsThinking: ai.setIsThinking,
+      settings, gameState: state, showStartScreen,
       aiTimerRef: ai.aiTimerRef, aiTurnLock: ai.aiTurnLock,
       webAi: { isWorkerReady: engine.isWorkerReady, isWebLoading: engine.isLoading,
         isWebThinking: engine.isThinking, isWebInitializing: engine.isInitializing,
@@ -66,15 +63,15 @@ export function setupGameFlow(t, { gameType = 'Go', boardSize = 9 } = {}) {
     const actions = useGameActions({
       settings, gameState: state, boardSizeRef, gameTypeRef,
       aiTimerRef: ai.aiTimerRef, aiTurnLock: ai.aiTurnLock, pendingEndGameRef: ai.pendingEndGameRef,
-      isThinking: flow.showThinkingStatus, isWebThinking: engine.isThinking, isWorkerReady: engine.isWorkerReady,
+      isWebThinking: engine.isThinking, isWorkerReady: engine.isWorkerReady,
       displayTerritory: flow.displayTerritory, requestAnalysis: engine.requestAnalysis,
-      webAiEngine: engine, stopWebThinking: engine.stopThinking, setIsThinking: ai.setIsThinking,
+      webAiEngine: engine, stopWebThinking: engine.stopThinking,
       onlineStatus: 'disconnected', onlineStatusRef: { current: 'disconnected' },
       myColor: null, myColorRef: { current: null }, session: null, userProfile: null, opponentProfile: null,
       sendData: async () => true, fetchProfile: async () => {},
       checkMoveAchievements: noop, checkEndGameAchievements: noop, cleanupOnline: noop,
-      clearInitialStones: noop, setEloDiffStyle: noop, setEloDiffText: noop,
-      setMyColor: noop, setShowMenu: noop, setShowPassModal: value => { showPassModal = value; },
+      setEloDiffStyle: noop, setEloDiffText: noop,
+      setMyColor: noop, setShowMenu: noop,
       playSfx: value => sounds.push(value), vibrate: noop,
     });
     executeMoveRef.current = actions.executeMove;

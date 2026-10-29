@@ -14,6 +14,7 @@ export type CurriculumSection = string;
 export interface CurriculumLesson {
   id: string; skillId: string; section: CurriculumSection; title: string;
   concept: string; example: string; misconception: string; prerequisites: readonly string[];
+  introduction?: string;
   contentRevision: string; reviewStatus: 'original-draft' | 'source-adapted'; exercises: readonly Exercise[];
   validation: 'rules-checked'; demonstration: LessonDemonstration; sources: readonly LessonSource[];
 }
