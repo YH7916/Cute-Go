@@ -27,6 +27,8 @@ key 默认仅保存在当前打开期间；主动勾选“记住”才写入本�
 
 ## 配置与部署
 
+GitHub Pages 对应的阿里云服务、HTTPS 入口和运维方式见 [阿里云部署](deploy-aliyun.md)。前端构建从 GitHub 仓库变量读取公开的 `VITE_COACH_ENDPOINT`；后台服务与模型凭证仍分别管理。
+
 | 后台变量 | 用途 |
 | --- | --- |
 | `COACH_HOST` / `COACH_PORT` | 默认 `127.0.0.1` / `8787` |

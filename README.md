@@ -35,9 +35,9 @@
 
 在线体验：[GitHub Pages](https://yh7916.github.io/Cute-Go/)。推送 `main` 后，现有 Quality 工作流在 Windows 与 Ubuntu 的 `npm run check` 全部通过后自动部署已检查的 `dist/`。项目路径沿用 Vite 相对资源路径；模型、WASM 与 Service Worker 随前端发布。
 
-GitHub Pages 只托管静态前端，不运行 `dist-server/` 的 Pi 后台；未配置独立 HTTPS 后台时使用本地讲解。后台部署与 `VITE_COACH_ENDPOINT` 配置见 [Pi 后台文档](docs/pi-coach-backend.md)。
+GitHub Pages 托管静态前端，独立 Pi 后台部署在阿里云，网页预设后台地址；玩家选择服务商、模型并填写自己的 API key 后可请求云讲解，未填写时继续本地讲解。运维及验证边界见 [阿里云部署](docs/deploy-aliyun.md)，协议见 [Pi 后台文档](docs/pi-coach-backend.md)。
 
-CuteGo 让新手在实际落子中理解围棋。原新手教学帮助熟悉规则，结束后可自由选择模式；“进阶教学”直接练习局面决策、按需看示范，“陪我下棋”围绕真实对局给提示。教学与陪练拥有独立局面，共享棋盘、角色和气泡；默认云服务未配置。
+CuteGo 让新手在实际落子中理解围棋。原新手教学帮助熟悉规则，结束后可自由选择模式；“进阶教学”直接练习局面决策、按需看示范，“陪我下棋”围绕真实对局给提示。教学与陪练拥有独立局面，共享棋盘、角色和气泡；网页版已预设云讲解后台，模型 key 由玩家自行填写。
 
 项目使用 **React** 构建棋盘交互。围棋挑战 AI 在浏览器 Worker 中通过 **ONNX Runtime / WASM** 本地推理；AI 陪练的启蒙对手与五子棋使用规则和搜索算法。Capacitor 用于原生封装，当前仓库的 Web 验收与 Android/TapTap 原生验收分别进行。
 

@@ -18,6 +18,8 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    env:
+      VITE_COACH_ENDPOINT: ${{ vars.VITE_COACH_ENDPOINT }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
