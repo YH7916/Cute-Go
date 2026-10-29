@@ -153,7 +153,7 @@ test('HTTP timeout aborts the runner and keeps its concurrency slot until work a
     return { text: 'ok' };
   } });
   const timedOut = await post(url);
-  assert.equal(timedOut.status, 504);
+  assert.equal(timedOut.status, 424);
   assert.equal((await timedOut.json()).code, 'timeout');
   assert.equal(firstSignal.aborted, true);
   assert.equal((await post(url)).status, 429);
@@ -166,7 +166,7 @@ test('slow request bodies share the timeout and never begin a late Pi call', asy
   let calls = 0;
   const url = await listen(t, { timeoutMs: 35, runReply: async () => { calls++; return { text: 'ok' }; } });
   const response = await rawPost(url, ['{"evidence":'], {}, false);
-  assert.equal(response.status, 504);
+  assert.equal(response.status, 424);
   assert.equal(calls, 0);
   assert.equal((await post(url)).status, 200);
 });
@@ -238,11 +238,25 @@ test('HTTP errors and malformed provider results cannot expose secrets or intern
   for (const mode of ['error', 'limit', 'empty', 'oversized']) {
     result = mode;
     const response = await post(url);
-    assert.equal(response.status, 502);
+    assert.equal(response.status, 424);
     const body = await response.text();
     assert.doesNotMatch(body, /synthetic-server-secret|private path|xxx/);
     if (mode === 'error') assert.match(body, /请检查模型、API key 和额度后重试/);
   }
+});
+
+test('provider failures retain CORS JSON with 424 instead of a CDN gateway error page', async t => {
+  const origin = 'https://yh7916.github.io';
+  const url = await listen(t, { allowedOrigin: origin, runReply: async () => {
+    throw Object.assign(new Error('synthetic-provider-secret'), { code: 'upstream_error' });
+  } });
+  const response = await post(url, input, { Origin: origin });
+  assert.equal(response.status, 424);
+  assert.equal(response.headers.get('access-control-allow-origin'), origin);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await response.json(), {
+    code: 'upstream_error', error: '模型服务暂不可用，请检查模型、API key 和额度后重试。',
+  });
 });
 
 test('server configuration ignores removed credentials and validates only listener and origin settings', () => {

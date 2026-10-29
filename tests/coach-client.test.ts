@@ -54,13 +54,13 @@ test('choosing OpenAI changes only the submitted model configuration, never the 
 });
 
 test('HTTP failures expose only local messages and never read server error details', async t => {
-  for (const status of [401, 403, 429, 500, 502]) {
+  for (const status of [401, 403, 424, 429, 500, 502]) {
     t.mock.method(globalThis, 'fetch', async () => new Response(`server leaked ${config.apiKey}`, { status }));
     await assert.rejects(requestCoachReply({ config, evidence }), error => {
       assert.ok(error instanceof Error);
       assert.ok(!error.message.includes(config.apiKey));
       assert.ok(!error.message.includes('server leaked'));
-      if (status === 502) assert.equal(error.message, '模型服务暂不可用，请检查模型、API key 和额度后重试。');
+      if (status === 424 || status === 502) assert.equal(error.message, '模型服务暂不可用，请检查模型、API key 和额度后重试。');
       return true;
     });
   }

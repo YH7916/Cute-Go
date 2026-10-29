@@ -85,7 +85,7 @@ export async function requestCoachReply({ config, evidence, question = '', signa
       void response.body?.cancel().catch(() => undefined);
       if (response.status === 401 || response.status === 403) throw new CoachServiceError('服务未授权，请检查所选服务商的 API 密钥及模型权限。');
       if (response.status === 429) throw new CoachServiceError('讲解服务繁忙，请稍后重试。');
-      if (response.status === 502) throw new CoachServiceError('模型服务暂不可用，请检查模型、API key 和额度后重试。');
+      if (response.status === 424 || response.status === 502) throw new CoachServiceError('模型服务暂不可用，请检查模型、API key 和额度后重试。');
       throw new CoachServiceError(`讲解服务暂不可用（HTTP ${response.status}），请检查后台状态后重试。`);
     }
     const reply = parseReply(await readPayload(response, controller.signal), checked.apiKey);

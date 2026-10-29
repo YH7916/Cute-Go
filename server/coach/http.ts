@@ -87,14 +87,15 @@ function readRequest(request: IncomingMessage, signal: AbortSignal): Promise<Coa
 }
 
 function reportError(response: ServerResponse, error: unknown, timedOut: boolean) {
-  if (timedOut) { fail(response, 504, 'timeout', '讲解请求超时，请稍后重试。'); return; }
+  // Handled execution failures use 424: CDN gateway pages can replace 502/504 and strip CORS/JSON.
+  if (timedOut) { fail(response, 424, 'timeout', '讲解请求超时，请稍后重试。'); return; }
   if (error instanceof HttpError) { fail(response, error.status, error.code, error.message); return; }
   const code = record(error) && typeof error.code === 'string' ? error.code : '';
   if (code === 'invalid_request') fail(response, 400, code, '局面证据格式不正确。');
-  else if (code === 'timeout') fail(response, 504, code, '讲解请求超时，请稍后重试。');
-  else if (code === 'limit_exceeded') fail(response, 502, code, '本次讲解已达到执行上限，请缩小问题范围。');
+  else if (code === 'timeout') fail(response, 424, code, '讲解请求超时，请稍后重试。');
+  else if (code === 'limit_exceeded') fail(response, 424, code, '本次讲解已达到执行上限，请缩小问题范围。');
   else if (code === 'aborted') fail(response, 499, code, '讲解已取消。');
-  else fail(response, 502, 'upstream_error', '模型服务暂不可用，请检查模型、API key 和额度后重试。');
+  else fail(response, 424, 'upstream_error', '模型服务暂不可用，请检查模型、API key 和额度后重试。');
 }
 
 /** The HTTP lifetime owns one Pi request; user credentials remain header-only and request-local. */
@@ -148,7 +149,7 @@ export function createCoachHttpServer(options: CoachHttpOptions) {
     try {
       const result = await Promise.race([work, interrupted]);
       if (!result || typeof result.text !== 'string' || !result.text.trim() || Buffer.byteLength(result.text) > 16384) {
-        throw new HttpError(502, 'invalid_response', '讲解服务返回了无效内容。');
+        throw new HttpError(424, 'invalid_response', '讲解服务返回了无效内容。');
       }
       if (!response.destroyed && !controller.signal.aborted) {
         response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });

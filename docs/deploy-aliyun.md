@@ -7,7 +7,7 @@
 - SSH：`ssh aliyun`；独立服务 `cute-go-coach.service`。
 - HTTPS 复用服务器已有 Cloudflare Tunnel，转发至 `http://localhost:80`；Pi 只监听 `127.0.0.1:80`，没有新增公网监听。
 - 独立 Node.js 22.23.4：`/opt/cute-go/node/bin/node`；保留系统 Node 18 及其他服务。
-- 发布目录：`/opt/cute-go/releases/20261030-891184e`，`/opt/cute-go/current` 指向当前版本。
+- 发布目录：`/opt/cute-go/releases/20261030-cors-errors`，`/opt/cute-go/current` 指向当前版本；上一版 `20261030-891184e` 保留供回退。
 
 ## 启动与运维
 
@@ -34,5 +34,7 @@ systemd 的 `WorkingDirectory` 使用当前发布链接，`ExecStart` 使用相�
 ## 部署验证及边界
 
 本次已观察到：systemd 为 active/running，绑定 `127.0.0.1:80`；公网允许来源的 OPTIONS 返回 204，携带 `Access-Control-Allow-Origin: https://yh7916.github.io`；无 key 的 POST 返回 401，其他来源返回 403；服务器可直连 DeepSeek API，未鉴权访问返回 401。
+
+公网代理曾将应用的 502 替换成无 CORS 头的错误页。回归先复现前后端契约失败，再将已处理执行错误改为 424；原超时取消、并发占位和脱敏断言保留。全量 1417 项测试通过。从真实 GitHub Pages 页面发起的无 key 请求返回可读 401 JSON，合成无效 key 请求经 Pi 返回可读 424 `upstream_error` JSON；服务无重启。该合成 key 不产生有效模型生成或付费调用。
 
 这些检查证明部署、HTTPS、跨域和鉴权边界，不证明有效 key 的模型生成。本轮未使用真实付费 key 发起讲解；其他服务商的可达性与模型兼容性仍须分别验收。当前模型接入范围和并发/超时限制见 [Pi 后台文档](pi-coach-backend.md)。

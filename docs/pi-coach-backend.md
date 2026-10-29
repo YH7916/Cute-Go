@@ -42,6 +42,8 @@ GitHub Pages 对应的阿里云服务、HTTPS 入口和运维方式见 [阿里�
 
 `POST /api/coach`，`Content-Type: application/json`，必须携带 `Authorization: Bearer <用户的模型API-key>`。不再使用后台共享令牌。
 
+已处理的模型调用失败、执行超时、调用上限与无效输出返回 HTTP 424，并保留固定脱敏 JSON `code` 和 CORS 头；避免公网代理将应用的 502/504 替换成不带跨域头的网关错误页。401/403/400/429 等鉴权、输入和并发拒绝状态保持独立。
+
 ```json
 {"provider":"deepseek","model":"deepseek-flash","evidence":{"boardSize":9,"boardRows":["…"]},"question":"为什么先观察角部？"}
 ```
