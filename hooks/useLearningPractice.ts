@@ -76,11 +76,13 @@ export function useLearningPractice(learning: ReturnType<typeof useLearningProgr
   }
   function clear() { update(null); }
   function demonstrate(current: PracticeSession) {
-    if (!demonstration.length) return;
+    const firstStep = demonstration[1];
+    if (!firstStep) return;
     if (!learning.recordExposure({ ...context(current), hintLevel: 3, exposureId: crypto.randomUUID(), attemptId: current.attemptId })) {
       options.onMessage('示范尚未记入学习记录，请稍后再试。'); return;
     }
-    update({ ...current, phase: 'demonstration', demoIndex: 0, position: demonstration[0].position,
+    // Show a worked step immediately; the unchanged root remains available via undo.
+    update({ ...current, phase: 'demonstration', demoIndex: 1, position: firstStep.position,
       hintLevel: 3, eligibleIndependent: false, grade: null, demoReturn: current, observation: '', focusPoint: undefined, replyKey: undefined });
   }
   function showDemonstration() {

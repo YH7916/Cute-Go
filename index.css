@@ -24,7 +24,8 @@
 
 @font-face {
   font-family: "GenSenRounded";
-  src: url("/GenSenRounded2PJP-M.otf") format("opentype");
+  src: url("./ui/fonts/GenSenRounded2PJP-M.woff2") format("woff2");
+  font-display: swap;
   font-weight: normal;
   font-style: normal;
 }

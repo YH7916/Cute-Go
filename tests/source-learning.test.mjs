@@ -161,6 +161,8 @@ test('source demonstration returns to the exact ongoing branch including capture
   host.render().view.active.onPoint(1, 2);
   const before = host.render().view.active;
   before.onDemonstrate();
+  assert.equal(host.render().view.active.board[2][1]?.color, 'black', 'the first source move is shown immediately');
+  host.render().view.active.onUndo();
   assert.equal(host.render().view.active.board, variation.position.board);
   host.render().view.active.onContinue();
   host.render().view.active.onContinue();

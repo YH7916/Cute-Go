@@ -127,7 +127,11 @@ for (const exercise of [capture, sequence]) test(`${exercise.kind}: real stopped
   button(tree, '示范').props.onClick();
   tree = refresh();
   assert.equal(input.phase, 'demonstration');
-  assert.equal(input.board, exercise.position.board);
+  assert.equal(input.board[2][1]?.color, 'black', 'clicking demonstration immediately shows the worked move');
+  assert.equal(input.board[1][1], null, 'the first move visibly captures the target');
+  button(tree, '上一手').props.onClick();
+  tree = refresh();
+  assert.equal(input.board, exercise.position.board, 'the starting diagram remains accessible');
   button(tree, '下一手').props.onClick();
   tree = refresh();
   button(tree, '返回练习').props.onClick();

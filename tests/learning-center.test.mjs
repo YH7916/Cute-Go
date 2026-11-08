@@ -99,9 +99,7 @@ test('demonstration uses this exercise and can return to an in-progress snapshot
   const before = host.render().view.active.board;
   host.render().view.active.onDemonstrate();
   let active = host.render().view.active;
-  assert.equal(active.board, sequence.position.board);
-  active.onContinue();
-  active = host.render().view.active;
+  assert.equal(active.demoStep, 2, 'the first worked step follows the original diagram');
   assert.equal(active.board[2][1].color, 'black');
   assert.equal(active.board[4][4], null, 'opponent move is shown as its own step');
   active.onUndo();

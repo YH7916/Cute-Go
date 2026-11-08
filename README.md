@@ -98,6 +98,10 @@ npm ci
 
 ```
 
+发布字体使用 `ui/fonts/GenSenRounded2PJP-M.woff2`，包含界面、课程字形和 GB2312 常用字；其余字形由系统字体补足。原始字体存于 `third_party/fonts/`，不随 H5 包体分发；`font-display: swap` 允许下载期间立即显示系统字体，Vite 为发布字体生成内容哈希以更新缓存。
+
+更新文案或课程后，可用 `uv run --with fonttools --with brotli python scripts/prepare-webfont.py` 重建并校验字形覆盖与字宽，再运行 `npm run check`。已生成的 WOFF2 随源码保存，常规 Node 构建不依赖 Python。
+
 ### 3. 开发模式运行
 
 ```bash
