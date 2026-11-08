@@ -27,13 +27,12 @@ key 默认仅保存在当前打开期间；主动勾选“记住”才写入本�
 
 ## 配置与部署
 
-Cloudflare Pages 与 GitHub Pages 共用的阿里云服务、HTTPS 入口和运维方式见 [阿里云部署](deploy-aliyun.md)。前端构建从部署环境读取公开的 `VITE_COACH_ENDPOINT`；后台服务与模型凭证仍分别管理。
+GitHub Pages 对应的阿里云服务、HTTPS 入口和运维方式见 [阿里云部署](deploy-aliyun.md)。前端构建从 GitHub 仓库变量读取公开的 `VITE_COACH_ENDPOINT`；后台服务与模型凭证仍分别管理。
 
 | 后台变量 | 用途 |
 | --- | --- |
 | `COACH_HOST` / `COACH_PORT` | 默认 `127.0.0.1` / `8787` |
 | `COACH_ALLOWED_ORIGIN` | 浏览器调用时必配的一个前端 origin，例如 `https://game.example.com`，无路径、尾斜杠或通配符；同源部署也须明确配置 |
-| `COACH_ALLOWED_ORIGINS` | 可选的逗号分隔来源列表，与单来源设置合并；每项同样要求完整 HTTP(S) origin，拒绝空项、路径和通配符 |
 
 `npm run build` 顺序构建前端 `dist/` 与后台 `dist-server/main.mjs`。静态站点只部署 `dist/`；Node 服务部署 `dist-server/`、`package.json`、`package-lock.json`，执行 `npm ci --omit=dev` 后启动。后台从进程环境或工作目录下被 Git 忽略的 `.env.coach.local` 读取监听配置；生产环境优先使用部署平台的环境变量。HTTPS 由部署平台或反向代理提供。任何 key 都不得作为 `VITE_*` 注入前端构建。
 

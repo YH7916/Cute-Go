@@ -135,36 +135,6 @@ test('default HTTP CORS rejects another browser origin without an explicit allow
   assert.throws(() => createCoachHttpServer({ runReply: async () => ({ text: 'ok' }), allowedOrigin: '*' }));
 });
 
-test('deployed Cloudflare frontends and the existing GitHub frontend each receive their own explicit CORS origin', async t => {
-  let calls = 0;
-  const url = await listen(t, { allowedOrigin: 'https://yh7916.github.io',
-    allowedOrigins: ['https://yesterhaze.codes', 'https://cute-go.pages.dev'],
-    runReply: async () => { calls++; return { text: 'ok' }; } });
-  for (const origin of ['https://yh7916.github.io', 'https://yesterhaze.codes', 'https://cute-go.pages.dev']) {
-    const response = await fetch(url, { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'POST' } });
-    assert.equal(response.status, 204, origin);
-    assert.equal(response.headers.get('access-control-allow-origin'), origin);
-  }
-  for (const origin of ['https://evil.example', 'https://yesterhaze.codes.evil.example', 'null']) {
-    assert.equal((await post(url, input, { Origin: origin })).status, 403);
-  }
-  assert.equal((await post(url, input, { Origin: 'https://yesterhaze.codes', Authorization: '' })).status, 401);
-  assert.equal(calls, 0, 'origin approval does not bypass API-key checks or make preflight calls billable');
-});
-
-test('plural origin configuration preserves strict URL validation and the single-origin deployment setting', () => {
-  const config = readCoachServerConfig({ COACH_ALLOWED_ORIGIN: 'https://yh7916.github.io',
-    COACH_ALLOWED_ORIGINS: ' https://yesterhaze.codes, https://cute-go.pages.dev ' });
-  assert.equal(config.allowedOrigin, 'https://yh7916.github.io');
-  assert.deepEqual(config.allowedOrigins, ['https://yesterhaze.codes', 'https://cute-go.pages.dev']);
-  for (const value of ['', '*', 'null', 'https://game.example/path', 'https://game.example,']) {
-    assert.throws(() => readCoachServerConfig({ COACH_ALLOWED_ORIGINS: value }));
-  }
-  for (const origin of ['', '*', 'null', 'https://game.example/path']) {
-    assert.throws(() => createCoachHttpServer({ runReply: async () => ({ text: 'ok' }), allowedOrigins: [origin] }));
-  }
-});
-
 test('Host cannot authorize an unlisted browser origin even with a user model key', async t => {
   let calls = 0;
   const url = await listen(t, { allowedOrigin: 'http://localhost:3001', runReply: async () => { calls++; return { text: 'ok' }; } });

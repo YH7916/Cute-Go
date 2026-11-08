@@ -1,8 +1,8 @@
 # 阿里云 Pi 后台部署
 
-更新：2026-11-08。
+更新：2026-10-30。
 
-- 前端：`https://yesterhaze.codes/`（Cloudflare Pages）；同项目地址 `https://cute-go.pages.dev/`，GitHub Pages 备用地址 `https://yh7916.github.io/Cute-Go/`。
+- 前端：`https://yh7916.github.io/Cute-Go/`。
 - 后台：`https://hutao.yesterhaze.codes/api/coach`。
 - SSH：`ssh aliyun`；独立服务 `cute-go-coach.service`。
 - HTTPS 复用服务器已有 Cloudflare Tunnel，转发至 `http://localhost:80`；Pi 只监听 `127.0.0.1:80`，没有新增公网监听。
@@ -29,7 +29,7 @@ systemd 的 `WorkingDirectory` 使用当前发布链接，`ExecStart` 使用相�
 4. 修改服务定义时先执行 `systemd-analyze verify`，再安装 unit 并 `systemctl daemon-reload`。
 5. 验证本机监听、公网 HTTPS 及 CORS。失败时将 `current` 恢复至已记录的旧目录并重启。
 
-Cloudflare Pages 的生产、预览环境及 GitHub 仓库变量均配置 `VITE_COACH_ENDPOINT` 为上述完整后台地址。Cloudflare 构建命令为 `npm run check`；GitHub Quality 工作流两端检查通过后再部署 GitHub Pages。这个变量是公开 URL，不是密钥。后台通过 `COACH_ALLOWED_ORIGIN` / `COACH_ALLOWED_ORIGINS` 精确允许三个前端来源，按实际请求来源返回 CORS 头。后台版本通过 SSH 单独发布，推送 GitHub 不会自动改动服务器。
+前端 Quality 工作流读取 GitHub 仓库变量 `VITE_COACH_ENDPOINT`，值为上述完整后台地址；两端检查通过后再部署 Pages。这个变量是公开 URL，不是密钥。后台版本通过 SSH 单独发布，推送 GitHub 不会自动改动服务器。
 
 ## 部署验证及边界
 

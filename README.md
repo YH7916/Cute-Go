@@ -2,7 +2,7 @@
 
 围棋与五子棋小游戏，提供本地双人、AI 对战、围棋课堂、复盘和 AI 陪练。
 
-[在线体验](https://yesterhaze.codes/) · [Cloudflare 地址](https://cute-go.pages.dev/) · [第三方内容与许可](THIRD_PARTY_NOTICES.md)
+[在线体验](https://yh7916.github.io/Cute-Go/) · [第三方内容与许可](THIRD_PARTY_NOTICES.md)
 
 围棋 AI 在浏览器 Worker 中通过 ONNX Runtime / WASM 本地推理；启蒙对手和五子棋使用规则及搜索。课堂复用真实规则与固定来源题目，保留独立作答、辅助曝光和续学记录。云讲解经独立 Pi 后台执行，玩家自行选择模型服务商并提供 API key；未配置时继续使用本地讲解。
 
@@ -28,7 +28,7 @@ git diff --check
 
 ## 发布
 
-Cloudflare Pages 连接 `main`，以 `npm run check` 检查并部署 `dist/`；生产和预览环境都配置公开的 `VITE_COACH_ENDPOINT`。GitHub Pages 备用入口仍由 Quality 工作流在 Windows、Ubuntu 两端检查通过后部署，并读取同名仓库变量。TapTap H5 包也应以同一公开地址构建；模型 API key 不放入构建变量。
+`main` 推送通过 Windows、Ubuntu 两端检查后，Quality 工作流自动部署 GitHub Pages。网页从仓库变量 `VITE_COACH_ENDPOINT` 取得公开的陪练后台地址。TapTap H5 包也应以同一公开地址构建；模型 API key 不放入构建变量。
 
 后台通过 SSH 单独发布，推送仓库不会重启后台；流程见 [阿里云部署](docs/deploy-aliyun.md)。TapTap 上传、提审和发布各有独立状态，上传成功不等于已经上线。
 

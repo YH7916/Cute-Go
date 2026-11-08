@@ -5,7 +5,6 @@ import type { PiCoachExecutionRequest } from './types';
 export interface CoachHttpOptions {
   runReply: (request: PiCoachExecutionRequest, signal?: AbortSignal) => Promise<CoachCloudReply>;
   allowedOrigin?: string;
-  allowedOrigins?: readonly string[];
   timeoutMs?: number;
   maxConcurrent?: number;
 }
@@ -35,20 +34,12 @@ export function validateCoachOrigin(value: string | undefined): string | undefin
   return origin.origin;
 }
 
-export function validateCoachOrigins(values: readonly string[]): string[] {
-  return values.map(value => {
-    const origin = validateCoachOrigin(value);
-    if (!origin) throw new Error('允许的前端来源列表不得包含空值。');
-    return origin;
-  });
-}
-
-function checkOrigin(request: IncomingMessage, response: ServerResponse, allowedOrigins: ReadonlySet<string>): boolean {
+function checkOrigin(request: IncomingMessage, response: ServerResponse, allowedOrigin?: string): boolean {
   const origin = request.headers.origin;
   if (!origin) return true;
   // Host is supplied by the caller and cannot establish a trusted browser
   // origin, including when DNS rebinding points that host at this local server.
-  if (!allowedOrigins.has(origin)) return false;
+  if (origin !== allowedOrigin) return false;
   response.setHeader('Access-Control-Allow-Origin', origin);
   response.setHeader('Vary', 'Origin');
   return true;
@@ -110,7 +101,6 @@ function reportError(response: ServerResponse, error: unknown, timedOut: boolean
 /** The HTTP lifetime owns one Pi request; user credentials remain header-only and request-local. */
 export function createCoachHttpServer(options: CoachHttpOptions) {
   const allowedOrigin = validateCoachOrigin(options.allowedOrigin);
-  const allowedOrigins = new Set([...validateCoachOrigins(options.allowedOrigins ?? []), ...(allowedOrigin ? [allowedOrigin] : [])]);
   const timeoutMs = options.timeoutMs ?? 25000;
   const maxConcurrent = options.maxConcurrent ?? 4;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs >= 30000
@@ -121,7 +111,7 @@ export function createCoachHttpServer(options: CoachHttpOptions) {
     // listener even after cancellation has removed the body reader's listeners.
     request.on('error', () => {});
     if (request.url !== '/api/coach') { fail(response, 404, 'not_found', '接口不存在。'); return; }
-    if (!checkOrigin(request, response, allowedOrigins)) { fail(response, 403, 'forbidden', '请求来源未获允许。'); return; }
+    if (!checkOrigin(request, response, allowedOrigin)) { fail(response, 403, 'forbidden', '请求来源未获允许。'); return; }
     if (request.method === 'OPTIONS') {
       const headers = (request.headers['access-control-request-headers'] ?? '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
       if (request.headers['access-control-request-method'] !== 'POST' || headers.some(value => !['authorization', 'content-type'].includes(value))) {
