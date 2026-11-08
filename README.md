@@ -28,9 +28,9 @@ git diff --check
 
 ## 发布
 
-`main` 推送通过 Windows、Ubuntu 两端检查后，Quality 工作流自动部署 GitHub Pages。网页从仓库变量 `VITE_COACH_ENDPOINT` 取得公开的陪练后台地址。TapTap H5 包也应以同一公开地址构建；模型 API key 不放入构建变量。
+`main` 推送通过 Windows、Ubuntu 两端检查后，Quality 工作流自动部署 GitHub Pages。网页从仓库变量 `VITE_COACH_ENDPOINT` 取得公开的陪练后台地址；模型 API key 不放入构建变量。当前 TapTap 审核包不预设云后台，接入前需单独验证 SDK 的请求来源与跨域配置。
 
-原域名已到期，当前不预设云讲解后台，继续使用本地功能；新的 HTTPS 后台地址确认后再配置。旧域名不得作为发布默认值。
+原域名已到期，云讲解后台现使用 `https://39.104.59.160/api/coach`，HTTPS 证书由服务器自动续期，仓库变量已配置。网页新版需先通过 GitHub Actions；账户账单锁定期间不会更新线上页面。旧域名不得作为发布默认值，旧用户保存的该地址及密钥在新版启动时清除；其他自定义后台不变。
 
 后台通过 SSH 单独发布，推送仓库不会重启后台；流程见 [阿里云部署](docs/deploy-aliyun.md)。TapTap 上传、提审和发布各有独立状态，上传成功不等于已经上线。
 

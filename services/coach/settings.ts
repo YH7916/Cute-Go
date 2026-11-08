@@ -46,9 +46,15 @@ export function readCoachSettings(storage: SettingsStorage): StoredCoachSettings
     if (!data || typeof data !== 'object') return fallback;
     const record = data as Record<string, unknown>;
     if (typeof record.endpoint !== 'string') return fallback;
+    const endpoint = record.endpoint.trim() ? normalizeCoachEndpoint(record.endpoint) : '';
+    // The expired domain is no longer an owned credential destination.
+    if (endpoint && new URL(endpoint).hostname === 'hutao.yesterhaze.codes') {
+      storage.removeItem(COACH_STORAGE_KEY);
+      return fallback;
+    }
     const rememberKey = record.rememberKey === true;
     const apiKey = rememberKey && typeof record.apiKey === 'string' ? record.apiKey : '';
-    return { config: validateCoachConfig({ endpoint: record.endpoint, ...parseCoachModel(record), apiKey }), rememberKey };
+    return { config: validateCoachConfig({ endpoint, ...parseCoachModel(record), apiKey }), rememberKey };
   } catch { return fallback; }
 }
 export function writeCoachSettings(storage: SettingsStorage, config: CoachConfig, rememberKey: boolean): void {

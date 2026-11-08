@@ -75,6 +75,17 @@ test('v3 preserves the chosen provider and custom model without persisting an op
   assert.ok(!store.values.get(COACH_STORAGE_KEY)?.includes('private-model-key'));
 });
 
+test('retired coach host clears saved credentials and falls back to the current deployment', () => {
+  for (const endpoint of ['https://hutao.yesterhaze.codes/api/coach',
+    'https://HUTAO.YESTERHAZE.CODES/api/coach/', 'https://hutao.yesterhaze.codes:8443/other']) {
+    const store = storage();
+    store.values.set(COACH_STORAGE_KEY, JSON.stringify({ endpoint, provider: 'deepseek',
+      model: 'deepseek-flash', apiKey: 'retired-host-secret', rememberKey: true }));
+    assert.deepEqual(readCoachSettings(store), { config: defaultCoachConfig(), rememberKey: false });
+    assert.equal(store.values.has(COACH_STORAGE_KEY), false);
+  }
+});
+
 test('saving v3 directly clears both legacy records and refuses unsupported model configuration', () => {
   const store = storage();
   store.values.set('cutego.coach.settings.v1', 'old-model-secret');

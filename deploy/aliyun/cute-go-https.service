@@ -1,0 +1,39 @@
+[Unit]
+Description=Cute-Go HTTPS and automatic IP certificate renewal
+Wants=network-online.target
+After=network-online.target cute-go-coach.service
+
+[Service]
+Type=notify
+DynamicUser=true
+StateDirectory=cute-go-https
+WorkingDirectory=/var/lib/cute-go-https
+Environment=HOME=/var/lib/cute-go-https
+Environment=XDG_DATA_HOME=/var/lib/cute-go-https/data
+Environment=XDG_CONFIG_HOME=/var/lib/cute-go-https/config
+Environment=COACH_PUBLIC_IP=39.104.59.160
+Environment=HTTPS_PROXY=http://127.0.0.1:7890
+Environment=NO_PROXY=127.0.0.1,localhost,39.104.59.160
+Environment=GOMEMLIMIT=96MiB
+ExecStart=/opt/cute-go/caddy/caddy run --config /etc/cute-go/Caddyfile --adapter caddyfile
+ExecReload=/opt/cute-go/caddy/caddy reload --config /etc/cute-go/Caddyfile --adapter caddyfile
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+MemoryMax=128M
+UMask=0077
+NoNewPrivileges=true
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

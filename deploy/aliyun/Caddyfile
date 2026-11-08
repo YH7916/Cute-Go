@@ -1,0 +1,22 @@
+{
+	admin 127.0.0.1:2019
+	auto_https disable_redirects
+	default_sni {$COACH_PUBLIC_IP}
+}
+
+https://{$COACH_PUBLIC_IP} {
+	tls {
+		issuer acme {
+			profile shortlived
+			disable_http_challenge
+		}
+	}
+	header -Server
+	header X-Content-Type-Options nosniff
+	handle /api/coach {
+		reverse_proxy 127.0.0.1:80
+	}
+	handle {
+		respond 404
+	}
+}
