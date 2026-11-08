@@ -1,11 +1,13 @@
 # 阿里云 Pi 后台部署
 
-更新：2026-10-30。
+更新：2026-11-08。
+
+当前网页使用 GitHub Pages。原 `yesterhaze.codes` 域名已到期，旧公网讲解地址停用；`VITE_COACH_ENDPOINT` 暂不预设，云讲解等待新 HTTPS 地址。本地课堂、AI 对战和复盘继续可用。下列阿里云服务保留为后续恢复后台的运维入口，历史公网验收不代表当前域名可访问。
 
 - 前端：`https://yh7916.github.io/Cute-Go/`。
-- 后台：`https://hutao.yesterhaze.codes/api/coach`。
+- 旧后台地址：`https://hutao.yesterhaze.codes/api/coach`（已停用，勿再作为构建默认值）。
 - SSH：`ssh aliyun`；独立服务 `cute-go-coach.service`。
-- HTTPS 复用服务器已有 Cloudflare Tunnel，转发至 `http://localhost:80`；Pi 只监听 `127.0.0.1:80`，没有新增公网监听。
+- 原 HTTPS 入口复用服务器已有 Cloudflare Tunnel，转发至 `http://localhost:80`；恢复公网服务需重新配置有效域名。Pi 只监听 `127.0.0.1:80`。
 - 独立 Node.js 22.23.4：`/opt/cute-go/node/bin/node`；保留系统 Node 18 及其他服务。
 - 发布目录：`/opt/cute-go/releases/20261030-cors-errors`，`/opt/cute-go/current` 指向当前版本；上一版 `20261030-891184e` 保留供回退。
 
@@ -29,7 +31,7 @@ systemd 的 `WorkingDirectory` 使用当前发布链接，`ExecStart` 使用相�
 4. 修改服务定义时先执行 `systemd-analyze verify`，再安装 unit 并 `systemctl daemon-reload`。
 5. 验证本机监听、公网 HTTPS 及 CORS。失败时将 `current` 恢复至已记录的旧目录并重启。
 
-前端 Quality 工作流读取 GitHub 仓库变量 `VITE_COACH_ENDPOINT`，值为上述完整后台地址；两端检查通过后再部署 Pages。这个变量是公开 URL，不是密钥。后台版本通过 SSH 单独发布，推送 GitHub 不会自动改动服务器。
+前端 Quality 工作流读取可选 GitHub 仓库变量 `VITE_COACH_ENDPOINT`；取得并验证新的 HTTPS 后台地址后再设置，两端检查通过后部署 Pages。未设置时使用本地讲解。这个变量是公开 URL，不是密钥。后台版本通过 SSH 单独发布，推送 GitHub 不会自动改动服务器。
 
 ## 部署验证及边界
 

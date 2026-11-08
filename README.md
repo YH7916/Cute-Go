@@ -30,6 +30,8 @@ git diff --check
 
 `main` 推送通过 Windows、Ubuntu 两端检查后，Quality 工作流自动部署 GitHub Pages。网页从仓库变量 `VITE_COACH_ENDPOINT` 取得公开的陪练后台地址。TapTap H5 包也应以同一公开地址构建；模型 API key 不放入构建变量。
 
+原域名已到期，当前不预设云讲解后台，继续使用本地功能；新的 HTTPS 后台地址确认后再配置。旧域名不得作为发布默认值。
+
 后台通过 SSH 单独发布，推送仓库不会重启后台；流程见 [阿里云部署](docs/deploy-aliyun.md)。TapTap 上传、提审和发布各有独立状态，上传成功不等于已经上线。
 
 Android 封装需 Android Studio；运行 `npm run build`、`npx cap sync android`、`npx cap open android` 后进行设备验证。浏览器和 Node 检查不能替代 Android / TapTap 原生验收。
