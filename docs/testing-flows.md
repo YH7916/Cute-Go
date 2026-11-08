@@ -21,6 +21,6 @@
 - 陪练会话控制 HTTP 响应以覆盖迟到回包；HTTP 流程另外启动绑定 `127.0.0.1` 随机端口的临时服务，实际经过生产 `fetch` 和解析路径，结束后关闭。
 - Worker 流程使用实际消息入口、调度与生命周期代码，仅替代 ONNX 初始化、推理和释放边界。这不证明真实模型文件、WASM、GPU 或手机适配正常。
 - `onnx-real-flow.test.mjs` 另走真实生产 `OnnxEngine`、`onnxruntime-web` 与项目模型/WASM，自动执行 5/9/10/13/19 路黑白推理和释放重载；不替代 `InferenceSession` 或 `session.run`，不新增依赖。此项覆盖 Node 单线程 WASM，缺失或损坏模型会使测试失败。
-- 不读取玩家保存的配置、不访问付费供应商、不修改用户对局。界面、触摸、跨域策略及 Android/TapTap 仍需对应环境验收；浏览器生产 Worker 的独立真实推理结果见 [本机 ONNX 验收](verification/2026-10-02-real-onnx.md)。
+- 不读取玩家保存的配置、不访问付费供应商、不修改用户对局。界面、触摸、跨域策略及 Android/TapTap 仍需对应环境验收；浏览器生产 Worker 的独立真实推理结果见 [本机 ONNX 验收](onnx-runtime-verification-2026-10-01.md)。
 
 调试单条流程可用 `npm test -- tests/flows/game-flow.test.mjs`；交付前运行 `npm run check` 和 `git diff --check`。不要用只打印错误却仍返回成功的临时脚本替代这些断言。

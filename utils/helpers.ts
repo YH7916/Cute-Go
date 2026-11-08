@@ -1,27 +1,6 @@
 import { Difficulty } from '../types';
 import { Crown, Trophy, Feather, Egg } from 'lucide-react';
 
-export const compareVersions = (v1: string, v2: string) => {
-  const parts1 = v1.split('.').map(Number);
-  const parts2 = v2.split('.').map(Number);
-  const len = Math.max(parts1.length, parts2.length);
-
-  for (let i = 0; i < len; i++) {
-    const num1 = parts1[i] || 0;
-    const num2 = parts2[i] || 0;
-    if (num1 > num2) return 1;
-    if (num1 < num2) return -1;
-  }
-  return 0;
-};
-
-export const calculateElo = (myRating: number, opponentRating: number, result: 'win' | 'loss'): number => {
-    const kFactor = 32;
-    const expectedScore = 1 / (1 + Math.pow(10, (opponentRating - myRating) / 400));
-    const actualScore = result === 'win' ? 1 : 0;
-    return Math.round(myRating + kFactor * (actualScore - expectedScore));
-};
-
 export const calculateNewRating = (
     playerRating: number,
     opponentRating: number,

@@ -2,7 +2,7 @@
 
 2026-10-01，Windows / Chromium 154.0.8037.58，当前生产构建与 `npm run preview -- --host 127.0.0.1 --port 3002 --strictPort`。使用真实浏览器 Worker、真实 ONNX 文件、真实 ORT WASM；没有替换推理结果或模型 session。
 
-后续代码健康治理已修复下方发现的模型输出问题，并再次通过 18/18 真模型测试，新增 ownership 范围和首手误计检查。最新全量测试 337/337；见 [代码健康验收](code-health-2026-10-01.md) 与 [新实测结果](../output/playwright/onnx-code-health.json)。以下 281 项和性能数值保留为首次验收记录。
+后续代码健康治理已修复下方发现的模型输出问题，并再次通过 18/18 真模型测试，新增 ownership 范围和首手误计检查。当时全量测试为 337/337；当前入口见 [架构与治理边界](architecture.md)，本地原始结果见 [新实测结果](../output/playwright/onnx-code-health.json)。以下 281 项和性能数值保留为首次验收记录。
 
 ## 已验证
 

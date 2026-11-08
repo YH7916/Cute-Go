@@ -1,153 +1,65 @@
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/ce08dfdc-2d59-4ad8-8509-12695cc5fca5" alt="Logo" width="120" height="120">
+# Cute-Go
 
-  <h1 align="center">Cute-Go</h1>
+围棋与五子棋小游戏，提供本地双人、AI 对战、围棋课堂、复盘和 AI 陪练。
 
-  <p align="center">
-    <strong>✨ 当古老的黑白智慧遇上治愈系画风 ✨</strong>
-  </p>
+[在线体验](https://yh7916.github.io/Cute-Go/) · [第三方内容与许可](THIRD_PARTY_NOTICES.md)
 
-  <p align="center">
-    一款由<strong>Gemini 3 Pro</strong> 辅助编码，基于 <strong>React</strong> 与 <strong>Capacitor</strong> 打造的现代化、高颜值围棋 Android 应用。
-  </p>
+围棋 AI 在浏览器 Worker 中通过 ONNX Runtime / WASM 本地推理；启蒙对手和五子棋使用规则及搜索。课堂复用真实规则与固定来源题目，保留独立作答、辅助曝光和续学记录。云讲解经独立 Pi 后台执行，玩家自行选择模型服务商并提供 API key；未配置时继续使用本地讲解。
 
-  <p align="center">
-    <a href="#-关于项目">关于项目</a> •
-    <a href="#-核心特性">核心特性</a> •
-    <a href="#-技术栈">技术栈</a> •
-    <a href="#-安装与构建">安装构建</a> •
-    <a href="#-预览">界面预览</a>
-  </p>
+## 开发与检查
 
-  <br />
+要求 Node.js 22.19+。
 
-  <img src="https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React" />
-  <img src="https://img.shields.io/badge/Capacitor-Android-1192F4?style=flat-square&logo=capacitor&logoColor=white" alt="Capacitor" />
-  <img src="https://img.shields.io/badge/AI-Gemini_3_Pro-8E75B2?style=flat-square&logo=google-gemini&logoColor=white" alt="Gemini" />
-  <a href="LICENSE"><img src="https://img.shields.io/badge/Software-AGPL--3.0--or--later-green?style=flat-square" alt="Software License: AGPL-3.0-or-later" /></a>
-</div>
-
-<br />
-
----
-
-## 📖 关于项目
-
-在线体验：[GitHub Pages](https://yh7916.github.io/Cute-Go/)。推送 `main` 后，现有 Quality 工作流在 Windows 与 Ubuntu 的 `npm run check` 全部通过后自动部署已检查的 `dist/`。项目路径沿用 Vite 相对资源路径；模型、WASM 与 Service Worker 随前端发布。
-
-GitHub Pages 托管静态前端，独立 Pi 后台部署在阿里云，网页预设后台地址；玩家选择服务商、模型并填写自己的 API key 后可请求云讲解，未填写时继续本地讲解。运维及验证边界见 [阿里云部署](docs/deploy-aliyun.md)，协议见 [Pi 后台文档](docs/pi-coach-backend.md)。
-
-CuteGo 让新手在实际落子中理解围棋。原新手教学帮助熟悉规则，结束后可自由选择模式；“进阶教学”直接练习局面决策、按需看示范，“陪我下棋”围绕真实对局给提示。教学与陪练拥有独立局面，共享棋盘、角色和气泡；网页版已预设云讲解后台，模型 key 由玩家自行填写。
-
-项目使用 **React** 构建棋盘交互。围棋挑战 AI 在浏览器 Worker 中通过 **ONNX Runtime / WASM** 本地推理；AI 陪练的启蒙对手与五子棋使用规则和搜索算法。Capacitor 用于原生封装，当前仓库的 Web 验收与 Android/TapTap 原生验收分别进行。
-
-## ✨ 核心特性
-
-* **🎨 治愈系 UI 设计**：告别枯燥的纹理，拥抱清新可爱的棋盘与棋子风格。
-* **🤖 本地 AI**：围棋模型推理、领地预估与复盘；陪练启蒙对手和五子棋复用各自的规则/搜索入口。
-* **💬 AI 陪练**：9 路执黑练习、带待机/思考/讲解/鼓励动作的褚嬴小助手与本地规则提示；云端讲解由独立 Node 后台运行官方 Pi Agent，用户在前端选择服务商并填写自己的 API key，由后台按请求使用该 key 调用模型；后台地址可在构建时预设。未配置时继续本地讲解，练习不计竞技积分。部署步骤见 [Pi 后台文档](docs/pi-coach-backend.md)。
-* **📖 进阶教学**：接在新手规则之后，直接练习救棋、吃子方向、双打吃、连续追吃、倒扑与保眼做活；落子后看结果，需要时再看提示或示范。内容复用真实规则与本地学习记录，尚未经专业教师审校；覆盖及来源见 [教学设计](docs/teaching-agent-design.md)。
-* **📱 原生级体验**：基于 Capacitor 跨平台技术，在 Android 设备上流畅运行。
-* **⚡ 响应式交互**：React 驱动的流畅落子动画与即时反馈。
-
-## 🛠 技术栈
-
-本项目采用现代前端技术栈构建：
-
-| 领域 | 技术/工具 | 说明 |
-| :--- | :--- | :--- |
-| **核心框架** | ![React](https://img.shields.io/badge/-React-black?style=flat-square&logo=react) | 构建用户界面的基石 |
-| **跨平台** | ![Capacitor](https://img.shields.io/badge/-Capacitor-black?style=flat-square&logo=capacitor) | Web 到 Android 的桥梁 |
-| **AI Copilot** | ![Gemini](https://img.shields.io/badge/-Gemini_3_Pro-black?style=flat-square&logo=google-gemini) | 用于生成逻辑代码、Bug 修复与重构建议 |
-| **构建工具** | ![Vite](https://img.shields.io/badge/-Vite-black?style=flat-square&logo=vite) | 极速的开发与打包体验 |
-| **样式方案** | ![TailwindCSS](https://img.shields.io/badge/-Tailwind-black?style=flat-square&logo=tailwindcss) | 优雅的样式原子 |
-
-## 📸 界面预览
-
-> *兼容多种设备尺寸，对平板和手机端分别设计*
-
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/58cf4719-cc11-4741-9cb5-922a795468d2" width="500" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://github.com/user-attachments/assets/15a6c647-9534-4b78-b2e6-ad8312393014" width="200" />
-</div>
-
-
-
-
-
-## 🚀 安装与构建
-
-如果你想在本地运行或二次开发，请遵循以下步骤：
-
-### 前置要求
-* Node.js (v22.19+，满足 Pi 后台及当前前端依赖要求)
-* Android Studio (用于真机调试)
-
-### 1. 克隆仓库
-```bash
-git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
-cd your-repo-name
-
-```
-
-### 2. 安装依赖
-
-```bash
+```sh
+git clone https://github.com/YH7916/Cute-Go.git
+cd Cute-Go
 npm ci
-
-```
-
-发布字体使用 `ui/fonts/GenSenRounded2PJP-M.woff2`，包含界面、课程字形和 GB2312 常用字；其余字形由系统字体补足。原始字体存于 `third_party/fonts/`，不随 H5 包体分发；`font-display: swap` 允许下载期间立即显示系统字体，Vite 为发布字体生成内容哈希以更新缓存。
-
-更新文案或课程后，可用 `uv run --with fonttools --with brotli python scripts/prepare-webfont.py` 重建并校验字形覆盖与字宽，再运行 `npm run check`。已生成的 WOFF2 随源码保存，常规 Node 构建不依赖 Python。
-
-### 3. 开发模式运行
-
-```bash
 npm run dev
-
 ```
 
-### 4. 构建 Android 版本
+修改前阅读 [AGENTS.md](AGENTS.md) 和 [当前架构](docs/architecture.md)。交付前执行：
 
-```bash
-# 构建 React 应用
-npm run build
-
-# 同步资源到 Android 目录
-npx cap sync android
-
-# 打开 Android Studio 进行打包或调试
-npx cap open android
-
+```sh
+npm run check
+git diff --check
 ```
 
-## 🤝 贡献指南
+统一入口依次运行 contracts、lint、typecheck、test、build；前端输出 `dist/`，后台输出 `dist-server/`。局部定位可用 `npm test -- tests/具体文件.test.ts`，不能替代全量检查。
 
-修改前阅读 [AGENTS.md](AGENTS.md)、[统一 harness 与复用入口](docs/harness.md) 和 [当前架构](docs/architecture.md)。
-提交前运行 `npm run check` 及 `git diff --check`。CI 使用同一入口；架构映射、受检扩展名和复用入口只维护在 `harness/architecture.mjs`，文档由契约生成并检查同步。
-局部测试使用 `npm test -- tests/具体文件.test.ts` 或 `npm test -- tests/harness`，完整验收始终运行 `npm run check`。
+## 发布
 
-新增功能先定位现有模块与调用方，复用协议、局面动作、搜索、平台服务和基础 UI，再补相应回归。
+`main` 推送通过 Windows、Ubuntu 两端检查后，Quality 工作流自动部署 GitHub Pages。网页从仓库变量 `VITE_COACH_ENDPOINT` 取得公开的陪练后台地址。TapTap H5 包也应以同一公开地址构建；模型 API key 不放入构建变量。
 
-1. Fork 本仓库
-2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交你的修改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
+后台通过 SSH 单独发布，推送仓库不会重启后台；流程见 [阿里云部署](docs/deploy-aliyun.md)。TapTap 上传、提审和发布各有独立状态，上传成功不等于已经上线。
 
-## 📄 许可证
+Android 封装需 Android Studio；运行 `npm run build`、`npx cap sync android`、`npx cap open android` 后进行设备验证。浏览器和 Node 检查不能替代 Android / TapTap 原生验收。
 
-除另有标注的第三方代码与资源外，Cute-Go 软件代码以 **[GNU AGPL-3.0-or-later](LICENSE)** 发布。
+## 字体资源
 
-课程与题库按各自许可使用：OGS Learn to Play Go 的课程改编保留 **AGPL-3.0-or-later**；Go Game Guru 的题谱、原讲解及其中文改编保留 **CC BY-NC-SA 4.0**，用于非商业性学习。第三方依赖、模型、字体与图片的许可不因软件许可变更而改变。
+发布字体为 `ui/fonts/GenSenRounded2PJP-M.woff2`，保留界面、课程字形和 GB2312 常用字；其他字形由系统字体补足。`font-display: swap` 允许下载期间显示系统字体，Vite 为发布字体生成内容哈希以更新缓存。
 
-原作者、上游仓库、固定版本与改编说明见 [第三方声明](THIRD_PARTY_NOTICES.md) 和 [third_party](third_party/)。应用内署名入口为“关于 → 致谢名单”。
+完整原字体在 `third_party/fonts/`，不随 H5 包体分发。更新文案或课程后，可重建并校验字形覆盖与字宽：
 
----
+```sh
+uv run --with fonttools --with brotli python scripts/prepare-webfont.py
+```
 
-<div align="center">
-Made with ❤️ by Yohaku
-</div>
+生成的 WOFF2 随源码保存；常规 Node 构建不依赖 Python。
 
+## 维护文档
+
+| 文档 | 用途 |
+| --- | --- |
+| [架构](docs/architecture.md) | 当前调用链、职责与限制 |
+| [Harness](docs/harness.md) | 由契约生成的检查指南 |
+| [固定流程测试](docs/testing-flows.md) | 可执行验证与替代边界 |
+| [教学设计](docs/teaching-agent-design.md) | 课程来源、适配和学习记录 |
+| [Prompt 评测](docs/coach-prompt-evaluation.md) | 云讲解评估方法与历史基线 |
+| [Pi 后台](docs/pi-coach-backend.md) | 协议、配置与运行 |
+| [部署运维](docs/deploy-aliyun.md) | 已有服务、发布和回退 |
+
+已完成的历史计划、逐轮验收及旧设计截图可从 Git 历史查阅。许可证、来源档案、模型资源及可执行回归继续保留。
+
+## 许可
+
+软件代码采用 [AGPL-3.0-or-later](LICENSE)，另有声明的第三方内容保留各自许可。OGS 课程改编沿用 AGPL；Go Game Guru 题谱与改编沿用 CC BY-NC-SA 4.0，不适用软件代码许可证。模型、字体、图片和音频的权利声明独立保留，详见 [第三方声明](THIRD_PARTY_NOTICES.md)。
